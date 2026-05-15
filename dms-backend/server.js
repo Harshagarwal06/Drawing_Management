@@ -1,13 +1,14 @@
 require('dotenv').config();
 
-const express  = require('express');
-const multer   = require('multer');
-const cors     = require('cors');
-const fs       = require('fs');
-const path     = require('path');
-const bcrypt   = require('bcrypt');
-const jwt      = require('jsonwebtoken');
-const Database = require('better-sqlite3');
+const express   = require('express');
+const multer    = require('multer');
+const cors      = require('cors');
+const fs        = require('fs');
+const path      = require('path');
+const bcrypt    = require('bcrypt');
+const jwt       = require('jsonwebtoken');
+const rateLimit = require('express-rate-limit');
+const Database  = require('better-sqlite3');
 
 const app         = express();
 const PORT        = process.env.PORT        || 3000;
@@ -110,12 +111,22 @@ for (const u of plainUsers) {
 
 console.log('✅ SQLite database ready');
 
-/* ── Multer ─────────────────────────────────────────────────────── */
+/* ── Multer — file type + size validation ────────────────────────── */
+const ALLOWED_EXTENSIONS = new Set(['.pdf','.dwg','.dxf','.ifc','.rvt','.nwd','.jpg','.jpeg','.png','.tif','.tiff']);
+
 const storage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, uploadDir),
   filename:    (req, file, cb) => cb(null, `${Date.now()}-${file.originalname}`),
 });
-const upload = multer({ storage });
+const upload = multer({
+  storage,
+  limits: { fileSize: 50 * 1024 * 1024 }, // 50 MB
+  fileFilter: (req, file, cb) => {
+    const ext = path.extname(file.originalname).toLowerCase();
+    if (ALLOWED_EXTENSIONS.has(ext)) return cb(null, true);
+    cb(new Error('File type not allowed. Accepted: PDF, DWG, DXF, IFC, RVT, NWD, JPG, PNG, TIF'));
+  },
+});
 
 /* ── JWT auth middleware ─────────────────────────────────────────── */
 function verifyToken(req, res, next) {
@@ -129,10 +140,39 @@ function verifyToken(req, res, next) {
   }
 }
 
-/* Apply verifyToken to all /api/* routes except POST /api/login */
+/* ── RBAC middleware — blocks Subcontractor / Read-Only from writes ─ */
+function requireWriteAccess(req, res, next) {
+  const restricted = ['Subcontractor', 'Read-Only'];
+  if (restricted.includes(req.user?.role)) {
+    return res.status(403).json({ error: 'Access denied — insufficient permissions for this action.' });
+  }
+  next();
+}
+
+/* ── Login rate limiter — max 10 attempts per 15 min ────────────── */
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many login attempts — please try again in 15 minutes.' },
+});
+
+/* Apply verifyToken to all /api/* routes except POST /api/login and GET /api/health */
 app.use('/api', (req, res, next) => {
-  if (req.path === '/login' && req.method === 'POST') return next();
+  if (req.path === '/login'  && req.method === 'POST') return next();
+  if (req.path === '/health' && req.method === 'GET')  return next();
   verifyToken(req, res, next);
+});
+
+/* ── GET /api/health ────────────────────────────────────────────── */
+app.get('/api/health', (req, res) => {
+  try {
+    db.prepare('SELECT 1').get();
+    res.json({ status: 'ok', db: 'connected', timestamp: new Date().toISOString() });
+  } catch {
+    res.status(503).json({ status: 'error', db: 'disconnected' });
+  }
 });
 
 /* ── GET /api/activity ──────────────────────────────────────────── */
@@ -158,7 +198,7 @@ app.get('/api/projects', (req, res) => {
 });
 
 /* ── POST /api/projects ─────────────────────────────────────────── */
-app.post('/api/projects', (req, res) => {
+app.post('/api/projects', requireWriteAccess, (req, res) => {
   const { name, code } = req.body;
   if (!name || !code) return res.status(400).json({ error: 'Name and code required.' });
   try {
@@ -194,7 +234,7 @@ app.get('/api/drawings', (req, res) => {
 });
 
 /* ── POST /api/upload ───────────────────────────────────────────── */
-app.post('/api/upload', upload.single('drawingFile'), (req, res) => {
+app.post('/api/upload', requireWriteAccess, upload.single('drawingFile'), (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'No file uploaded.' });
 
   const { drawingNumber, title, discipline, originator, revision, status, projectId } = req.body;
@@ -245,7 +285,7 @@ app.get('/api/transmittals', (req, res) => {
 });
 
 /* ── POST /api/transmittals ─────────────────────────────────────── */
-app.post('/api/transmittals', (req, res) => {
+app.post('/api/transmittals', requireWriteAccess, (req, res) => {
   const { number, drawingIds, recipients, purpose, remarks, issuedAt, projectId } = req.body;
   const pId = projectId || 1;
   if (!drawingIds?.length || !recipients?.length || !purpose)
@@ -266,7 +306,7 @@ app.post('/api/transmittals', (req, res) => {
 });
 
 /* ── PATCH /api/drawings/:id/void ───────────────────────────────── */
-app.patch('/api/drawings/:id/void', (req, res) => {
+app.patch('/api/drawings/:id/void', requireWriteAccess, (req, res) => {
   const { id } = req.params;
   try {
     const drawing = db.prepare('SELECT number, project_id FROM drawings WHERE id = ?').get(id);
@@ -283,7 +323,7 @@ app.patch('/api/drawings/:id/void', (req, res) => {
 });
 
 /* ── POST /api/login ────────────────────────────────────────────── */
-app.post('/api/login', async (req, res) => {
+app.post('/api/login', loginLimiter, async (req, res) => {
   const { username, password } = req.body;
   try {
     const user = db.prepare('SELECT * FROM users WHERE username = ?').get(username);
@@ -300,6 +340,18 @@ app.post('/api/login', async (req, res) => {
     console.error('❌ POST /api/login error:', err);
     res.status(500).json({ error: 'Login failed' });
   }
+});
+
+/* ── Global error handler (catches Multer errors cleanly) ────────── */
+app.use((err, req, res, next) => {
+  if (err.code === 'LIMIT_FILE_SIZE') {
+    return res.status(400).json({ error: 'File too large — maximum size is 50 MB.' });
+  }
+  if (err.message?.startsWith('File type not allowed')) {
+    return res.status(400).json({ error: err.message });
+  }
+  console.error('❌ Unhandled error:', err.message);
+  res.status(500).json({ error: 'Internal server error.' });
 });
 
 /* ── Start ──────────────────────────────────────────────────────── */
