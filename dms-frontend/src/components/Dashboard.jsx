@@ -40,9 +40,9 @@ export default function Dashboard({ totalDrawings, totalTransmittals, latestRevi
                     PDF
                   </div>
                   <div className="flex-1 flex flex-col justify-center">
-                    <h3 className="font-label-md text-label-md text-on-surface font-semibold group-hover:text-primary transition-colors line-clamp-1">{dwg.title || dwg.drawingNumber}</h3>
+                    <h3 className="font-label-md text-label-md text-on-surface font-semibold group-hover:text-primary transition-colors line-clamp-1">{dwg.title || dwg.number}</h3>
                     <div className="flex items-center gap-2 mt-1">
-                      <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-surface-container-high border border-white/10 text-[10px] text-on-surface-variant">{dwg.revision}</span>
+                      <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-surface-container-high border border-white/10 text-[10px] text-on-surface-variant">{dwg.rev}</span>
                       <span className="font-body-sm text-[12px] text-on-surface-variant">Updated recently</span>
                     </div>
                   </div>

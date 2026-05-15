@@ -65,13 +65,14 @@ db.exec(`
 try { db.exec('ALTER TABLE drawings ADD COLUMN project_id INTEGER DEFAULT 1;'); } catch (e) { /* ignore if exists */ }
 try { db.exec('ALTER TABLE transmittals ADD COLUMN project_id INTEGER DEFAULT 1;'); } catch (e) { /* ignore if exists */ }
 
-// Seed projects if empty
-const projCount = db.prepare('SELECT COUNT(*) as count FROM projects').get().count;
-if (projCount === 0) {
-  db.prepare('INSERT INTO projects (name, code, created_at) VALUES (?, ?, ?)').run(
-    'Orion Tower, Dubai', 'ORI-2024', new Date().toISOString()
-  );
-}
+// Seed projects (INSERT OR IGNORE so re-runs are safe)
+const insertProject = db.prepare('INSERT OR IGNORE INTO projects (name, code, created_at) VALUES (?, ?, ?)');
+const now = new Date().toISOString();
+insertProject.run('QUE 154 — Punawale',          'QUE-154',    now);
+insertProject.run('UNI 89 — KP Annexe',           'UNI-89',     now);
+insertProject.run('Unique Sky Links — Baner Annexe', 'SKY-LINKS', now);
+insertProject.run('QUE-914 — Keshavnagar',        'QUE-914',    now);
+insertProject.run('Unique Youtopia — Kharadi',     'YOUTOPIA',   now);
 
 // Seed users if empty
 const userCount = db.prepare('SELECT COUNT(*) as count FROM users').get().count;
@@ -233,6 +234,20 @@ app.post('/api/transmittals', (req, res) => {
   } catch (err) {
     console.error('❌ POST /api/transmittals error:', err);
     res.status(500).json({ error: 'Failed to save transmittal.' });
+  }
+});
+
+/* ── PATCH /api/drawings/:id/void ───────────────────────────────── */
+app.patch('/api/drawings/:id/void', (req, res) => {
+  const { id } = req.params;
+  try {
+    const result = db.prepare("UPDATE drawings SET status = 'VOID' WHERE id = ?").run(id);
+    if (result.changes === 0) return res.status(404).json({ error: 'Drawing not found.' });
+    console.log(`✅ Drawing ${id} voided`);
+    res.json({ id, status: 'VOID' });
+  } catch (err) {
+    console.error('❌ PATCH /api/drawings/:id/void error:', err);
+    res.status(500).json({ error: 'Failed to void drawing.' });
   }
 });
 

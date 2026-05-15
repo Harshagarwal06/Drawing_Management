@@ -54,7 +54,7 @@ export default function LoginPage({ onLogin }) {
           <div className="text-center mb-8">
             <div className="flex items-center justify-center gap-2 mb-2">
               <span className="material-symbols-outlined text-primary text-[28px]" style={{ fontVariationSettings: "'FILL' 1" }}>architecture</span>
-              <h1 className="font-headline-md text-headline-md text-on-surface tracking-tight">DrawVault</h1>
+              <h1 className="font-headline-md text-headline-md text-on-surface tracking-tight">Unique Properties</h1>
             </div>
             <p className="font-body-sm text-body-sm text-on-surface-variant">Secure Project Workspace</p>
           </div>

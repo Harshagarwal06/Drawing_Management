@@ -5,6 +5,7 @@ import UploadModal from "./components/UploadModal";
 import TransmittalModal from "./components/TransmittalModal";
 import ProjectModal from "./components/ProjectModal";
 import MasterRegisterTable from "./components/MasterRegisterTable";
+import TransmittalsView from "./components/TransmittalsView";
 import Toast from "./components/Toast";
 import LoginPage from "./components/LoginPage";
 
@@ -52,6 +53,19 @@ export default function App() {
 
   const activeRole = currentUser?.role || "Read-Only";
   const isRestricted = activeRole === "Subcontractor" || activeRole === "Read-Only";
+
+  /* ── Session persistence ── */
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem("dms_user");
+      if (saved) setCurrentUser(JSON.parse(saved));
+    } catch {}
+  }, []);
+
+  useEffect(() => {
+    if (currentUser) localStorage.setItem("dms_user", JSON.stringify(currentUser));
+    else localStorage.removeItem("dms_user");
+  }, [currentUser]);
 
   /* ── Bootstrap: load projects ── */
   useEffect(() => {
@@ -175,6 +189,18 @@ export default function App() {
     }
   };
 
+  /* ── Void/Supersede a drawing ── */
+  const handleVoid = async (id) => {
+    try {
+      const res = await fetch(`${API}/api/drawings/${id}/void`, { method: "PATCH" });
+      if (!res.ok) throw new Error();
+      setDrawings(await fetchDrawings(activeProject.id));
+      setToast({ msg: "Drawing voided successfully.", type: "success" });
+    } catch {
+      setToast({ msg: "Failed to void drawing.", type: "error" });
+    }
+  };
+
   if (!currentUser) {
     return <LoginPage onLogin={setCurrentUser} />;
   }
@@ -204,7 +230,7 @@ export default function App() {
         <div className="flex items-center gap-4">
           <div className="relative focus-within:ring-2 focus-within:ring-primary/50 rounded-full hidden lg:block">
             <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant text-sm">search</span>
-            <input className="bg-surface-container-highest/50 border border-white/10 rounded-full pl-9 pr-4 py-1.5 text-sm text-on-surface placeholder:text-on-surface-variant focus:outline-none focus:bg-surface-container-high w-64 transition-all" placeholder="Search..." type="text" />
+            <input className="bg-surface-container-highest/50 border border-white/10 rounded-full pl-9 pr-4 py-1.5 text-sm text-on-surface placeholder:text-on-surface-variant focus:outline-none focus:bg-surface-container-high w-64 transition-all" placeholder="Search..." type="text" value={search} onChange={e => handleSearch(e.target.value)} />
           </div>
           <select
             value={activeProject?.id || ""}
@@ -230,15 +256,32 @@ export default function App() {
       {/* Main Canvas */}
       <main className="flex-1 w-full pt-20 pb-10 md:pl-72 pr-4 md:pr-10 min-h-screen">
         {currentTab === 'dashboard' ? (
-          <Dashboard 
-            totalDrawings={totalDrawings} 
-            totalTransmittals={totalTransmittals} 
-            latestRevisions={pendingReviews} 
-            overdueItems={overdueTransmit} 
+          <Dashboard
+            totalDrawings={totalDrawings}
+            totalTransmittals={totalTransmittals}
+            latestRevisions={pendingReviews}
+            overdueItems={overdueTransmit}
             drawings={drawings}
           />
+        ) : currentTab === 'register' ? (
+          <MasterRegisterTable
+            drawings={pageRows}
+            total={filtered.length}
+            page={page}
+            totalPages={totalPages}
+            search={search}
+            filterStat={filterStat}
+            onPageChange={setPage}
+            onSearch={handleSearch}
+            onFilterStat={handleFilterStat}
+            onNewEntry={() => setShowModal(true)}
+            onVoid={handleVoid}
+            API={API}
+          />
+        ) : currentTab === 'transmittals' ? (
+          <TransmittalsView transmittals={transmittals} drawings={drawings} />
         ) : (
-          <MasterRegisterTable drawings={drawings} />
+          <PlaceholderView tab={currentTab} />
         )}
       </main>
 
@@ -264,10 +307,11 @@ export default function App() {
         />
       )}
       {showTransmittal && (
-        <TransmittalModal 
+        <TransmittalModal
           drawings={drawings}
           onClose={() => setShowTransmittal(false)}
           onSubmit={handleTransmittal}
+          trnNumber={nextTrnNumber}
         />
       )}
       {toast && (
@@ -295,6 +339,17 @@ export default function App() {
           }}
         />
       )}
+    </div>
+  );
+}
+
+function PlaceholderView({ tab }) {
+  const iconMap = { documents: "folder_open", analytics: "insights" };
+  return (
+    <div className="flex flex-col items-center justify-center h-[60vh] gap-4 text-on-surface-variant">
+      <span className="material-symbols-outlined text-[64px] opacity-30">{iconMap[tab] || "construction"}</span>
+      <p className="font-headline-sm text-headline-sm capitalize">{tab}</p>
+      <p className="font-body-md text-body-md">This section is coming soon.</p>
     </div>
   );
 }
