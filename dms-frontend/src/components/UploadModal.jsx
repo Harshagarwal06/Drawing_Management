@@ -74,7 +74,7 @@ export default function UploadModal({ onClose, onSubmit }) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(15,23,42,0.55)" }}>
-      <div className="modal-enter bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden">
+      <div className="modal-enter bg-white/90 backdrop-blur-xl rounded-2xl shadow-2xl border border-white/50 w-full max-w-2xl overflow-hidden">
 
         {/* Header */}
         <div className="px-6 py-5 border-b border-slate-100 flex items-center justify-between bg-gradient-to-r from-slate-900 to-slate-800">

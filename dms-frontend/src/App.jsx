@@ -1,36 +1,47 @@
 import { useState, useMemo, useEffect } from "react";
-import { Bell, User, ChevronDown, Send, Upload } from "lucide-react";
-
-import MetricCard from "./components/MetricCard";
+import Sidebar from "./components/Sidebar";
+import Dashboard from "./components/Dashboard";
 import UploadModal from "./components/UploadModal";
 import TransmittalModal from "./components/TransmittalModal";
+import ProjectModal from "./components/ProjectModal";
 import MasterRegisterTable from "./components/MasterRegisterTable";
 import Toast from "./components/Toast";
+import LoginPage from "./components/LoginPage";
 
 import { ROLES, OVERDUE_PURPOSES, MS_30_DAYS } from "./constants";
 
 const API = "http://localhost:3000";
 const PER_PAGE = 8;
 
-async function fetchDrawings() {
-  const res = await fetch(`${API}/api/drawings`);
+async function fetchProjects() {
+  const res = await fetch(`${API}/api/projects`);
+  if (!res.ok) throw new Error("projects fetch failed");
+  return res.json();
+}
+
+async function fetchDrawings(projectId) {
+  const res = await fetch(`${API}/api/drawings?projectId=${projectId}`);
   if (!res.ok) throw new Error("drawings fetch failed");
   return res.json();
 }
 
-async function fetchTransmittals() {
-  const res = await fetch(`${API}/api/transmittals`);
+async function fetchTransmittals(projectId) {
+  const res = await fetch(`${API}/api/transmittals?projectId=${projectId}`);
   if (!res.ok) throw new Error("transmittals fetch failed");
   return res.json();
 }
 
 export default function App() {
+  const [currentTab,      setCurrentTab]      = useState("dashboard");
+  const [projects,        setProjects]        = useState([]);
+  const [activeProject,   setActiveProject]   = useState(null);
+  const [showProjectModal,setShowProjectModal] = useState(false);
   const [drawings,        setDrawings]        = useState([]);
   const [transmittals,    setTransmittals]    = useState([]);
   const [showModal,       setShowModal]       = useState(false);
   const [showTransmittal, setShowTransmittal] = useState(false);
   const [toast,           setToast]           = useState(null);
-  const [activeRole,      setActiveRole]      = useState("Document Controller");
+  const [currentUser,     setCurrentUser]     = useState(null);
   const [search,          setSearch]          = useState("");
   const [filterDisc,      setFilterDisc]      = useState("All");
   const [filterStat,      setFilterStat]      = useState("All");
@@ -39,13 +50,24 @@ export default function App() {
   const [page,            setPage]            = useState(1);
   const [activeTab,       setActiveTab]       = useState("Dashboard");
 
+  const activeRole = currentUser?.role || "Read-Only";
   const isRestricted = activeRole === "Subcontractor" || activeRole === "Read-Only";
 
-  /* ── Bootstrap: load both collections from backend ── */
+  /* ── Bootstrap: load projects ── */
   useEffect(() => {
-    fetchDrawings().then(setDrawings).catch(() => {});
-    fetchTransmittals().then(setTransmittals).catch(() => {});
-  }, []);
+    if (!currentUser) return;
+    fetchProjects().then(data => {
+      setProjects(data);
+      if (data.length > 0) setActiveProject(data[0]);
+    }).catch(() => {});
+  }, [currentUser]);
+
+  /* ── Load collections when project changes ── */
+  useEffect(() => {
+    if (!activeProject) return;
+    fetchDrawings(activeProject.id).then(setDrawings).catch(() => {});
+    fetchTransmittals(activeProject.id).then(setTransmittals).catch(() => {});
+  }, [activeProject]);
 
   /* ── Derived metrics ── */
   const totalDrawings     = drawings.length;
@@ -105,12 +127,13 @@ export default function App() {
     fd.append("originator",    form.originator);
     fd.append("status",        form.status);
     fd.append("notes",         form.notes || "");
+    fd.append("projectId",     activeProject.id);
 
     try {
       const res = await fetch(`${API}/api/upload`, { method: "POST", body: fd });
       if (!res.ok) throw new Error(`Server responded ${res.status}`);
       await res.json();
-      setDrawings(await fetchDrawings());
+      setDrawings(await fetchDrawings(activeProject.id));
       setShowModal(false);
       setToast({ msg: `"${form.drawingNumber}" registered successfully.`, type: "success" });
     } catch {
@@ -132,14 +155,15 @@ export default function App() {
           purpose:    formData.purpose,
           remarks:    formData.remarks,
           issuedAt:   new Date().toISOString().split("T")[0],
+          projectId:  activeProject.id,
         }),
       });
       if (!res.ok) throw new Error(`Server responded ${res.status}`);
 
       /* Re-fetch both so transmittal counts on drawings update too */
       const [freshDrawings, freshTransmittals] = await Promise.all([
-        fetchDrawings(),
-        fetchTransmittals(),
+        fetchDrawings(activeProject.id),
+        fetchTransmittals(activeProject.id),
       ]);
       setDrawings(freshDrawings);
       setTransmittals(freshTransmittals);
@@ -151,150 +175,125 @@ export default function App() {
     }
   };
 
+  if (!currentUser) {
+    return <LoginPage onLogin={setCurrentUser} />;
+  }
+
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col">
+    <div className="flex min-h-screen bg-background overflow-x-hidden selection:bg-primary/30 selection:text-primary">
+      <Sidebar activeProject={activeProject} onTabChange={setCurrentTab} currentTab={currentTab} />
 
-      {/* Top nav */}
-      <header className="sticky top-0 z-40 bg-slate-900 border-b border-slate-800 px-6 py-0 flex items-center h-14 gap-6">
-        <div className="flex items-center gap-2.5">
-          <div className="w-7 h-7 rounded-lg bg-blue-500 flex items-center justify-center text-white text-xs font-bold shrink-0">DV</div>
-          <span className="text-white font-semibold text-sm tracking-tight">DrawVault</span>
-          <span className="text-slate-600 text-sm hidden sm:block">/ Enterprise DMS</span>
-        </div>
-        <nav className="hidden md:flex items-center gap-1 ml-4">
-          {["Dashboard", "Drawings", "Transmittals", "Packages", "Reports"].map((n) => (
-            <button
-              key={n}
-              onClick={() => setActiveTab(n)}
-              className={`px-3 py-1.5 rounded-md text-xs font-medium transition ${
-                activeTab === n ? "bg-blue-600 text-white" : "text-slate-400 hover:text-white hover:bg-slate-800"
-              }`}
+      {/* TopNavBar */}
+      <header className="hidden md:flex fixed top-0 right-0 h-16 bg-surface/60 dark:bg-surface/60 backdrop-blur-md border-b border-white/5 bg-surface-container-lowest/30 items-center justify-between pl-72 pr-10 w-full z-40">
+        <div className="flex items-center gap-6">
+          <nav className="flex gap-6 h-full items-center">
+            <button 
+              onClick={() => setCurrentTab('dashboard')} 
+              className={`font-body-md text-body-md h-full flex items-center pt-[2px] ${currentTab === 'dashboard' ? 'text-primary font-bold border-b-2 border-primary' : 'text-on-surface-variant hover:text-on-surface transition-colors border-b-2 border-transparent'}`}
             >
-              {n}
+              Project Overview
             </button>
-          ))}
-        </nav>
-        <div className="ml-auto flex items-center gap-3">
-          <button className="relative p-2 text-slate-400 hover:text-white transition rounded-lg hover:bg-slate-800">
-            <Bell className="w-5 h-5" />
-            <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full border-2 border-slate-900" />
-          </button>
-
-          {/* Role selector */}
-          <div className="flex items-center gap-1.5 border border-slate-700 rounded-lg px-2.5 py-1.5 bg-slate-800 hover:border-slate-600 transition">
-            <User className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-            <span className="text-slate-400 text-xs hidden sm:block">Viewing as:</span>
-            <select
-              value={activeRole}
-              onChange={e => setActiveRole(e.target.value)}
-              className="bg-transparent text-xs font-semibold text-white outline-none cursor-pointer max-w-[130px]"
-              style={{ WebkitAppearance: "none" }}
+            <button 
+              onClick={() => setCurrentTab('register')}
+              className={`font-body-md text-body-md h-full flex items-center pt-[2px] ${currentTab === 'register' ? 'text-primary font-bold border-b-2 border-primary' : 'text-on-surface-variant hover:text-on-surface transition-colors border-b-2 border-transparent'}`}
             >
-              {ROLES.map(r => (
-                <option key={r} value={r} className="bg-slate-800 text-white">{r}</option>
-              ))}
-            </select>
-            <ChevronDown className="w-3 h-3 text-slate-500 shrink-0 pointer-events-none" />
+              Drawing Register
+            </button>
+          </nav>
+        </div>
+        <div className="flex items-center gap-4">
+          <div className="relative focus-within:ring-2 focus-within:ring-primary/50 rounded-full hidden lg:block">
+            <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant text-sm">search</span>
+            <input className="bg-surface-container-highest/50 border border-white/10 rounded-full pl-9 pr-4 py-1.5 text-sm text-on-surface placeholder:text-on-surface-variant focus:outline-none focus:bg-surface-container-high w-64 transition-all" placeholder="Search..." type="text" />
           </div>
-
-          <div className="w-7 h-7 rounded-full bg-blue-600 flex items-center justify-center text-white text-xs font-semibold">HA</div>
+          <select
+            value={activeProject?.id || ""}
+            onChange={e => setActiveProject(projects.find(p => p.id === Number(e.target.value)))}
+            className="bg-surface-container-highest/50 border border-white/10 rounded-md px-2 py-1.5 text-xs text-on-surface outline-none cursor-pointer focus:ring-1 focus:ring-primary transition-all"
+          >
+            {projects.map(p => <option key={p.id} value={p.id}>{p.code}</option>)}
+          </select>
+          {!isRestricted && (
+            <button onClick={() => setShowProjectModal(true)} className="p-1.5 hover:bg-white/5 rounded-md text-on-surface-variant hover:text-primary transition-colors" title="New Project">
+              <span className="material-symbols-outlined text-[18px]">add</span>
+            </button>
+          )}
+          <button onClick={() => setCurrentUser(null)} className="p-1.5 hover:bg-white/5 rounded-md text-on-surface-variant hover:text-error transition-colors ml-2" title="Sign out">
+             <span className="material-symbols-outlined text-[18px]">logout</span>
+          </button>
+          <div className="w-8 h-8 rounded-full bg-surface-container-highest border border-white/10 overflow-hidden ml-2 cursor-pointer relative" title={currentUser.name}>
+            <div className="w-full h-full flex items-center justify-center bg-primary text-on-primary font-bold">{currentUser.name.charAt(0).toUpperCase()}</div>
+          </div>
         </div>
       </header>
 
-      {/* Project bar */}
-      <div className="bg-white border-b border-slate-200 px-6 py-3 flex items-center justify-between">
-        <div>
-          <p className="text-xs text-slate-400 mb-0.5">
-            Project — <span className="text-slate-600 font-medium">Orion Tower, Dubai (ORI-2024)</span>
-          </p>
-          <h1 className="text-lg font-bold text-slate-900">Drawing Management</h1>
-        </div>
-        <div className="flex items-center gap-2">
-          <span className="hidden sm:flex items-center gap-1.5 text-xs text-slate-500 bg-slate-100 px-3 py-1.5 rounded-full">
-            <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block" />
-            Live sync active
-          </span>
-          {!isRestricted && (
-            <button
-              onClick={() => setShowTransmittal(true)}
-              className="flex items-center gap-2 text-sm font-semibold px-4 py-2 rounded-lg transition border border-indigo-200 text-indigo-700 bg-indigo-50 hover:bg-indigo-100 hover:border-indigo-300"
-            >
-              <Send className="w-4 h-4" />
-              Create Transmittal
-            </button>
-          )}
-          {!isRestricted && (
-            <button
-              onClick={() => setShowModal(true)}
-              className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-4 py-2 rounded-lg transition shadow-sm shadow-blue-200"
-            >
-              <Upload className="w-4 h-4" />
-              Upload Drawing
-            </button>
-          )}
-        </div>
-      </div>
-
-      <main className="flex-1 px-6 py-6 space-y-6 max-w-screen-xl mx-auto w-full">
-        {activeTab === "Dashboard" ? (
-          <>
-            {/* Metrics */}
-        <section>
-          <h2 className="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-3">Project Overview</h2>
-          <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
-            <MetricCard label="Total Drawings"     value={totalDrawings}     sub={`Across ${disciplineCount} disciplines`} icon="📐" accent="blue"    />
-            <MetricCard label="For Construction"   value={forConstruction}   sub="Status S3 issued"                        icon="🏗️" accent="emerald"  />
-            <MetricCard label="Pending Reviews"    value={pendingReviews}    sub="Awaiting S2 approval"                    icon="🔍" accent="amber"   />
-            <MetricCard label="Overdue Transmit."  value={overdueTransmit}   sub="Unresolved > 30 days"                   icon="⚠️" accent="red"     />
-            <MetricCard label="Total Transmittals" value={totalTransmittals} sub="Packages issued to date"                 icon="📦" accent="violet"  />
-          </div>
-        </section>
-
-        <MasterRegisterTable
-          drawings={drawings}
-          filtered={filtered}
-          pageRows={pageRows}
-          page={page}
-          totalPages={totalPages}
-          search={search}
-          filterDisc={filterDisc}
-          filterStat={filterStat}
-          sortKey={sortKey}
-          sortDir={sortDir}
-          isRestricted={isRestricted}
-          onSearch={handleSearch}
-          onFilterDisc={handleFilterDisc}
-          onFilterStat={handleFilterStat}
-          onSort={handleSort}
-          onPageChange={setPage}
-        />
-          </>
+      {/* Main Canvas */}
+      <main className="flex-1 w-full pt-20 pb-10 md:pl-72 pr-4 md:pr-10 min-h-screen">
+        {currentTab === 'dashboard' ? (
+          <Dashboard 
+            totalDrawings={totalDrawings} 
+            totalTransmittals={totalTransmittals} 
+            latestRevisions={pendingReviews} 
+            overdueItems={overdueTransmit} 
+            drawings={drawings}
+          />
         ) : (
-          <div className="flex flex-col items-center justify-center h-64 text-slate-400">
-            <p className="text-lg font-medium">{activeTab} coming soon...</p>
-          </div>
+          <MasterRegisterTable drawings={drawings} />
         )}
       </main>
 
-      {/* Footer */}
-      <footer className="border-t border-slate-200 bg-white px-6 py-3 text-xs text-slate-400 flex items-center justify-between">
-        <span>DrawVault Enterprise DMS — Orion Tower, Dubai (ORI-2024)</span>
-        <span>© 2025 DrawVault Technologies</span>
-      </footer>
+      {/* Action Floating Buttons */}
+      {!isRestricted && (
+        <div className="fixed bottom-6 right-6 flex gap-3 z-50">
+          <button onClick={() => setShowTransmittal(true)} className="flex items-center gap-2 bg-surface-container-highest text-on-surface px-4 py-2.5 rounded-full shadow-[0_10px_25px_-5px_rgba(0,0,0,0.5)] border border-white/10 hover:bg-white/10 transition-all">
+            <span className="material-symbols-outlined text-[18px]">send</span>
+            <span className="font-label-md text-label-md">Transmittal</span>
+          </button>
+          <button onClick={() => setShowModal(true)} className="flex items-center gap-2 bg-primary text-on-primary px-4 py-2.5 rounded-full shadow-[0_10px_25px_-5px_rgba(195,192,255,0.3)] hover:bg-primary/90 transition-all">
+            <span className="material-symbols-outlined text-[18px]">upload</span>
+            <span className="font-label-md text-label-md">Upload</span>
+          </button>
+        </div>
+      )}
 
+      {/* Modals & Toasts */}
       {showModal && (
-        <UploadModal onClose={() => setShowModal(false)} onSubmit={handleUpload} />
+        <UploadModal 
+          onClose={() => setShowModal(false)}
+          onSubmit={handleUpload}
+        />
       )}
       {showTransmittal && (
-        <TransmittalModal
+        <TransmittalModal 
           drawings={drawings}
           onClose={() => setShowTransmittal(false)}
           onSubmit={handleTransmittal}
-          trnNumber={nextTrnNumber}
         />
       )}
       {toast && (
         <Toast msg={toast.msg} type={toast.type} onDone={() => setToast(null)} />
+      )}
+      {showProjectModal && (
+        <ProjectModal
+          onClose={() => setShowProjectModal(false)}
+          onSubmit={async (data) => {
+            const res = await fetch(`${API}/api/projects`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(data),
+            });
+            if (res.ok) {
+              const newProj = await res.json();
+              const allProjs = await fetchProjects();
+              setProjects(allProjs);
+              setActiveProject(newProj);
+              setShowProjectModal(false);
+              setToast({ msg: `Project ${data.code} created.`, type: "success" });
+            } else {
+              setToast({ msg: "Failed to create project.", type: "error" });
+            }
+          }}
+        />
       )}
     </div>
   );

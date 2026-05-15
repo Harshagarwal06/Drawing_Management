@@ -73,7 +73,7 @@ export default function TransmittalModal({ drawings, onClose, onSubmit, trnNumbe
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(15,23,42,0.6)" }}>
       <div
-        className="modal-enter bg-white rounded-2xl shadow-2xl w-full max-w-3xl overflow-hidden flex flex-col"
+        className="modal-enter bg-white/95 backdrop-blur-xl rounded-2xl shadow-2xl border border-white/50 w-full max-w-3xl overflow-hidden flex flex-col"
         style={{ maxHeight: "92vh" }}
       >
         {/* Header */}

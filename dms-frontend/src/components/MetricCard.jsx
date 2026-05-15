@@ -9,12 +9,12 @@ const ACCENTS = {
 export default function MetricCard({ label, value, sub, icon, accent }) {
   const a = ACCENTS[accent] ?? ACCENTS.blue;
   return (
-    <div className={`metric-card bg-white rounded-xl border ${a.ring} p-5 flex items-start gap-4`}>
-      <div className={`${a.icon} rounded-lg p-2.5 text-xl shrink-0`}>{icon}</div>
+    <div className={`metric-card bg-white/70 backdrop-blur-xl rounded-2xl border ${a.ring} p-5 flex items-start gap-4 transition-all duration-300 hover:-translate-y-1.5 hover:shadow-[0_8px_30px_rgb(0,0,0,0.04)] hover:bg-white`}>
+      <div className={`${a.icon} rounded-xl p-3 text-xl shrink-0 shadow-sm`}>{icon}</div>
       <div>
-        <p className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-1">{label}</p>
-        <p className={`text-3xl font-bold ${a.val}`}>{value}</p>
-        {sub && <p className="text-xs text-slate-400 mt-1">{sub}</p>}
+        <p className="text-xs font-semibold text-slate-500 uppercase tracking-widest mb-1">{label}</p>
+        <p className={`text-3xl font-black tracking-tight ${a.val}`}>{value}</p>
+        {sub && <p className="text-xs text-slate-400 mt-1.5 font-medium">{sub}</p>}
       </div>
     </div>
   );
