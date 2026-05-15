@@ -1,6 +1,6 @@
 import { useState } from "react";
 
-const API = "http://localhost:3000";
+const API = import.meta.env.VITE_API_URL;
 
 const STATUS_PILLS = [
   { label: "All",              value: "All",  dot: "bg-on-surface-variant" },

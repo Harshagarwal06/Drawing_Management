@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 
-const API = "http://localhost:3000";
+const API = import.meta.env.VITE_API_URL;
 
 const STATUS_META = {
   S3:   { label: "For Construction", color: "#34d399" },
@@ -27,16 +27,18 @@ function timeAgo(iso) {
   return `${d}d ago`;
 }
 
-export default function Dashboard({ totalDrawings, totalTransmittals, latestRevisions, overdueItems, drawings, activeProjectId }) {
+export default function Dashboard({ totalDrawings, totalTransmittals, latestRevisions, overdueItems, drawings, activeProjectId, token }) {
   const [activity, setActivity] = useState([]);
 
   useEffect(() => {
-    if (!activeProjectId) return;
-    fetch(`${API}/api/activity?projectId=${activeProjectId}`)
+    if (!activeProjectId || !token) return;
+    fetch(`${API}/api/activity?projectId=${activeProjectId}`, {
+      headers: { Authorization: `Bearer ${token}` }
+    })
       .then(r => r.ok ? r.json() : [])
       .then(setActivity)
       .catch(() => {});
-  }, [activeProjectId]);
+  }, [activeProjectId, token]);
 
   /* ── Discipline breakdown ── */
   const byDisc = {};

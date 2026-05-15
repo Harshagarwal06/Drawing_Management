@@ -12,23 +12,30 @@ import LoginPage from "./components/LoginPage";
 
 import { ROLES, OVERDUE_PURPOSES, MS_30_DAYS } from "./constants";
 
-const API = "http://localhost:3000";
+const API = import.meta.env.VITE_API_URL;
 const PER_PAGE = 8;
 
-async function fetchProjects() {
-  const res = await fetch(`${API}/api/projects`);
+function authHeaders(token) {
+  return { Authorization: `Bearer ${token}` };
+}
+
+async function fetchProjects(token) {
+  const res = await fetch(`${API}/api/projects`, { headers: authHeaders(token) });
+  if (res.status === 401) throw Object.assign(new Error("Unauthorized"), { status: 401 });
   if (!res.ok) throw new Error("projects fetch failed");
   return res.json();
 }
 
-async function fetchDrawings(projectId) {
-  const res = await fetch(`${API}/api/drawings?projectId=${projectId}`);
+async function fetchDrawings(projectId, token) {
+  const res = await fetch(`${API}/api/drawings?projectId=${projectId}`, { headers: authHeaders(token) });
+  if (res.status === 401) throw Object.assign(new Error("Unauthorized"), { status: 401 });
   if (!res.ok) throw new Error("drawings fetch failed");
   return res.json();
 }
 
-async function fetchTransmittals(projectId) {
-  const res = await fetch(`${API}/api/transmittals?projectId=${projectId}`);
+async function fetchTransmittals(projectId, token) {
+  const res = await fetch(`${API}/api/transmittals?projectId=${projectId}`, { headers: authHeaders(token) });
+  if (res.status === 401) throw Object.assign(new Error("Unauthorized"), { status: 401 });
   if (!res.ok) throw new Error("transmittals fetch failed");
   return res.json();
 }
@@ -68,20 +75,28 @@ export default function App() {
     else localStorage.removeItem("dms_user");
   }, [currentUser]);
 
+  /* ── Handle 401 globally — clear session ── */
+  const handleUnauthorized = () => {
+    setCurrentUser(null);
+    setToast({ msg: "Session expired — please log in again.", type: "error" });
+  };
+
   /* ── Bootstrap: load projects ── */
   useEffect(() => {
     if (!currentUser) return;
-    fetchProjects().then(data => {
+    fetchProjects(currentUser.token).then(data => {
       setProjects(data);
       if (data.length > 0) setActiveProject(data[0]);
-    }).catch(() => {});
+    }).catch(err => { if (err.status === 401) handleUnauthorized(); });
   }, [currentUser]);
 
   /* ── Load collections when project changes ── */
   useEffect(() => {
-    if (!activeProject) return;
-    fetchDrawings(activeProject.id).then(setDrawings).catch(() => {});
-    fetchTransmittals(activeProject.id).then(setTransmittals).catch(() => {});
+    if (!activeProject || !currentUser) return;
+    fetchDrawings(activeProject.id, currentUser.token).then(setDrawings)
+      .catch(err => { if (err.status === 401) handleUnauthorized(); });
+    fetchTransmittals(activeProject.id, currentUser.token).then(setTransmittals)
+      .catch(err => { if (err.status === 401) handleUnauthorized(); });
   }, [activeProject]);
 
   /* ── Derived metrics ── */
@@ -145,10 +160,10 @@ export default function App() {
     fd.append("projectId",     activeProject.id);
 
     try {
-      const res = await fetch(`${API}/api/upload`, { method: "POST", body: fd });
+      const res = await fetch(`${API}/api/upload`, { method: "POST", body: fd, headers: authHeaders(currentUser.token) });
       if (!res.ok) throw new Error(`Server responded ${res.status}`);
       await res.json();
-      setDrawings(await fetchDrawings(activeProject.id));
+      setDrawings(await fetchDrawings(activeProject.id, currentUser.token));
       setShowModal(false);
       setToast({ msg: `"${form.drawingNumber}" registered successfully.`, type: "success" });
     } catch {
@@ -162,7 +177,7 @@ export default function App() {
     try {
       const res = await fetch(`${API}/api/transmittals`, {
         method:  "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...authHeaders(currentUser.token) },
         body:    JSON.stringify({
           number:     nextTrnNumber,
           drawingIds: formData.drawingIds,
@@ -177,8 +192,8 @@ export default function App() {
 
       /* Re-fetch both so transmittal counts on drawings update too */
       const [freshDrawings, freshTransmittals] = await Promise.all([
-        fetchDrawings(activeProject.id),
-        fetchTransmittals(activeProject.id),
+        fetchDrawings(activeProject.id, currentUser.token),
+        fetchTransmittals(activeProject.id, currentUser.token),
       ]);
       setDrawings(freshDrawings);
       setTransmittals(freshTransmittals);
@@ -193,9 +208,9 @@ export default function App() {
   /* ── Void/Supersede a drawing ── */
   const handleVoid = async (id) => {
     try {
-      const res = await fetch(`${API}/api/drawings/${id}/void`, { method: "PATCH" });
+      const res = await fetch(`${API}/api/drawings/${id}/void`, { method: "PATCH", headers: authHeaders(currentUser.token) });
       if (!res.ok) throw new Error();
-      setDrawings(await fetchDrawings(activeProject.id));
+      setDrawings(await fetchDrawings(activeProject.id, currentUser.token));
       setToast({ msg: "Drawing voided successfully.", type: "success" });
     } catch {
       setToast({ msg: "Failed to void drawing.", type: "error" });
@@ -259,6 +274,7 @@ export default function App() {
             overdueItems={overdueTransmit}
             drawings={drawings}
             activeProjectId={activeProject?.id}
+            token={currentUser?.token}
           />
         ) : currentTab === 'register' ? (
           <MasterRegisterTable
@@ -325,12 +341,12 @@ export default function App() {
           onSubmit={async (data) => {
             const res = await fetch(`${API}/api/projects`, {
               method: "POST",
-              headers: { "Content-Type": "application/json" },
+              headers: { "Content-Type": "application/json", ...authHeaders(currentUser.token) },
               body: JSON.stringify(data),
             });
             if (res.ok) {
               const newProj = await res.json();
-              const allProjs = await fetchProjects();
+              const allProjs = await fetchProjects(currentUser.token);
               setProjects(allProjs);
               setActiveProject(newProj);
               setShowProjectModal(false);
