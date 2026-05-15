@@ -1,0 +1,997 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>DrawVault — Enterprise Drawing Management</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+    * { font-family: 'Inter', sans-serif; }
+    .status-pill { @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium; }
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #f1f5f9; }
+    ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+    .modal-enter { animation: fadeIn 0.2s ease; }
+    @keyframes fadeIn { from { opacity: 0; transform: scale(0.97); } to { opacity: 1; transform: scale(1); } }
+    .row-hover:hover { background-color: #f8fafc; }
+    .metric-card:hover { transform: translateY(-2px); box-shadow: 0 10px 25px -5px rgba(0,0,0,0.08); }
+    .metric-card { transition: transform 0.2s ease, box-shadow 0.2s ease; }
+  </style>
+</head>
+<body class="bg-slate-50">
+<div id="root"></div>
+
+<script type="text/babel">
+const { useState, useMemo, useEffect, useRef } = React;
+
+/* ─── LOCALSTORAGE HELPERS ──────────────────────────────────────── */
+const LS_KEYS = { drawings: "dv_drawings", transmittals: "dv_transmittals" };
+
+function lsLoad(key, fallback) {
+  try {
+    const raw = localStorage.getItem(key);
+    return raw ? JSON.parse(raw) : fallback;
+  } catch { return fallback; }
+}
+
+function lsSave(key, value) {
+  try { localStorage.setItem(key, JSON.stringify(value)); } catch {}
+}
+
+/* ─── SEED DATA ─────────────────────────────────────────────────── */
+const MOCK_DRAWINGS = [
+  { id: 1,  number: "ARC-GF-001", title: "Ground Floor Plan",            discipline: "Architecture", rev: "C",  status: "S3",  issueDate: "2025-04-02", originator: "HDA Architects",  transmittals: 4 },
+  { id: 2,  number: "ARC-RF-002", title: "Roof Plan & Details",           discipline: "Architecture", rev: "B",  status: "S2",  issueDate: "2025-03-18", originator: "HDA Architects",  transmittals: 2 },
+  { id: 3,  number: "STR-FD-001", title: "Foundation Layout",             discipline: "Structure",    rev: "D",  status: "S3",  issueDate: "2025-04-10", originator: "Turner Eng.",     transmittals: 6 },
+  { id: 4,  number: "STR-FD-002", title: "Pile Cap Details",              discipline: "Structure",    rev: "A",  status: "S1",  issueDate: "2025-05-01", originator: "Turner Eng.",     transmittals: 1 },
+  { id: 5,  number: "MEP-AC-001", title: "HVAC Schematic - Level 1",     discipline: "MEP",          rev: "B",  status: "S3",  issueDate: "2025-03-25", originator: "AirFlow MEP",     transmittals: 3 },
+  { id: 6,  number: "MEP-EL-001", title: "Electrical Single Line Diag.", discipline: "MEP",          rev: "A",  status: "S1",  issueDate: "2025-05-05", originator: "AirFlow MEP",     transmittals: 1 },
+  { id: 7,  number: "CIV-SD-001", title: "Site Drainage Plan",           discipline: "Civil",        rev: "C",  status: "S3",  issueDate: "2025-02-14", originator: "Terrain Civil",   transmittals: 5 },
+  { id: 8,  number: "CIV-RD-001", title: "Road Pavement Design",         discipline: "Civil",        rev: "B",  status: "S2",  issueDate: "2025-03-30", originator: "Terrain Civil",   transmittals: 2 },
+  { id: 9,  number: "INT-LB-001", title: "Lobby Interior Elevations",    discipline: "Interior",     rev: "A",  status: "S1",  issueDate: "2025-05-08", originator: "Spatial Studio",  transmittals: 0 },
+  { id: 10, number: "INT-OF-001", title: "Open Plan Office Layout",      discipline: "Interior",     rev: "B",  status: "S2",  issueDate: "2025-04-20", originator: "Spatial Studio",  transmittals: 2 },
+  { id: 11, number: "STR-CL-003", title: "Column Schedule",              discipline: "Structure",    rev: "A",  status: "VOID",issueDate: "2025-01-10", originator: "Turner Eng.",     transmittals: 3 },
+  { id: 12, number: "ARC-FA-003", title: "Facade Cladding System",       discipline: "Architecture", rev: "E",  status: "S3",  issueDate: "2025-04-28", originator: "HDA Architects",  transmittals: 7 },
+  { id: 13, number: "MEP-PL-002", title: "Plumbing Isometrics - L2",    discipline: "MEP",          rev: "A",  status: "S1",  issueDate: "2025-05-11", originator: "AirFlow MEP",     transmittals: 0 },
+  { id: 14, number: "CIV-LS-001", title: "Landscape Masterplan",         discipline: "Civil",        rev: "B",  status: "S2",  issueDate: "2025-04-05", originator: "GreenAxis",       transmittals: 2 },
+  { id: 15, number: "STR-BM-004", title: "Beam Connection Details",      discipline: "Structure",    rev: "C",  status: "S3",  issueDate: "2025-03-12", originator: "Turner Eng.",     transmittals: 4 },
+];
+
+/* Seeded with two "For Approval / For Review" transmittals > 30 days old
+   so the Overdue metric starts at a realistic non-zero number.            */
+const MOCK_TRANSMITTALS = [
+  {
+    id: 1, number: "TRN-001",
+    drawingIds: [1, 3, 5],
+    recipients: [{ id: "r1", name: "James Whitfield", role: "Project Manager", avatar: "JW" }],
+    purpose: "For Construction", remarks: "Issued for site commencement.",
+    issuedAt: "2025-04-10",
+  },
+  {
+    id: 2, number: "TRN-002",
+    drawingIds: [2, 8, 10],
+    recipients: [{ id: "r2", name: "Priya Nair", role: "Structural Engineer", avatar: "PN" }],
+    purpose: "For Approval", remarks: "Please review and return comments by end of month.",
+    issuedAt: "2025-03-22",
+  },
+  {
+    id: 3, number: "TRN-003",
+    drawingIds: [7, 14],
+    recipients: [{ id: "r9", name: "Client Review Board", role: "Group", avatar: "CR" }],
+    purpose: "For Review & Comment", remarks: "Drainage and landscape drawings for client review.",
+    issuedAt: "2025-03-30",
+  },
+  {
+    id: 4, number: "TRN-004",
+    drawingIds: [12, 1],
+    recipients: [
+      { id: "r4", name: "Aisha Al-Farsi", role: "Architect", avatar: "AA" },
+      { id: "r6", name: "Sophie Leclerc", role: "Design Manager", avatar: "SL" },
+    ],
+    purpose: "For Review & Comment", remarks: "Facade package — awaiting design manager sign-off.",
+    issuedAt: "2025-04-01",
+  },
+  {
+    id: 5, number: "TRN-005",
+    drawingIds: [15, 3, 11],
+    recipients: [{ id: "r10", name: "Main Contractor", role: "Group", avatar: "MC" }],
+    purpose: "For Construction", remarks: "Structural package for subcontractor coordination.",
+    issuedAt: "2025-04-15",
+  },
+];
+
+/* ─── STATIC LOOKUPS ────────────────────────────────────────────── */
+const STATUS_META = {
+  S1:   { label: "S1 – For Information",    bg: "bg-blue-100",    text: "text-blue-700",   dot: "bg-blue-400"    },
+  S2:   { label: "S2 – For Approval",       bg: "bg-amber-100",   text: "text-amber-700",  dot: "bg-amber-400"   },
+  S3:   { label: "S3 – For Construction",   bg: "bg-emerald-100", text: "text-emerald-700",dot: "bg-emerald-500" },
+  VOID: { label: "Void",                    bg: "bg-red-100",     text: "text-red-600",    dot: "bg-red-400"     },
+};
+
+const DISCIPLINE_COLORS = {
+  Architecture: "bg-violet-100 text-violet-700",
+  Structure:    "bg-orange-100 text-orange-700",
+  MEP:          "bg-cyan-100 text-cyan-700",
+  Civil:        "bg-teal-100 text-teal-700",
+  Interior:     "bg-pink-100 text-pink-700",
+};
+
+const DISCIPLINES = ["Architecture", "Structure", "MEP", "Civil", "Interior"];
+const STATUSES    = ["S1", "S2", "S3", "VOID"];
+const ORIGINATORS = ["HDA Architects", "Turner Eng.", "AirFlow MEP", "Terrain Civil", "Spatial Studio", "GreenAxis"];
+
+const MOCK_RECIPIENTS = [
+  { id: "r1",  name: "James Whitfield",     role: "Project Manager",     avatar: "JW" },
+  { id: "r2",  name: "Priya Nair",          role: "Structural Engineer", avatar: "PN" },
+  { id: "r3",  name: "Carlos Mendez",       role: "MEP Coordinator",     avatar: "CM" },
+  { id: "r4",  name: "Aisha Al-Farsi",      role: "Architect",           avatar: "AA" },
+  { id: "r5",  name: "Thomas Bergmann",     role: "Quantity Surveyor",   avatar: "TB" },
+  { id: "r6",  name: "Sophie Leclerc",      role: "Design Manager",      avatar: "SL" },
+  { id: "r7",  name: "Raj Patel",           role: "Civil Engineer",      avatar: "RP" },
+  { id: "r8",  name: "Orion QA Team",       role: "Group",               avatar: "QA" },
+  { id: "r9",  name: "Client Review Board", role: "Group",               avatar: "CR" },
+  { id: "r10", name: "Main Contractor",     role: "Group",               avatar: "MC" },
+];
+
+const TRANSMITTAL_PURPOSES = [
+  "For Review & Comment",
+  "For Approval",
+  "For Construction",
+  "For Information",
+  "As-Built",
+];
+
+/* Overdue = issued more than 30 days ago with an unresolved purpose */
+const OVERDUE_PURPOSES = new Set(["For Review & Comment", "For Approval"]);
+const MS_30_DAYS = 30 * 24 * 60 * 60 * 1000;
+
+/* ─── SHARED PRIMITIVE COMPONENTS ───────────────────────────────── *
+ * Defined at module scope so React never sees a new identity between
+ * renders — the root cause of the "focus lost on keystroke" bug.    */
+
+/* Labelled form row with inline error — used by UploadModal */
+function Field({ label, id, req, errors = {}, children }) {
+  return (
+    <div>
+      <label htmlFor={id} className="block text-xs font-semibold text-slate-600 mb-1.5">
+        {label}{req && <span className="text-red-500 ml-0.5">*</span>}
+      </label>
+      {children}
+      {errors[id] && <p className="text-xs text-red-500 mt-1">{errors[id]}</p>}
+    </div>
+  );
+}
+
+/* Compact label with optional required marker — used by TransmittalModal */
+function FieldLabel({ children, req }) {
+  return (
+    <p className="text-xs font-semibold text-slate-600 mb-1.5">
+      {children}{req && <span className="text-red-500 ml-0.5">*</span>}
+    </p>
+  );
+}
+
+/* Sortable column header pair — used by the drawing register table */
+function SortIcon({ col, sortKey, sortDir }) {
+  if (sortKey !== col) return <span className="text-slate-300 ml-1">↕</span>;
+  return <span className="text-blue-500 ml-1">{sortDir === "asc" ? "↑" : "↓"}</span>;
+}
+function Th({ col, label, cls = "", sortKey, sortDir, onSort }) {
+  return (
+    <th
+      className={`px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider cursor-pointer select-none whitespace-nowrap hover:text-slate-700 ${cls}`}
+      onClick={() => onSort(col)}>
+      {label}<SortIcon col={col} sortKey={sortKey} sortDir={sortDir} />
+    </th>
+  );
+}
+
+/* ─── METRIC CARD ───────────────────────────────────────────────── */
+function MetricCard({ label, value, sub, icon, accent }) {
+  const accents = {
+    blue:    { ring: "border-blue-200",    icon: "bg-blue-50 text-blue-600",       val: "text-blue-700"    },
+    amber:   { ring: "border-amber-200",   icon: "bg-amber-50 text-amber-600",     val: "text-amber-700"   },
+    red:     { ring: "border-red-200",     icon: "bg-red-50 text-red-600",         val: "text-red-700"     },
+    emerald: { ring: "border-emerald-200", icon: "bg-emerald-50 text-emerald-600", val: "text-emerald-700" },
+    violet:  { ring: "border-violet-200",  icon: "bg-violet-50 text-violet-600",   val: "text-violet-700"  },
+  };
+  const a = accents[accent] || accents.blue;
+  return (
+    <div className={`metric-card bg-white rounded-xl border ${a.ring} p-5 flex items-start gap-4`}>
+      <div className={`${a.icon} rounded-lg p-2.5 text-xl shrink-0`}>{icon}</div>
+      <div>
+        <p className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-1">{label}</p>
+        <p className={`text-3xl font-bold ${a.val}`}>{value}</p>
+        {sub && <p className="text-xs text-slate-400 mt-1">{sub}</p>}
+      </div>
+    </div>
+  );
+}
+
+/* ─── STATUS BADGE ──────────────────────────────────────────────── */
+function StatusBadge({ code }) {
+  const m = STATUS_META[code] || STATUS_META.S1;
+  return (
+    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold ${m.bg} ${m.text}`}>
+      <span className={`w-1.5 h-1.5 rounded-full ${m.dot}`}></span>
+      {m.label}
+    </span>
+  );
+}
+
+/* ─── TRANSMITTAL MODAL ─────────────────────────────────────────── */
+function TransmittalModal({ drawings, onClose, onSubmit, trnNumber }) {
+  const [selectedDrawings,   setSelectedDrawings]   = useState([]);
+  const [selectedRecipients, setSelectedRecipients] = useState([]);
+  const [purpose,            setPurpose]            = useState("");
+  const [remarks,            setRemarks]            = useState("");
+  const [drawingSearch,      setDrawingSearch]      = useState("");
+  const [recipientSearch,    setRecipientSearch]    = useState("");
+  const [recipientOpen,      setRecipientOpen]      = useState(false);
+  const [errors,             setErrors]             = useState({});
+  const [submitting,         setSubmitting]         = useState(false);
+
+  const filteredDrawings = drawings.filter(d => {
+    const q = drawingSearch.toLowerCase();
+    return !q || d.number.toLowerCase().includes(q) || d.title.toLowerCase().includes(q);
+  });
+
+  const filteredRecipients = MOCK_RECIPIENTS.filter(r =>
+    !selectedRecipients.find(s => s.id === r.id) &&
+    (recipientSearch === "" ||
+      r.name.toLowerCase().includes(recipientSearch.toLowerCase()) ||
+      r.role.toLowerCase().includes(recipientSearch.toLowerCase()))
+  );
+
+  const toggleDrawing = (id) =>
+    setSelectedDrawings(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+
+  const addRecipient = (r) => {
+    setSelectedRecipients(prev => [...prev, r]);
+    setRecipientSearch("");
+    setErrors(e => ({ ...e, recipients: "" }));
+  };
+
+  const removeRecipient = (id) =>
+    setSelectedRecipients(prev => prev.filter(r => r.id !== id));
+
+  const validate = () => {
+    const e = {};
+    if (selectedDrawings.length === 0)   e.drawings   = "Select at least one drawing";
+    if (selectedRecipients.length === 0) e.recipients = "Add at least one recipient";
+    if (!purpose)                        e.purpose    = "Required";
+    return e;
+  };
+
+  const handleSubmit = (ev) => {
+    ev.preventDefault();
+    const e = validate();
+    if (Object.keys(e).length) { setErrors(e); return; }
+    setSubmitting(true);
+    setTimeout(() => {
+      onSubmit({ drawingIds: selectedDrawings, recipients: selectedRecipients, purpose, remarks });
+      setSubmitting(false);
+    }, 950);
+  };
+
+  const avatarColors = ["bg-violet-500","bg-blue-500","bg-teal-500","bg-amber-500","bg-pink-500","bg-cyan-500","bg-orange-500","bg-emerald-500","bg-rose-500","bg-indigo-500"];
+  const avatarColor  = (id) => avatarColors[MOCK_RECIPIENTS.findIndex(r => r.id === id) % avatarColors.length];
+
+  /* errMsg is a plain function (not a component), safe to define inline */
+  const errMsg = (key) => errors[key] && <p className="text-xs text-red-500 mt-1.5">{errors[key]}</p>;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(15,23,42,0.6)" }}>
+      <div className="modal-enter bg-white rounded-2xl shadow-2xl w-full max-w-3xl overflow-hidden flex flex-col" style={{ maxHeight: "92vh" }}>
+
+        {/* Header */}
+        <div className="px-6 py-5 flex items-center justify-between shrink-0"
+          style={{ background: "linear-gradient(135deg,#1e1b4b 0%,#312e81 60%,#4338ca 100%)" }}>
+          <div>
+            <div className="flex items-center gap-2 mb-0.5">
+              <span className="text-xs font-mono font-bold text-indigo-300 bg-indigo-900/50 px-2 py-0.5 rounded">{trnNumber}</span>
+            </div>
+            <h2 className="text-base font-semibold text-white">Create Transmittal</h2>
+            <p className="text-xs text-indigo-300 mt-0.5">Issue drawings to project recipients with a formal cover sheet</p>
+          </div>
+          <button onClick={onClose} className="text-indigo-300 hover:text-white transition p-1 rounded-lg hover:bg-white/10">
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12"/></svg>
+          </button>
+        </div>
+
+        {/* Body */}
+        <form onSubmit={handleSubmit} className="overflow-y-auto flex-1">
+          <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+
+            {/* LEFT: Drawing selection */}
+            <div className="flex flex-col gap-3">
+              <div>
+                <FieldLabel req>Drawings to Issue</FieldLabel>
+                <div className={`border rounded-xl overflow-hidden ${errors.drawings ? "border-red-400" : "border-slate-200"}`}>
+                  <div className="flex items-center gap-2 px-3 py-2 border-b border-slate-100 bg-slate-50">
+                    <svg className="w-3.5 h-3.5 text-slate-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0"/></svg>
+                    <input placeholder="Filter drawings…" value={drawingSearch} onChange={e => setDrawingSearch(e.target.value)}
+                      className="text-xs flex-1 outline-none bg-transparent text-slate-600 placeholder:text-slate-300" />
+                    {selectedDrawings.length > 0 && (
+                      <span className="text-xs font-semibold text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded-full shrink-0">
+                        {selectedDrawings.length} selected
+                      </span>
+                    )}
+                  </div>
+                  <div className="overflow-y-auto" style={{ maxHeight: "260px" }}>
+                    {filteredDrawings.length === 0 ? (
+                      <p className="text-xs text-slate-400 text-center py-6">No drawings match.</p>
+                    ) : filteredDrawings.map(d => {
+                      const checked = selectedDrawings.includes(d.id);
+                      const sm = STATUS_META[d.status] || STATUS_META.S1;
+                      return (
+                        <label key={d.id}
+                          className={`flex items-start gap-3 px-3 py-2.5 cursor-pointer border-b border-slate-50 last:border-0 transition ${checked ? "bg-indigo-50/60" : "hover:bg-slate-50"}`}>
+                          <input type="checkbox" checked={checked}
+                            onChange={() => { toggleDrawing(d.id); setErrors(e => ({ ...e, drawings: "" })); }}
+                            className="mt-0.5 accent-indigo-600 shrink-0" />
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span className="font-mono text-xs font-semibold text-indigo-700">{d.number}</span>
+                              <span className={`text-xs px-1.5 py-0.5 rounded-full font-medium ${sm.bg} ${sm.text}`}>{d.status}</span>
+                            </div>
+                            <p className="text-xs text-slate-500 truncate mt-0.5">{d.title}</p>
+                          </div>
+                          <span className="text-xs text-slate-300 font-medium shrink-0 mt-0.5">Rev.{d.rev}</span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                  <div className="flex items-center gap-3 px-3 py-2 border-t border-slate-100 bg-slate-50">
+                    <button type="button" onClick={() => { setSelectedDrawings(drawings.map(d => d.id)); setErrors(e => ({ ...e, drawings: "" })); }}
+                      className="text-xs text-indigo-600 hover:underline font-medium">Select all</button>
+                    <span className="text-slate-300">·</span>
+                    <button type="button" onClick={() => setSelectedDrawings([])}
+                      className="text-xs text-slate-500 hover:underline">Clear</button>
+                  </div>
+                </div>
+                {errMsg("drawings")}
+              </div>
+            </div>
+
+            {/* RIGHT: Recipients + Purpose + Remarks */}
+            <div className="flex flex-col gap-5">
+
+              {/* Recipients */}
+              <div className="relative">
+                <FieldLabel req>Recipients</FieldLabel>
+                <div className={`min-h-[42px] border rounded-xl px-3 py-2 flex flex-wrap gap-1.5 cursor-text transition ${errors.recipients ? "border-red-400 bg-red-50" : "border-slate-200 bg-white"}`}
+                  onClick={() => setRecipientOpen(true)}>
+                  {selectedRecipients.map(r => (
+                    <span key={r.id} className="inline-flex items-center gap-1 bg-indigo-100 text-indigo-700 text-xs font-medium px-2 py-1 rounded-full">
+                      <span className={`w-4 h-4 rounded-full ${avatarColor(r.id)} text-white flex items-center justify-center text-[8px] font-bold shrink-0`}>{r.avatar[0]}</span>
+                      {r.name}
+                      <button type="button" onClick={e => { e.stopPropagation(); removeRecipient(r.id); }}
+                        className="ml-0.5 text-indigo-400 hover:text-indigo-700">×</button>
+                    </span>
+                  ))}
+                  <input
+                    placeholder={selectedRecipients.length === 0 ? "Search people or groups…" : ""}
+                    value={recipientSearch}
+                    onChange={e => { setRecipientSearch(e.target.value); setRecipientOpen(true); }}
+                    onFocus={() => setRecipientOpen(true)}
+                    className="text-xs flex-1 min-w-[120px] outline-none bg-transparent text-slate-600 placeholder:text-slate-300 py-0.5"
+                  />
+                </div>
+                {recipientOpen && filteredRecipients.length > 0 && (
+                  <div className="absolute z-20 left-0 right-0 top-full mt-1 bg-white border border-slate-200 rounded-xl shadow-lg overflow-hidden">
+                    {filteredRecipients.slice(0, 6).map(r => (
+                      <button type="button" key={r.id}
+                        onMouseDown={e => { e.preventDefault(); addRecipient(r); setRecipientOpen(false); }}
+                        className="w-full flex items-center gap-2.5 px-3 py-2.5 text-left hover:bg-indigo-50 transition border-b border-slate-50 last:border-0">
+                        <span className={`w-7 h-7 rounded-full ${avatarColor(r.id)} text-white text-xs font-bold flex items-center justify-center shrink-0`}>{r.avatar}</span>
+                        <div>
+                          <p className="text-xs font-semibold text-slate-700">{r.name}</p>
+                          <p className="text-xs text-slate-400">{r.role}</p>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+                {recipientOpen && <div className="fixed inset-0 z-10" onClick={() => setRecipientOpen(false)} />}
+                {errMsg("recipients")}
+              </div>
+
+              {/* Purpose */}
+              <div>
+                <FieldLabel req>Purpose of Issue</FieldLabel>
+                <select value={purpose} onChange={e => { setPurpose(e.target.value); setErrors(er => ({ ...er, purpose: "" })); }}
+                  className={`w-full border rounded-xl px-3 py-2.5 text-sm text-slate-700 outline-none transition focus:ring-2 focus:ring-indigo-500 focus:border-transparent ${errors.purpose ? "border-red-400 bg-red-50" : "border-slate-200 bg-white"}`}>
+                  <option value="">Select purpose…</option>
+                  {TRANSMITTAL_PURPOSES.map(p => <option key={p}>{p}</option>)}
+                </select>
+                {errMsg("purpose")}
+              </div>
+
+              {/* Remarks */}
+              <div>
+                <FieldLabel>Remarks</FieldLabel>
+                <textarea rows={4} value={remarks} onChange={e => setRemarks(e.target.value)}
+                  placeholder="Add any cover notes, instructions, or deadlines for the recipient…"
+                  className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-700 outline-none resize-none transition focus:ring-2 focus:ring-indigo-500 focus:border-transparent placeholder:text-slate-300 bg-white" />
+              </div>
+
+              {/* Live summary */}
+              {(selectedDrawings.length > 0 || selectedRecipients.length > 0 || purpose) && (
+                <div className="bg-indigo-50 border border-indigo-100 rounded-xl p-3 text-xs text-indigo-700 space-y-1">
+                  <p className="font-semibold text-indigo-800 mb-1.5">Transmittal Summary</p>
+                  {selectedDrawings.length > 0  && <p>📐 <span className="font-medium">{selectedDrawings.length}</span> drawing{selectedDrawings.length !== 1 ? "s" : ""} selected</p>}
+                  {selectedRecipients.length > 0 && <p>👥 <span className="font-medium">{selectedRecipients.length}</span> recipient{selectedRecipients.length !== 1 ? "s" : ""}</p>}
+                  {purpose && <p>📋 Purpose: <span className="font-medium">{purpose}</span></p>}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Footer */}
+          <div className="px-6 py-4 border-t border-slate-100 bg-slate-50/60 flex items-center justify-between gap-3 shrink-0">
+            <p className="text-xs text-slate-400 hidden sm:block">A PDF cover sheet will be auto-generated and attached.</p>
+            <div className="flex items-center gap-2 ml-auto">
+              <button type="button" onClick={onClose}
+                className="px-4 py-2 text-sm font-medium text-slate-600 hover:text-slate-900 border border-slate-200 hover:border-slate-300 rounded-lg transition bg-white">
+                Cancel
+              </button>
+              <button type="submit" disabled={submitting}
+                className="px-5 py-2 text-sm font-semibold text-white rounded-lg transition flex items-center gap-2 disabled:opacity-60"
+                style={{ background: submitting ? "#6366f1" : "linear-gradient(135deg,#4f46e5,#7c3aed)" }}>
+                {submitting
+                  ? <><svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeDasharray="30 70" strokeLinecap="round"/></svg>Sending…</>
+                  : <><svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/></svg>Send Transmittal</>}
+              </button>
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+/* ─── UPLOAD MODAL ──────────────────────────────────────────────── */
+function UploadModal({ onClose, onSubmit }) {
+  const [form, setForm]             = useState({ drawingNumber: "", title: "", discipline: "", revision: "", originator: "", status: "S1", notes: "" });
+  const [file, setFile]             = useState(null);
+  const [dragging, setDragging]     = useState(false);
+  const [errors, setErrors]         = useState({});
+  const [submitting, setSubmitting] = useState(false);
+  const fileInputRef                = useRef(null);
+
+  const set = (k, v) => { setForm(f => ({ ...f, [k]: v })); setErrors(e => ({ ...e, [k]: "" })); };
+
+  const pickFile = (f) => {
+    if (!f) return;
+    setFile(f);
+    setErrors(e => ({ ...e, file: "" }));
+  };
+
+  const handleDrop = (ev) => {
+    ev.preventDefault();
+    setDragging(false);
+    pickFile(ev.dataTransfer.files[0]);
+  };
+
+  const validate = () => {
+    const e = {};
+    if (!file)                      e.file         = "A file is required";
+    if (!form.drawingNumber.trim()) e.drawingNumber = "Required";
+    if (!form.title.trim())         e.title         = "Required";
+    if (!form.discipline)           e.discipline    = "Required";
+    if (!form.revision.trim())      e.revision      = "Required";
+    if (!form.originator)           e.originator    = "Required";
+    return e;
+  };
+
+  const handleSubmit = async (ev) => {
+    ev.preventDefault();
+    const e = validate();
+    if (Object.keys(e).length) { setErrors(e); return; }
+    setSubmitting(true);
+    try {
+      await onSubmit(form, file);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const inputCls = (key) =>
+    `w-full border rounded-lg px-3 py-2.5 text-sm text-slate-700 outline-none transition focus:ring-2 focus:ring-blue-500 focus:border-transparent placeholder:text-slate-300 ${errors[key] ? "border-red-400 bg-red-50" : "border-slate-200 bg-white"}`;
+
+  /* ── drop-zone appearance ── */
+  const dropZoneCls = [
+    "border-2 border-dashed rounded-xl p-5 text-center transition cursor-pointer group select-none",
+    dragging              ? "border-blue-500 bg-blue-50 scale-[1.01]"  :
+    errors.file           ? "border-red-400 bg-red-50"                  :
+    file                  ? "border-emerald-400 bg-emerald-50"          :
+                            "border-slate-200 bg-slate-50 hover:border-blue-400 hover:bg-blue-50",
+  ].join(" ");
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(15,23,42,0.55)" }}>
+      <div className="modal-enter bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden">
+        <div className="px-6 py-5 border-b border-slate-100 flex items-center justify-between bg-gradient-to-r from-slate-900 to-slate-800">
+          <div>
+            <h2 className="text-base font-semibold text-white">Upload Drawing</h2>
+            <p className="text-xs text-slate-400 mt-0.5">Register a new drawing to the Master Drawing Register</p>
+          </div>
+          <button onClick={onClose} className="text-slate-400 hover:text-white transition p-1 rounded-lg hover:bg-white/10">
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12"/></svg>
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="p-6 space-y-5">
+          {/* ── File drop zone ── */}
+          <div>
+            <input ref={fileInputRef} type="file" accept=".pdf,.dwg,.dxf" className="hidden"
+              onChange={ev => pickFile(ev.target.files[0])} />
+            <div className={dropZoneCls}
+              onClick={() => fileInputRef.current.click()}
+              onDragOver={ev => { ev.preventDefault(); setDragging(true); }}
+              onDragLeave={() => setDragging(false)}
+              onDrop={handleDrop}>
+              {file ? (
+                <div className="flex items-center justify-center gap-2.5">
+                  <svg className="w-5 h-5 text-emerald-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                  <span className="text-sm font-medium text-emerald-700 truncate max-w-xs">{file.name}</span>
+                  <span className="text-xs text-emerald-500 shrink-0">({(file.size / 1024 / 1024).toFixed(1)} MB)</span>
+                  <button type="button" onClick={ev => { ev.stopPropagation(); setFile(null); }}
+                    className="ml-1 text-emerald-400 hover:text-red-500 transition text-xl leading-none font-light">×</button>
+                </div>
+              ) : (
+                <div className="flex flex-col items-center gap-2">
+                  <svg className={`w-8 h-8 transition ${dragging ? "text-blue-500" : "text-slate-300 group-hover:text-blue-400"}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
+                  <p className={`text-sm font-medium transition ${dragging ? "text-blue-600" : "text-slate-500 group-hover:text-blue-600"}`}>
+                    {dragging ? "Drop file here" : "Drag & drop PDF / DWG / DXF here"}
+                  </p>
+                  <p className="text-xs text-slate-400">or <span className="text-blue-500 underline">browse files</span> — max 100 MB</p>
+                </div>
+              )}
+            </div>
+            {errors.file && <p className="text-xs text-red-500 mt-1.5">{errors.file}</p>}
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <Field errors={errors} label="Drawing Number" id="drawingNumber" req>
+              <input id="drawingNumber" placeholder="e.g. ARC-GF-004" className={inputCls("drawingNumber")}
+                value={form.drawingNumber} onChange={e => set("drawingNumber", e.target.value)} />
+            </Field>
+            <Field errors={errors} label="Revision" id="revision" req>
+              <input id="revision" placeholder="e.g. A" maxLength={4} className={inputCls("revision")}
+                value={form.revision} onChange={e => set("revision", e.target.value.toUpperCase())} />
+            </Field>
+          </div>
+
+          <Field errors={errors} label="Drawing Title" id="title" req>
+            <input id="title" placeholder="e.g. Ground Floor Plan — Level 01" className={inputCls("title")}
+              value={form.title} onChange={e => set("title", e.target.value)} />
+          </Field>
+
+          <div className="grid grid-cols-2 gap-4">
+            <Field errors={errors} label="Discipline" id="discipline" req>
+              <select id="discipline" className={inputCls("discipline")} value={form.discipline} onChange={e => set("discipline", e.target.value)}>
+                <option value="">Select discipline</option>
+                {DISCIPLINES.map(d => <option key={d}>{d}</option>)}
+              </select>
+            </Field>
+            <Field errors={errors} label="Originator" id="originator" req>
+              <select id="originator" className={inputCls("originator")} value={form.originator} onChange={e => set("originator", e.target.value)}>
+                <option value="">Select originator</option>
+                {ORIGINATORS.map(o => <option key={o}>{o}</option>)}
+              </select>
+            </Field>
+          </div>
+
+          <Field errors={errors} label="Issue Status" id="status">
+            <div className="grid grid-cols-4 gap-2">
+              {STATUSES.map(s => {
+                const m = STATUS_META[s];
+                const active = form.status === s;
+                return (
+                  <button type="button" key={s} onClick={() => set("status", s)}
+                    className={`border rounded-lg py-2 px-2 text-xs font-semibold transition ${active ? `${m.bg} ${m.text} border-current` : "border-slate-200 text-slate-500 hover:border-slate-300"}`}>
+                    {s}
+                  </button>
+                );
+              })}
+            </div>
+          </Field>
+
+          <Field errors={errors} label="Notes / Comments" id="notes">
+            <textarea id="notes" rows={2} placeholder="Optional transmittal notes…" className={`${inputCls("notes")} resize-none`}
+              value={form.notes} onChange={e => set("notes", e.target.value)} />
+          </Field>
+
+          <div className="flex items-center justify-end gap-3 pt-2 border-t border-slate-100">
+            <button type="button" onClick={onClose}
+              className="px-4 py-2 text-sm font-medium text-slate-600 hover:text-slate-900 border border-slate-200 hover:border-slate-300 rounded-lg transition">
+              Cancel
+            </button>
+            <button type="submit" disabled={submitting}
+              className="px-5 py-2 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition flex items-center gap-2 disabled:opacity-60">
+              {submitting
+                ? <><svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeDasharray="30 70" strokeLinecap="round"/></svg>Uploading…</>
+                : <><svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>Register Drawing</>}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+/* ─── TOAST ─────────────────────────────────────────────────────── */
+function Toast({ msg, type = "success", onDone }) {
+  useEffect(() => { const t = setTimeout(onDone, 4000); return () => clearTimeout(t); }, []);
+  const isError = type === "error";
+  return (
+    <div className={`fixed bottom-6 right-6 z-50 modal-enter px-4 py-3 rounded-xl shadow-xl flex items-center gap-3 text-sm font-medium text-white ${isError ? "bg-red-600" : "bg-emerald-600"}`}>
+      {isError
+        ? <svg className="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg>
+        : <svg className="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7"/></svg>
+      }
+      {msg}
+    </div>
+  );
+}
+
+/* ─── MAIN APP ──────────────────────────────────────────────────── */
+function App() {
+  /* ── Persisted state: seed from localStorage, fall back to mock data ── */
+  const [drawings, setDrawings] = useState([]);
+  const [transmittals, setTransmittals] = useState(() => lsLoad(LS_KEYS.transmittals, MOCK_TRANSMITTALS));
+
+  /* ── Fetch drawings from backend on mount ── */
+  useEffect(() => {
+    fetch("http://localhost:3000/api/drawings")
+      .then(res => res.json())
+      .then(data => setDrawings(data))
+      .catch(() => {});
+  }, []);
+
+  /* ── Sync transmittals to localStorage on every change ── */
+  useEffect(() => { lsSave(LS_KEYS.transmittals, transmittals); }, [transmittals]);
+
+  /* ── UI state ── */
+  const [showModal,       setShowModal]       = useState(false);
+  const [showTransmittal, setShowTransmittal] = useState(false);
+  const [toast,           setToast]           = useState(null);
+  const [activeRole,      setActiveRole]      = useState("Document Controller");
+
+  const ROLES = ["Document Controller", "Project Manager", "Internal User", "Subcontractor", "Read-Only"];
+  const isRestricted = activeRole === "Subcontractor" || activeRole === "Read-Only";
+  const [search,          setSearch]          = useState("");
+  const [filterDisc,      setFilterDisc]      = useState("All");
+  const [filterStat,      setFilterStat]      = useState("All");
+  const [sortKey,         setSortKey]         = useState("number");
+  const [sortDir,         setSortDir]         = useState("asc");
+  const [page,            setPage]            = useState(1);
+  const PER_PAGE = 8;
+
+  /* ── Derived metrics — all calculated from live state, no hardcoding ── */
+  const totalDrawings   = drawings.length;
+  const forConstruction = drawings.filter(d => d.status === "S3").length;
+  const pendingReviews  = drawings.filter(d => d.status === "S2").length;
+  const disciplineCount = new Set(drawings.map(d => d.discipline)).size;
+  const totalTransmittals = transmittals.length;
+  const overdueTransmit = transmittals.filter(t =>
+    OVERDUE_PURPOSES.has(t.purpose) &&
+    (Date.now() - new Date(t.issuedAt).getTime()) > MS_30_DAYS
+  ).length;
+
+  /* Next transmittal number, always one ahead of current length */
+  const nextTrnNumber = `TRN-${String(transmittals.length + 1).padStart(3, "0")}`;
+
+  /* ── Filtered + sorted table data ── */
+  const filtered = useMemo(() => {
+    let d = drawings.filter(row => {
+      const q = search.toLowerCase();
+      const matchQ = !q ||
+        row.number.toLowerCase().includes(q) ||
+        row.title.toLowerCase().includes(q) ||
+        row.originator.toLowerCase().includes(q);
+      const matchD = filterDisc === "All" || row.discipline === filterDisc;
+      const matchS = filterStat === "All" || row.status    === filterStat;
+      return matchQ && matchD && matchS;
+    });
+    d = [...d].sort((a, b) => {
+      let va = a[sortKey] ?? "", vb = b[sortKey] ?? "";
+      if (typeof va === "string") { va = va.toLowerCase(); vb = vb.toLowerCase(); }
+      if (va < vb) return sortDir === "asc" ? -1 :  1;
+      if (va > vb) return sortDir === "asc" ?  1 : -1;
+      return 0;
+    });
+    return d;
+  }, [drawings, search, filterDisc, filterStat, sortKey, sortDir]);
+
+  const totalPages = Math.ceil(filtered.length / PER_PAGE);
+  const pageRows   = filtered.slice((page - 1) * PER_PAGE, page * PER_PAGE);
+
+  const handleSort = (key) => {
+    if (sortKey === key) setSortDir(d => d === "asc" ? "desc" : "asc");
+    else { setSortKey(key); setSortDir("asc"); }
+    setPage(1);
+  };
+
+  /* ── Handlers ── */
+  const handleUpload = async (form, file) => {
+    const fd = new FormData();
+    fd.append("drawingFile",   file);
+    fd.append("drawingNumber", form.drawingNumber);
+    fd.append("title",         form.title);
+    fd.append("discipline",    form.discipline);
+    fd.append("revision",      form.revision);
+    fd.append("originator",    form.originator);
+    fd.append("status",        form.status);
+    fd.append("notes",         form.notes || "");
+
+    try {
+      const res = await fetch("http://localhost:3000/api/upload", { method: "POST", body: fd });
+      if (!res.ok) throw new Error(`Server responded ${res.status}`);
+      const data = await res.json();
+
+      const refreshed = await fetch("http://localhost:3000/api/drawings");
+      const data2 = await refreshed.json();
+      setDrawings(data2);
+      setShowModal(false);
+      setToast({ msg: `"${form.drawingNumber}" registered successfully.`, type: "success" });
+    } catch (err) {
+      setShowModal(false);
+      setToast({ msg: "Upload failed — backend server is unreachable.", type: "error" });
+    }
+  };
+
+  const handleTransmittal = (formData) => {
+    const newTrn = {
+      id:         Date.now(),
+      number:     nextTrnNumber,
+      drawingIds: formData.drawingIds,
+      recipients: formData.recipients,
+      purpose:    formData.purpose,
+      remarks:    formData.remarks,
+      issuedAt:   new Date().toISOString().split("T")[0],
+    };
+    setTransmittals(prev => [...prev, newTrn]);  /* useEffect syncs to localStorage */
+    /* Increment per-drawing transmittal count for drawings included in this package */
+    setDrawings(prev => prev.map(d =>
+      formData.drawingIds.includes(d.id) ? { ...d, transmittals: d.transmittals + 1 } : d
+    ));
+    setShowTransmittal(false);
+    setToast({ msg: `Transmittal #${nextTrnNumber} Issued Successfully`, type: "success" });
+  };
+
+  return (
+    <div className="min-h-screen bg-slate-50 flex flex-col">
+
+      {/* ── TOP NAV ── */}
+      <header className="sticky top-0 z-40 bg-slate-900 border-b border-slate-800 px-6 py-0 flex items-center h-14 gap-6">
+        <div className="flex items-center gap-2.5">
+          <div className="w-7 h-7 rounded-lg bg-blue-500 flex items-center justify-center text-white text-xs font-bold shrink-0">DV</div>
+          <span className="text-white font-semibold text-sm tracking-tight">DrawVault</span>
+          <span className="text-slate-600 text-sm hidden sm:block">/ Enterprise DMS</span>
+        </div>
+        <nav className="flex items-center gap-1 ml-4 hidden md:flex">
+          {["Dashboard", "Drawings", "Transmittals", "Packages", "Reports"].map((n, i) => (
+            <button key={n} className={`px-3 py-1.5 rounded-md text-xs font-medium transition ${i === 0 ? "bg-blue-600 text-white" : "text-slate-400 hover:text-white hover:bg-slate-800"}`}>{n}</button>
+          ))}
+        </nav>
+        <div className="ml-auto flex items-center gap-3">
+          <button className="relative p-2 text-slate-400 hover:text-white transition rounded-lg hover:bg-slate-800">
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/></svg>
+            <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full border-2 border-slate-900"></span>
+          </button>
+          {/* ── Role selector ── */}
+          <div className="flex items-center gap-1.5 border border-slate-700 rounded-lg px-2.5 py-1.5 bg-slate-800 hover:border-slate-600 transition">
+            <svg className="w-3.5 h-3.5 text-slate-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
+            <span className="text-slate-400 text-xs hidden sm:block">Viewing as:</span>
+            <select
+              value={activeRole}
+              onChange={e => setActiveRole(e.target.value)}
+              className="bg-transparent text-xs font-semibold text-white outline-none cursor-pointer max-w-[130px]"
+              style={{ WebkitAppearance: "none" }}>
+              {ROLES.map(r => <option key={r} value={r} className="bg-slate-800 text-white">{r}</option>)}
+            </select>
+            <svg className="w-3 h-3 text-slate-500 shrink-0 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7"/></svg>
+          </div>
+          <div className="w-7 h-7 rounded-full bg-blue-600 flex items-center justify-center text-white text-xs font-semibold">HA</div>
+        </div>
+      </header>
+
+      {/* ── PROJECT BAR ── */}
+      <div className="bg-white border-b border-slate-200 px-6 py-3 flex items-center justify-between">
+        <div>
+          <p className="text-xs text-slate-400 mb-0.5">Project — <span className="text-slate-600 font-medium">Orion Tower, Dubai (ORI-2024)</span></p>
+          <h1 className="text-lg font-bold text-slate-900">Drawing Management</h1>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="hidden sm:flex items-center gap-1.5 text-xs text-slate-500 bg-slate-100 px-3 py-1.5 rounded-full">
+            <svg className="w-3.5 h-3.5 text-emerald-500" fill="currentColor" viewBox="0 0 8 8"><circle cx="4" cy="4" r="4"/></svg>
+            Live sync active
+          </span>
+          {!isRestricted && (
+            <button onClick={() => setShowTransmittal(true)}
+              className="flex items-center gap-2 text-sm font-semibold px-4 py-2 rounded-lg transition border border-indigo-200 text-indigo-700 bg-indigo-50 hover:bg-indigo-100 hover:border-indigo-300">
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/></svg>
+              Create Transmittal
+            </button>
+          )}
+          {!isRestricted && (
+            <button onClick={() => setShowModal(true)}
+              className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-4 py-2 rounded-lg transition shadow-sm shadow-blue-200">
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
+              Upload Drawing
+            </button>
+          )}
+        </div>
+      </div>
+
+      <main className="flex-1 px-6 py-6 space-y-6 max-w-screen-xl mx-auto w-full">
+
+        {/* ── METRICS — all driven by live state ── */}
+        <section>
+          <h2 className="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-3">Project Overview</h2>
+          <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+            <MetricCard label="Total Drawings"     value={totalDrawings}     sub={`Across ${disciplineCount} disciplines`}  icon="📐" accent="blue"    />
+            <MetricCard label="For Construction"   value={forConstruction}   sub="Status S3 issued"                         icon="🏗️" accent="emerald"  />
+            <MetricCard label="Pending Reviews"    value={pendingReviews}    sub="Awaiting S2 approval"                     icon="🔍" accent="amber"   />
+            <MetricCard label="Overdue Transmit."  value={overdueTransmit}   sub="Unresolved > 30 days"                    icon="⚠️" accent="red"     />
+            <MetricCard label="Total Transmittals" value={totalTransmittals} sub="Packages issued to date"                  icon="📦" accent="violet"  />
+          </div>
+        </section>
+
+        {/* ── DISCIPLINE BREAKDOWN ── */}
+        <section className="bg-white border border-slate-200 rounded-xl p-5">
+          <h2 className="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-4">Drawings by Discipline</h2>
+          <div className="flex flex-wrap gap-3">
+            {DISCIPLINES.map(disc => {
+              const count  = drawings.filter(d => d.discipline === disc).length;
+              const pct    = totalDrawings > 0 ? Math.round((count / totalDrawings) * 100) : 0;
+              const colors = DISCIPLINE_COLORS[disc] || "bg-slate-100 text-slate-700";
+              return (
+                <div key={disc} className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium ${colors}`}>
+                  <span>{disc}</span>
+                  <span className="opacity-60 text-xs font-bold">{count}</span>
+                  <div className="w-12 h-1.5 bg-black/10 rounded-full overflow-hidden">
+                    <div className="h-full bg-current rounded-full opacity-40" style={{ width: `${pct}%` }}></div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+
+        {/* ── MASTER DRAWING REGISTER ── */}
+        <section className="bg-white border border-slate-200 rounded-xl overflow-hidden">
+          <div className="px-5 py-4 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center gap-3">
+            <div>
+              <h2 className="text-sm font-bold text-slate-800">Master Drawing Register</h2>
+              <p className="text-xs text-slate-400 mt-0.5">{filtered.length} drawing{filtered.length !== 1 ? "s" : ""} found</p>
+            </div>
+            <div className="sm:ml-auto flex flex-wrap items-center gap-2">
+              <div className="relative">
+                <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0"/></svg>
+                <input placeholder="Search drawings…" value={search} onChange={e => { setSearch(e.target.value); setPage(1); }}
+                  className="pl-8 pr-3 py-2 text-xs border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-slate-50 w-44" />
+              </div>
+              <select value={filterDisc} onChange={e => { setFilterDisc(e.target.value); setPage(1); }}
+                className="text-xs border border-slate-200 rounded-lg px-2.5 py-2 outline-none focus:ring-2 focus:ring-blue-500 bg-slate-50 text-slate-600">
+                <option value="All">All Disciplines</option>
+                {DISCIPLINES.map(d => <option key={d}>{d}</option>)}
+              </select>
+              <select value={filterStat} onChange={e => { setFilterStat(e.target.value); setPage(1); }}
+                className="text-xs border border-slate-200 rounded-lg px-2.5 py-2 outline-none focus:ring-2 focus:ring-blue-500 bg-slate-50 text-slate-600">
+                <option value="All">All Statuses</option>
+                {STATUSES.map(s => <option key={s} value={s}>{STATUS_META[s].label}</option>)}
+              </select>
+              <button className="flex items-center gap-1.5 text-xs font-medium text-slate-600 border border-slate-200 hover:border-slate-300 px-3 py-2 rounded-lg transition bg-slate-50">
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+                Export
+              </button>
+            </div>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="min-w-full text-sm">
+              <thead className="bg-slate-50 border-b border-slate-200">
+                <tr>
+                  <Th col="number"     label="Drawing No."      sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
+                  <Th col="title"      label="Title"            sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
+                  <Th col="discipline" label="Discipline"       sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
+                  <Th col="rev"        label="Rev."  cls="w-16" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
+                  <Th col="status"     label="Status"           sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
+                  <Th col="issueDate"  label="Issue Date"       sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
+                  <Th col="originator" label="Originator"       sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {pageRows.length === 0 ? (
+                  <tr><td colSpan={8} className="text-center py-16 text-slate-400 text-sm">No drawings match your filters.</td></tr>
+                ) : pageRows.map(row => (
+                  <tr key={row.id} className="row-hover cursor-default">
+                    <td className="px-4 py-3.5 font-mono text-xs font-semibold text-blue-700 whitespace-nowrap">{row.number}</td>
+                    <td className="px-4 py-3.5 text-slate-700 max-w-xs">
+                      <p className="font-medium truncate">{row.title}</p>
+                      <p className="text-xs text-slate-400 mt-0.5">{row.transmittals} transmittal{row.transmittals !== 1 ? "s" : ""}</p>
+                    </td>
+                    <td className="px-4 py-3.5 whitespace-nowrap">
+                      <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${DISCIPLINE_COLORS[row.discipline] || "bg-slate-100 text-slate-700"}`}>{row.discipline}</span>
+                    </td>
+                    <td className="px-4 py-3.5 text-center">
+                      <span className="inline-block w-7 h-7 rounded-full bg-slate-100 text-slate-700 text-xs font-bold leading-7 text-center">{row.rev}</span>
+                    </td>
+                    <td className="px-4 py-3.5 whitespace-nowrap"><StatusBadge code={row.status} /></td>
+                    <td className="px-4 py-3.5 text-slate-500 text-xs whitespace-nowrap">{row.issueDate}</td>
+                    <td className="px-4 py-3.5 text-slate-500 text-xs whitespace-nowrap">{row.originator}</td>
+                    <td className="px-4 py-3.5 whitespace-nowrap">
+                      <div className="flex items-center gap-1">
+                        <button title="View" className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded transition"
+                          onClick={() => {
+                            if (row.path) {
+                              window.open(`http://localhost:3000${row.path}`, "_blank", "noopener,noreferrer");
+                            } else {
+                              alert("This is a mock drawing. Upload a real file to view it.");
+                            }
+                          }}>
+                          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                        </button>
+                        <button title="Download" className="p-1.5 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded transition">
+                          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+                        </button>
+                        {!isRestricted && (
+                          <button title="More options" className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded transition">
+                            <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/></svg>
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="px-5 py-3.5 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center gap-2 justify-between bg-slate-50/50">
+            <p className="text-xs text-slate-400">
+              Showing {filtered.length === 0 ? 0 : Math.min((page-1)*PER_PAGE+1, filtered.length)}–{Math.min(page*PER_PAGE, filtered.length)} of {filtered.length} results
+            </p>
+            <div className="flex items-center gap-1">
+              <button disabled={page === 1} onClick={() => setPage(p => p - 1)}
+                className="px-3 py-1.5 text-xs font-medium border border-slate-200 rounded-lg disabled:opacity-40 hover:bg-slate-100 transition">← Prev</button>
+              {[...Array(totalPages)].map((_, i) => (
+                <button key={i} onClick={() => setPage(i+1)}
+                  className={`w-7 h-7 text-xs font-medium rounded-lg transition ${page === i+1 ? "bg-blue-600 text-white border border-blue-600" : "border border-slate-200 text-slate-600 hover:bg-slate-100"}`}>
+                  {i+1}
+                </button>
+              ))}
+              <button disabled={page === totalPages || totalPages === 0} onClick={() => setPage(p => p + 1)}
+                className="px-3 py-1.5 text-xs font-medium border border-slate-200 rounded-lg disabled:opacity-40 hover:bg-slate-100 transition">Next →</button>
+            </div>
+          </div>
+        </section>
+      </main>
+
+      {/* ── FOOTER ── */}
+      <footer className="border-t border-slate-200 bg-white px-6 py-3 text-xs text-slate-400 flex items-center justify-between">
+        <span>DrawVault Enterprise DMS — Orion Tower, Dubai (ORI-2024)</span>
+        <span>© 2025 DrawVault Technologies</span>
+      </footer>
+
+      {/* ── MODALS / OVERLAYS ── */}
+      {showModal       && <UploadModal onClose={() => setShowModal(false)} onSubmit={handleUpload} />}
+      {showTransmittal && <TransmittalModal drawings={drawings} onClose={() => setShowTransmittal(false)} onSubmit={handleTransmittal} trnNumber={nextTrnNumber} />}
+      {toast && <Toast msg={toast.msg} type={toast.type} onDone={() => setToast(null)} />}
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+</script>
+</body>
+</html>
