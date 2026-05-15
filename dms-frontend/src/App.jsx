@@ -6,6 +6,7 @@ import TransmittalModal from "./components/TransmittalModal";
 import ProjectModal from "./components/ProjectModal";
 import MasterRegisterTable from "./components/MasterRegisterTable";
 import TransmittalsView from "./components/TransmittalsView";
+import ProjectSelector from "./components/ProjectSelector";
 import Toast from "./components/Toast";
 import LoginPage from "./components/LoginPage";
 
@@ -232,18 +233,13 @@ export default function App() {
             <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant text-sm">search</span>
             <input className="bg-surface-container-highest/50 border border-white/10 rounded-full pl-9 pr-4 py-1.5 text-sm text-on-surface placeholder:text-on-surface-variant focus:outline-none focus:bg-surface-container-high w-64 transition-all" placeholder="Search..." type="text" value={search} onChange={e => handleSearch(e.target.value)} />
           </div>
-          <select
-            value={activeProject?.id || ""}
-            onChange={e => setActiveProject(projects.find(p => p.id === Number(e.target.value)))}
-            className="bg-surface-container-highest/50 border border-white/10 rounded-md px-2 py-1.5 text-xs text-on-surface outline-none cursor-pointer focus:ring-1 focus:ring-primary transition-all"
-          >
-            {projects.map(p => <option key={p.id} value={p.id}>{p.code}</option>)}
-          </select>
-          {!isRestricted && (
-            <button onClick={() => setShowProjectModal(true)} className="p-1.5 hover:bg-white/5 rounded-md text-on-surface-variant hover:text-primary transition-colors" title="New Project">
-              <span className="material-symbols-outlined text-[18px]">add</span>
-            </button>
-          )}
+          <ProjectSelector
+            projects={projects}
+            activeProject={activeProject}
+            onChange={setActiveProject}
+            onNew={() => setShowProjectModal(true)}
+            isRestricted={isRestricted}
+          />
           <button onClick={() => setCurrentUser(null)} className="p-1.5 hover:bg-white/5 rounded-md text-on-surface-variant hover:text-error transition-colors ml-2" title="Sign out">
              <span className="material-symbols-outlined text-[18px]">logout</span>
           </button>
@@ -262,21 +258,27 @@ export default function App() {
             latestRevisions={pendingReviews}
             overdueItems={overdueTransmit}
             drawings={drawings}
+            activeProjectId={activeProject?.id}
           />
         ) : currentTab === 'register' ? (
           <MasterRegisterTable
             drawings={pageRows}
+            allDrawings={drawings}
             total={filtered.length}
             page={page}
             totalPages={totalPages}
             search={search}
             filterStat={filterStat}
+            filterDisc={filterDisc}
+            sortKey={sortKey}
+            sortDir={sortDir}
             onPageChange={setPage}
             onSearch={handleSearch}
             onFilterStat={handleFilterStat}
+            onFilterDisc={handleFilterDisc}
+            onSort={handleSort}
             onNewEntry={() => setShowModal(true)}
             onVoid={handleVoid}
-            API={API}
           />
         ) : currentTab === 'transmittals' ? (
           <TransmittalsView transmittals={transmittals} drawings={drawings} />

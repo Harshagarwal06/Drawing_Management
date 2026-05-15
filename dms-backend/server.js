@@ -21,6 +21,15 @@ app.use('/uploads', express.static(uploadDir));
 const db = new Database(path.join(__dirname, 'dms.db'));
 
 db.exec(`
+  CREATE TABLE IF NOT EXISTS activity_log (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    project_id INTEGER NOT NULL DEFAULT 1,
+    type       TEXT NOT NULL,
+    title      TEXT NOT NULL,
+    detail     TEXT,
+    created_at TEXT NOT NULL
+  );
+
   CREATE TABLE IF NOT EXISTS drawings (
     id           INTEGER PRIMARY KEY AUTOINCREMENT,
     number       TEXT    NOT NULL UNIQUE,
@@ -92,6 +101,20 @@ const storage = multer.diskStorage({
   filename:    (req, file, cb) => cb(null, `${Date.now()}-${file.originalname}`),
 });
 const upload = multer({ storage });
+
+/* ── GET /api/activity ──────────────────────────────────────────── */
+app.get('/api/activity', (req, res) => {
+  const projectId = req.query.projectId || 1;
+  try {
+    const rows = db.prepare(
+      'SELECT * FROM activity_log WHERE project_id = ? ORDER BY id DESC LIMIT 30'
+    ).all(projectId);
+    res.json(rows);
+  } catch (err) {
+    console.error('❌ GET /api/activity error:', err);
+    res.status(500).json({ error: 'Failed to fetch activity.' });
+  }
+});
 
 /* ── GET /api/projects ──────────────────────────────────────────── */
 app.get('/api/projects', (req, res) => {
@@ -172,6 +195,11 @@ app.post('/api/upload', upload.single('drawingFile'), (req, res) => {
       console.log(`✅ Registered new drawing ${drawingNumber} Rev ${revision}`);
     }
 
+    db.prepare('INSERT INTO activity_log (project_id, type, title, detail, created_at) VALUES (?, ?, ?, ?, ?)')
+      .run(pId, existing ? 'revision' : 'upload',
+        existing ? `${drawingNumber} revised to Rev ${revision}` : `${drawingNumber} registered`,
+        title, new Date().toISOString());
+
     res.json({ message: 'Drawing saved successfully.', path: filePath });
   } catch (err) {
     console.error('❌ POST /api/upload error:', err);
@@ -229,6 +257,9 @@ app.post('/api/transmittals', (req, res) => {
     );
     for (const id of drawingIds) updateCount.run(id);
 
+    db.prepare('INSERT INTO activity_log (project_id, type, title, detail, created_at) VALUES (?, ?, ?, ?, ?)')
+      .run(pId, 'transmittal', `${number} issued`, `${drawingIds.length} drawing(s) — ${purpose}`, new Date().toISOString());
+
     console.log(`✅ Transmittal ${number} saved (${drawingIds.length} drawings)`);
     res.status(201).json({ id: result.lastInsertRowid, number });
   } catch (err) {
@@ -241,9 +272,12 @@ app.post('/api/transmittals', (req, res) => {
 app.patch('/api/drawings/:id/void', (req, res) => {
   const { id } = req.params;
   try {
-    const result = db.prepare("UPDATE drawings SET status = 'VOID' WHERE id = ?").run(id);
-    if (result.changes === 0) return res.status(404).json({ error: 'Drawing not found.' });
-    console.log(`✅ Drawing ${id} voided`);
+    const drawing = db.prepare('SELECT number, project_id FROM drawings WHERE id = ?').get(id);
+    if (!drawing) return res.status(404).json({ error: 'Drawing not found.' });
+    db.prepare("UPDATE drawings SET status = 'VOID' WHERE id = ?").run(id);
+    db.prepare('INSERT INTO activity_log (project_id, type, title, detail, created_at) VALUES (?, ?, ?, ?, ?)')
+      .run(drawing.project_id, 'void', `${drawing.number} voided`, 'Drawing superseded / voided', new Date().toISOString());
+    console.log(`✅ Drawing ${drawing.number} voided`);
     res.json({ id, status: 'VOID' });
   } catch (err) {
     console.error('❌ PATCH /api/drawings/:id/void error:', err);
