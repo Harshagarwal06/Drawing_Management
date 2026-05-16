@@ -64,7 +64,12 @@ export default function LoginPage({ onLogin }) {
             {/* Logo */}
             <div className="flex flex-col items-center mb-8">
               <img src="/logo.png" alt="Unique Properties" className="h-10 w-auto object-contain mb-4" />
-              <h1 className="font-headline-sm text-headline-sm text-on-surface font-semibold text-center">DrawVault</h1>
+              <h1
+                className="font-headline-sm text-headline-sm font-semibold text-center"
+                style={{ background: "linear-gradient(90deg, #F4A223 0%, #C9A06A 50%, #1B6ABF 100%)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text" }}
+              >
+                Unique Properties
+              </h1>
               <p className="font-body-sm text-body-sm text-on-surface-variant text-center mt-1">Secure Project Workspace</p>
             </div>
 
@@ -141,7 +146,7 @@ export default function LoginPage({ onLogin }) {
             </form>
 
             <p className="mt-6 text-center font-body-sm text-body-sm text-on-surface-variant">
-              Enterprise instance · DrawVault v2.0
+              Enterprise instance · Unique Properties v2.0
             </p>
           </div>
         </div>

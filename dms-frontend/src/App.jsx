@@ -104,7 +104,6 @@ export default function App() {
 
   /* ── Derived metrics ── */
   const totalDrawings     = drawings.length;
-  const forConstruction   = drawings.filter(d => d.status === "S3").length;
   const pendingReviews    = drawings.filter(d => d.status === "S2").length;
   const totalTransmittals = transmittals.length;
   const overdueTransmit   = transmittals.filter(t =>
@@ -117,7 +116,7 @@ export default function App() {
   /* ── Filter + sort ── */
   const filtered = useMemo(() => {
     let d = drawings.filter(row => {
-      const q     = search.toLowerCase();
+      const q      = search.toLowerCase();
       const matchQ = !q ||
         row.number.toLowerCase().includes(q) ||
         row.title.toLowerCase().includes(q) ||
@@ -139,12 +138,11 @@ export default function App() {
   const totalPages = Math.ceil(filtered.length / PER_PAGE);
   const pageRows   = filtered.slice((page - 1) * PER_PAGE, page * PER_PAGE);
 
-  const handleSort = (key) => {
+  const handleSort      = key => {
     if (sortKey === key) setSortDir(d => d === "asc" ? "desc" : "asc");
     else { setSortKey(key); setSortDir("asc"); }
     setPage(1);
   };
-
   const handleSearch     = v => { setSearch(v);     setPage(1); };
   const handleFilterDisc = v => { setFilterDisc(v); setPage(1); };
   const handleFilterStat = v => { setFilterStat(v); setPage(1); };
@@ -221,7 +219,6 @@ export default function App() {
   if (!currentUser) return <LoginPage onLogin={setCurrentUser} />;
 
   return (
-    /* ── Root shell ── */
     <div className="bg-background text-on-surface font-outfit min-h-screen flex">
 
       <Sidebar
@@ -229,16 +226,16 @@ export default function App() {
         onTabChange={setCurrentTab}
         currentTab={currentTab}
         currentUser={currentUser}
-        onNewDrawing={!isRestricted ? () => { setModalFolder(""); setShowModal(true); } : undefined}
+        /* New Drawing CTA removed — upload lives in the contextual action bar */
       />
 
       {/* ── Right column ── */}
       <div className="flex flex-col flex-1" style={{ marginLeft: "280px" }}>
 
-        {/* Top App Bar — glassmorphism */}
-        <header className="bg-glass-surface/80 backdrop-blur-md border-b border-border-slate sticky top-0 z-40 h-16 flex items-center justify-between px-10">
+        {/* ── Top App Bar — search only + utility icons ── */}
+        <header className="bg-glass-surface/80 backdrop-blur-md border-b border-border-slate sticky top-0 z-40 h-16 flex items-center justify-between px-10 gap-6">
 
-          {/* Search */}
+          {/* Search — left */}
           <div className="relative w-full max-w-md">
             <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant text-[20px]">search</span>
             <input
@@ -250,60 +247,38 @@ export default function App() {
             />
           </div>
 
-          {/* Nav tabs + actions */}
-          <div className="flex items-center gap-6 ml-8">
-            <nav className="hidden lg:flex items-center gap-8">
-              {[
-                { label: "Overview",         tab: "dashboard"    },
-                { label: "Drawing Register", tab: "register"     },
-                { label: "Transmittals",     tab: "transmittals" },
-              ].map(({ label, tab }) => (
-                <button
-                  key={tab}
-                  onClick={() => setCurrentTab(tab)}
-                  className={`text-body-md pb-1 border-b-2 transition-colors whitespace-nowrap ${
-                    currentTab === tab
-                      ? "text-primary font-bold border-primary"
-                      : "text-on-surface-variant font-medium hover:text-primary border-transparent"
-                  }`}
-                >
-                  {label}
-                </button>
-              ))}
-            </nav>
+          {/* Utility icons — right */}
+          <div className="flex items-center gap-1 shrink-0">
+            <button className="p-2 text-on-surface-variant hover:bg-surface-container rounded-full transition-colors" title="Notifications">
+              <span className="material-symbols-outlined text-[22px]">notifications</span>
+            </button>
+            <button className="p-2 text-on-surface-variant hover:bg-surface-container rounded-full transition-colors" title="Help">
+              <span className="material-symbols-outlined text-[22px]">help</span>
+            </button>
 
-            <div className="flex items-center gap-1">
-              <button className="p-2 text-on-surface-variant hover:bg-surface-container rounded-full transition-colors" title="Notifications">
-                <span className="material-symbols-outlined text-[22px]">notifications</span>
-              </button>
-              <button className="p-2 text-on-surface-variant hover:bg-surface-container rounded-full transition-colors" title="Help">
-                <span className="material-symbols-outlined text-[22px]">help</span>
-              </button>
+            <ProjectSelector
+              projects={projects}
+              activeProject={activeProject}
+              onChange={setActiveProject}
+              onNew={() => setShowProjectModal(true)}
+              isRestricted={isRestricted}
+            />
 
-              <ProjectSelector
-                projects={projects}
-                activeProject={activeProject}
-                onChange={setActiveProject}
-                onNew={() => setShowProjectModal(true)}
-                isRestricted={isRestricted}
-              />
+            <div className="h-6 w-px bg-border-slate mx-1" />
 
-              <div className="h-6 w-px bg-border-slate mx-1" />
+            <button
+              onClick={() => setCurrentUser(null)}
+              className="p-2 text-on-surface-variant hover:bg-status-rose-bg hover:text-status-rose-text rounded-full transition-colors"
+              title="Sign out"
+            >
+              <span className="material-symbols-outlined text-[20px]">logout</span>
+            </button>
 
-              <button
-                onClick={() => setCurrentUser(null)}
-                className="p-2 text-on-surface-variant hover:bg-status-rose-bg hover:text-status-rose-text rounded-full transition-colors"
-                title="Sign out"
-              >
-                <span className="material-symbols-outlined text-[20px]">logout</span>
-              </button>
-
-              <div
-                className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-white text-[13px] font-bold cursor-pointer border border-border-slate ml-1"
-                title={currentUser.name}
-              >
-                {currentUser.name.charAt(0).toUpperCase()}
-              </div>
+            <div
+              className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-white text-[13px] font-bold cursor-pointer border border-border-slate ml-1"
+              title={currentUser.name}
+            >
+              {currentUser.name.charAt(0).toUpperCase()}
             </div>
           </div>
         </header>
@@ -339,15 +314,16 @@ export default function App() {
               onFilterDisc={handleFilterDisc}
               onSort={handleSort}
               onNewEntry={() => { setModalFolder(""); setShowModal(true); }}
+              onNewTransmittal={!isRestricted ? () => setShowTransmittal(true) : undefined}
               onVoid={handleVoid}
               isRestricted={isRestricted}
             />
           ) : currentTab === "transmittals" ? (
             <TransmittalsView transmittals={transmittals} drawings={drawings} />
           ) : currentTab === "documents" ? (
-            <DocumentsView 
-              drawings={drawings} 
-              onUpload={!isRestricted ? (folder) => { setModalFolder(folder); setShowModal(true); } : undefined} 
+            <DocumentsView
+              drawings={drawings}
+              onUpload={!isRestricted ? (folder) => { setModalFolder(folder); setShowModal(true); } : undefined}
             />
           ) : currentTab === "analytics" ? (
             <AnalyticsView drawings={drawings} transmittals={transmittals} />
@@ -358,17 +334,6 @@ export default function App() {
           )}
         </main>
       </div>
-
-      {/* ── New Transmittal FAB ── */}
-      {!isRestricted && (
-        <button
-          onClick={() => setShowTransmittal(true)}
-          className="fixed bottom-6 right-6 z-50 flex items-center gap-2 bg-primary text-white px-5 py-3 rounded-full shadow-lg hover:bg-primary-container transition-all font-medium text-[14px] active:scale-[0.98]"
-        >
-          <span className="material-symbols-outlined text-[18px]">send</span>
-          New Transmittal
-        </button>
-      )}
 
       {/* ── Modals & Toasts ── */}
       {showModal && <UploadModal onClose={() => setShowModal(false)} onSubmit={handleUpload} initialFolder={modalFolder} />}

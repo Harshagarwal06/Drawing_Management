@@ -1,4 +1,6 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
+import { createPortal } from "react-dom";
+import { MoreVertical, Eye, Download, Ban } from "lucide-react";
 
 const API = import.meta.env.VITE_API_URL;
 
@@ -20,6 +22,18 @@ const STATUS_FILTERS = [
 
 const MEP_SUBTYPES = ["Electrical", "Plumbing", "Fire"];
 const KNOWN_TYPES  = new Set(["Architecture", "Structure", ...MEP_SUBTYPES, "Civil", "Interior"]);
+
+/* ── Truncate filename in the middle, preserving extension ── */
+function truncateMid(str, maxLen = 22) {
+  if (!str || str.length <= maxLen) return str;
+  const dot  = str.lastIndexOf(".");
+  const ext  = dot > 0 ? str.slice(dot) : "";
+  const name = dot > 0 ? str.slice(0, dot) : str;
+  const keep = maxLen - ext.length - 1;           // 1 for the ellipsis
+  const head = Math.ceil(keep / 2);
+  const tail = Math.floor(keep / 2);
+  return `${name.slice(0, head)}…${name.slice(-tail)}${ext}`;
+}
 
 function SortIcon({ col, sortKey, sortDir }) {
   if (sortKey !== col)
@@ -44,22 +58,23 @@ export default function MasterRegisterTable({
   onFilterDisc,
   onSort,
   onNewEntry,
+  onNewTransmittal,
   onVoid,
   isRestricted = false,
 }) {
   const [discOpen, setDiscOpen] = useState(false);
 
-  const extraTypes   = Array.from(new Set(allDrawings.map(d => d.discipline).filter(d => d && !KNOWN_TYPES.has(d))));
+  const extraTypes    = Array.from(new Set(allDrawings.map(d => d.discipline).filter(d => d && !KNOWN_TYPES.has(d))));
   const activeFilters = (filterStat !== "All" ? 1 : 0) + (filterDisc !== "All" ? 1 : 0) + (search ? 1 : 0);
 
-  /* ── Handlers ── */
+  /* ── Export ── */
   const handleExport = () => {
     const headers = ["Drawing No.", "Title", "Discipline", "Rev", "Status", "Date", "Originator", "Transmittals"];
-    const rows = allDrawings.map(d => [d.number, d.title, d.discipline, d.rev, d.status, d.issueDate ?? "", d.originator, d.transmittals ?? 0]);
-    const csv  = [headers, ...rows].map(r => r.map(v => `"${String(v ?? "").replace(/"/g, '""')}"`).join(",")).join("\n");
-    const blob = new Blob([csv], { type: "text/csv" });
-    const url  = URL.createObjectURL(blob);
-    const a    = document.createElement("a"); a.href = url; a.download = "drawing-register.csv"; a.click();
+    const rows    = allDrawings.map(d => [d.number, d.title, d.discipline, d.rev, d.status, d.issueDate ?? "", d.originator, d.transmittals ?? 0]);
+    const csv     = [headers, ...rows].map(r => r.map(v => `"${String(v ?? "").replace(/"/g, '""')}"`).join(",")).join("\n");
+    const blob    = new Blob([csv], { type: "text/csv" });
+    const url     = URL.createObjectURL(blob);
+    const a       = document.createElement("a"); a.href = url; a.download = "drawing-register.csv"; a.click();
     URL.revokeObjectURL(url);
   };
 
@@ -77,15 +92,25 @@ export default function MasterRegisterTable({
     <div className="flex flex-col gap-6">
 
       {/* ── Page header ── */}
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h2 className="text-headline-lg font-semibold text-on-surface tracking-tight">Master Drawing Register</h2>
           <p className="text-body-md text-on-surface-variant mt-1">
             Central repository for all project drawings.{total > 0 ? ` ${total} drawing${total !== 1 ? "s" : ""} found.` : ""}
           </p>
         </div>
+
+        {/* ── Contextual Action Bar ── */}
         <div className="flex items-center gap-2 shrink-0">
-          {/* Secondary action */}
+          {onNewTransmittal && (
+            <button
+              onClick={onNewTransmittal}
+              className="bg-white border border-border-slate text-on-surface-variant hover:bg-surface-container-low px-4 py-2 rounded-lg flex items-center gap-2 text-[14px] font-medium transition-colors active:scale-[0.98]"
+            >
+              <span className="material-symbols-outlined text-[17px]">send</span>
+              New Transmittal
+            </button>
+          )}
           <button
             onClick={handleExport}
             className="bg-white border border-border-slate text-on-surface-variant hover:bg-surface-container-low px-4 py-2 rounded-lg flex items-center gap-2 text-[14px] font-medium transition-colors active:scale-[0.98]"
@@ -93,14 +118,13 @@ export default function MasterRegisterTable({
             <span className="material-symbols-outlined text-[17px]">ios_share</span>
             Export
           </button>
-          {/* Primary action */}
           {!isRestricted && (
             <button
               onClick={onNewEntry}
               className="bg-primary text-white rounded-lg hover:bg-primary-container px-4 py-2 font-medium flex items-center gap-2 text-[14px] transition-colors active:scale-[0.98]"
             >
-              <span className="material-symbols-outlined text-[17px]">add</span>
-              Upload Drawing
+              <span className="material-symbols-outlined text-[17px]">upload</span>
+              Upload to Project
             </button>
           )}
         </div>
@@ -143,14 +167,14 @@ export default function MasterRegisterTable({
 
           {discOpen && (
             <div className="absolute top-full left-0 mt-1.5 w-52 bg-white border border-border-slate rounded-xl shadow-lg z-50 py-1.5 overflow-hidden">
-              <TypeItem label="All"          active={filterDisc === "All"} onClick={() => { onFilterDisc?.("All"); setDiscOpen(false); }} />
+              <TypeItem label="All"          active={filterDisc === "All"}          onClick={() => { onFilterDisc?.("All");          setDiscOpen(false); }} />
               <TypeItem label="Architecture" active={filterDisc === "Architecture"} onClick={() => { onFilterDisc?.("Architecture"); setDiscOpen(false); }} />
-              <TypeItem label="Structure"    active={filterDisc === "Structure"}    onClick={() => { onFilterDisc?.("Structure"); setDiscOpen(false); }} />
-              <TypeItem label="MEP" active={filterDisc === "MEP"} onClick={() => { onFilterDisc?.("MEP"); setDiscOpen(false); }} isGroup />
+              <TypeItem label="Structure"    active={filterDisc === "Structure"}    onClick={() => { onFilterDisc?.("Structure");    setDiscOpen(false); }} />
+              <TypeItem label="MEP" isGroup  active={filterDisc === "MEP"}          onClick={() => { onFilterDisc?.("MEP");          setDiscOpen(false); }} />
               {MEP_SUBTYPES.map(d => (
-                <TypeItem key={d} label={d} active={filterDisc === d} onClick={() => { onFilterDisc?.(d); setDiscOpen(false); }} indent />
+                <TypeItem key={d} label={d} indent active={filterDisc === d} onClick={() => { onFilterDisc?.(d); setDiscOpen(false); }} />
               ))}
-              <TypeItem label="Civil"    active={filterDisc === "Civil"}    onClick={() => { onFilterDisc?.("Civil"); setDiscOpen(false); }} />
+              <TypeItem label="Civil"    active={filterDisc === "Civil"}    onClick={() => { onFilterDisc?.("Civil");    setDiscOpen(false); }} />
               <TypeItem label="Interior" active={filterDisc === "Interior"} onClick={() => { onFilterDisc?.("Interior"); setDiscOpen(false); }} />
               {extraTypes.map(d => (
                 <TypeItem key={d} label={d} active={filterDisc === d} onClick={() => { onFilterDisc?.(d); setDiscOpen(false); }} />
@@ -194,10 +218,10 @@ export default function MasterRegisterTable({
         <div className="overflow-x-auto">
           <table className="w-full text-left min-w-[900px]">
 
-            {/* Table Header */}
+            {/* Header */}
             <thead className="bg-surface-container-low border-b border-border-slate">
               <tr>
-                <th className="py-3 px-4 w-10 text-center">
+                <th className="py-2.5 px-4 w-10 text-left">
                   <input type="checkbox" className="rounded border-border-slate text-primary focus:ring-primary/30" />
                 </th>
                 {[
@@ -211,7 +235,7 @@ export default function MasterRegisterTable({
                   <th
                     key={key}
                     onClick={() => onSort?.(key)}
-                    className="py-3 px-4 text-on-surface-variant uppercase tracking-wider text-[12px] font-semibold cursor-pointer hover:text-on-surface transition-colors select-none group"
+                    className="py-2.5 px-4 text-left text-on-surface-variant uppercase tracking-wider text-[11px] font-semibold cursor-pointer hover:text-on-surface transition-colors select-none group"
                   >
                     <div className="flex items-center gap-1">
                       {label}
@@ -219,13 +243,13 @@ export default function MasterRegisterTable({
                     </div>
                   </th>
                 ))}
-                <th className="py-3 px-4 text-on-surface-variant uppercase tracking-wider text-[12px] font-semibold text-right">
+                <th className="py-2.5 px-4 text-left text-on-surface-variant uppercase tracking-wider text-[11px] font-semibold">
                   Actions
                 </th>
               </tr>
             </thead>
 
-            {/* Table Rows */}
+            {/* Rows */}
             <tbody>
               {drawings.length === 0 ? (
                 <tr>
@@ -247,41 +271,62 @@ export default function MasterRegisterTable({
                   </td>
                 </tr>
               ) : drawings.map(d => {
-                const s = STATUS_MAP[d.status] || { label: d.status, pillCls: "bg-surface-container text-on-surface-variant", dot: "bg-on-surface-variant" };
+                const s        = STATUS_MAP[d.status] || { label: d.status, pillCls: "bg-surface-container text-on-surface-variant", dot: "bg-on-surface-variant" };
+                const filename = d.path ? d.path.split("/").pop() : null;
                 return (
                   <tr key={d.id} className="border-b border-border-slate hover:bg-surface-container-low/50 transition-colors group">
-                    <td className="py-3 px-4 text-center">
+
+                    {/* Checkbox */}
+                    <td className="py-2.5 px-4 text-left">
                       <input type="checkbox" className="rounded border-border-slate text-primary focus:ring-primary/30 opacity-0 group-hover:opacity-100 transition-opacity" />
                     </td>
-                    <td className="py-3 px-4">
-                      <span className="font-mono text-[13px] font-semibold text-primary group-hover:underline">{d.number}</span>
+
+                    {/* Drawing No. + filename */}
+                    <td className="py-2.5 px-4 text-left">
+                      <span className="font-mono text-[13px] font-semibold text-primary group-hover:underline cursor-pointer">{d.number}</span>
+                      {filename && (
+                        <p className="font-mono text-[10px] text-on-surface-variant mt-0.5" title={filename}>
+                          {truncateMid(filename)}
+                        </p>
+                      )}
                     </td>
-                    <td className="py-3 px-4">
-                      <p className="text-[13px] text-on-surface font-medium leading-tight truncate max-w-[260px]">{d.title || "Untitled"}</p>
+
+                    {/* Title + meta */}
+                    <td className="py-2.5 px-4 text-left">
+                      <p className="text-[13px] text-on-surface font-medium leading-tight truncate max-w-[240px]">{d.title || "Untitled"}</p>
                       <p className="text-[11px] text-on-surface-variant mt-0.5">{d.originator} · {d.transmittals ?? 0} Tx</p>
                     </td>
-                    <td className="py-3 px-4">
+
+                    {/* Discipline */}
+                    <td className="py-2.5 px-4 text-left">
                       <span className="px-2 py-0.5 rounded bg-surface-container border border-border-slate text-on-surface-variant text-[11px] font-medium">{d.discipline}</span>
                     </td>
-                    <td className="py-3 px-4">
+
+                    {/* Rev */}
+                    <td className="py-2.5 px-4 text-left">
                       <span className="font-mono text-[13px] text-on-surface">{d.rev}</span>
                     </td>
-                    <td className="py-3 px-4">
-                      {/* Status pill — exact spec from rule 8 */}
-                      <span className={`rounded-full px-3 py-1 text-[12px] font-bold inline-flex items-center gap-1.5 ${s.pillCls}`}>
+
+                    {/* Status */}
+                    <td className="py-2.5 px-4 text-left">
+                      <span className={`rounded-full px-2.5 py-1 text-[11px] font-bold inline-flex items-center gap-1.5 ${s.pillCls}`}>
                         <span className={`w-1.5 h-1.5 rounded-full ${s.dot}`} />
                         {s.label}
                       </span>
                     </td>
-                    <td className="py-3 px-4 text-[12px] text-on-surface-variant">{d.issueDate ?? "—"}</td>
-                    <td className="py-3 px-4">
-                      <div className="flex items-center justify-end gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <ActionBtn title="View"     icon="visibility" onClick={() => handleView(d)}     disabled={!d.path} />
-                        <ActionBtn title="Download" icon="download"   onClick={() => handleDownload(d)} disabled={!d.path} />
-                        {!isRestricted && d.status !== "VOID" && (
-                          <ActionBtn title="Void" icon="block" onClick={() => handleVoidClick(d)} danger />
-                        )}
-                      </div>
+
+                    {/* Date */}
+                    <td className="py-2.5 px-4 text-left text-[12px] text-on-surface-variant">{d.issueDate ?? "—"}</td>
+
+                    {/* Actions — always-visible MoreVertical menu */}
+                    <td className="py-2.5 px-4 text-left">
+                      <RowMenu
+                        d={d}
+                        isRestricted={isRestricted}
+                        onView={() => handleView(d)}
+                        onDownload={() => handleDownload(d)}
+                        onVoid={() => handleVoidClick(d)}
+                      />
                     </td>
                   </tr>
                 );
@@ -290,7 +335,7 @@ export default function MasterRegisterTable({
           </table>
         </div>
 
-        {/* Pagination footer */}
+        {/* Pagination */}
         <div className="bg-surface-container-low border-t border-border-slate px-4 py-3 flex items-center justify-between">
           <p className="text-[12px] text-on-surface-variant">
             {drawings.length > 0
@@ -299,7 +344,7 @@ export default function MasterRegisterTable({
           </p>
           {totalPages > 1 && (
             <div className="flex items-center gap-1.5">
-              <PagBtn onClick={() => onPageChange?.(page - 1)} disabled={page <= 1} icon="chevron_left" />
+              <PagBtn onClick={() => onPageChange?.(page - 1)} disabled={page <= 1}         icon="chevron_left"  />
               {Array.from({ length: Math.min(totalPages, 7) }, (_, i) => {
                 const p = totalPages <= 7 ? i + 1 : i < 3 ? i + 1 : i === 3 ? "..." : totalPages - (6 - i);
                 if (p === "...") return <span key="ell" className="w-8 text-center text-on-surface-variant text-[12px]">…</span>;
@@ -312,9 +357,7 @@ export default function MasterRegisterTable({
                         ? "bg-primary text-white"
                         : "bg-white border border-border-slate text-on-surface-variant hover:bg-surface-container-low"
                     }`}
-                  >
-                    {p}
-                  </button>
+                  >{p}</button>
                 );
               })}
               <PagBtn onClick={() => onPageChange?.(page + 1)} disabled={page >= totalPages} icon="chevron_right" />
@@ -326,25 +369,76 @@ export default function MasterRegisterTable({
   );
 }
 
-/* ── Helper components ── */
+/* ── RowMenu — portal-based dropdown (escapes overflow:hidden on table) ── */
+function RowMenu({ d, isRestricted, onView, onDownload, onVoid }) {
+  const [open,    setOpen]    = useState(false);
+  const [menuPos, setMenuPos] = useState({ top: 0, left: 0 });
+  const btnRef = useRef(null);
 
-function ActionBtn({ title, icon, onClick, disabled = false, danger = false }) {
+  useEffect(() => {
+    if (!open) return;
+    const close = e => { if (!btnRef.current?.contains(e.target)) setOpen(false); };
+    document.addEventListener("mousedown", close);
+    return () => document.removeEventListener("mousedown", close);
+  }, [open]);
+
+  const handleClick = () => {
+    if (!open && btnRef.current) {
+      const r = btnRef.current.getBoundingClientRect();
+      setMenuPos({ top: r.bottom + 4, left: r.left });
+    }
+    setOpen(o => !o);
+  };
+
+  return (
+    <>
+      <button
+        ref={btnRef}
+        onClick={handleClick}
+        className="p-1.5 rounded-lg text-on-surface-variant hover:text-on-surface hover:bg-surface-container transition-colors"
+        title="More actions"
+      >
+        <MoreVertical size={15} />
+      </button>
+
+      {open && createPortal(
+        <div
+          style={{ position: "fixed", top: menuPos.top, left: menuPos.left, zIndex: 9999 }}
+          className="w-44 bg-white border border-border-slate rounded-xl shadow-lg py-1 overflow-hidden"
+        >
+          <DropItem icon={<Eye size={14} />}      label="View"     onClick={() => { onView();     setOpen(false); }} disabled={!d.path} />
+          <DropItem icon={<Download size={14} />} label="Download" onClick={() => { onDownload(); setOpen(false); }} disabled={!d.path} />
+          {!isRestricted && d.status !== "VOID" && (
+            <>
+              <div className="h-px bg-border-slate mx-2 my-1" />
+              <DropItem icon={<Ban size={14} />} label="Void Drawing" onClick={() => { onVoid(); setOpen(false); }} danger />
+            </>
+          )}
+        </div>,
+        document.body
+      )}
+    </>
+  );
+}
+
+function DropItem({ icon, label, onClick, disabled = false, danger = false }) {
   return (
     <button
       onClick={onClick}
       disabled={disabled}
-      title={title}
-      className={`p-1.5 rounded-lg transition-colors disabled:opacity-30 disabled:cursor-not-allowed ${
+      className={`w-full flex items-center gap-2.5 px-3 py-2 text-[13px] font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${
         danger
-          ? "text-on-surface-variant hover:text-status-rose-text hover:bg-status-rose-bg"
-          : "text-on-surface-variant hover:text-primary hover:bg-primary/10"
+          ? "text-status-rose-text hover:bg-status-rose-bg"
+          : "text-on-surface-variant hover:text-on-surface hover:bg-surface-container-low"
       }`}
     >
-      <span className="material-symbols-outlined text-[17px]">{icon}</span>
+      {icon}
+      {label}
     </button>
   );
 }
 
+/* ── Pagination button ── */
 function PagBtn({ onClick, disabled, icon }) {
   return (
     <button
@@ -357,6 +451,7 @@ function PagBtn({ onClick, disabled, icon }) {
   );
 }
 
+/* ── Drawing Type dropdown item ── */
 function TypeItem({ label, active, onClick, isGroup = false, indent = false }) {
   return (
     <button

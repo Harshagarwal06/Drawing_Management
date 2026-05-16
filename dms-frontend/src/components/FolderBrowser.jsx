@@ -1,7 +1,8 @@
 import { useState, useCallback, useRef, useEffect } from "react";
 import {
   ChevronRight, ChevronDown, Folder, FolderOpen,
-  FolderPlus, Search, LayoutGrid, Pencil, Trash2, Check, X,
+  FolderPlus, Search, LayoutGrid, Pencil, Trash2,
+  Check, X, MoreVertical,
 } from "lucide-react";
 
 const DEFAULT_TREE = () => ({
@@ -18,8 +19,8 @@ const DEFAULT_TREE = () => ({
     {
       name: "Structural",
       children: [
-        { name: "Infra",     children: [] },
-        { name: "Building",  children: [] },
+        { name: "Infra",    children: [] },
+        { name: "Building", children: [] },
       ],
     },
     {
@@ -37,7 +38,7 @@ const DEFAULT_TREE = () => ({
   ],
 });
 
-const STORAGE_KEY = "drawvault_folder_tree";
+const STORAGE_KEY = "uniqueproperties_folder_tree";
 
 function loadTree() {
   try {
@@ -45,6 +46,73 @@ function loadTree() {
     if (saved) return JSON.parse(saved);
   } catch {}
   return DEFAULT_TREE();
+}
+
+/* ── FolderRowMenu — MoreVertical dropdown for a single folder row ── */
+function FolderRowMenu({ pathKey, isRoot, onAdd, onRename, onDelete }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const close = e => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    document.addEventListener("mousedown", close);
+    return () => document.removeEventListener("mousedown", close);
+  }, [open]);
+
+  return (
+    <div ref={ref} className="relative shrink-0" onClick={e => e.stopPropagation()}>
+      <button
+        onClick={e => { e.stopPropagation(); setOpen(o => !o); }}
+        className="p-0.5 rounded text-outline hover:text-on-surface hover:bg-surface-container transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100"
+        title="Folder options"
+      >
+        <MoreVertical size={13} />
+      </button>
+
+      {open && (
+        <div className="absolute right-0 top-full mt-1 w-44 bg-white border border-border-slate rounded-xl shadow-lg z-50 py-1 overflow-hidden">
+          <FolderMenuItem
+            icon={<FolderPlus size={13} />}
+            label="Add subfolder"
+            onClick={() => { onAdd(); setOpen(false); }}
+          />
+          {!isRoot && (
+            <>
+              <FolderMenuItem
+                icon={<Pencil size={13} />}
+                label="Rename"
+                onClick={() => { onRename(); setOpen(false); }}
+              />
+              <div className="h-px bg-border-slate mx-2 my-1" />
+              <FolderMenuItem
+                icon={<Trash2 size={13} />}
+                label="Delete folder"
+                onClick={() => { onDelete(); setOpen(false); }}
+                danger
+              />
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function FolderMenuItem({ icon, label, onClick, danger = false }) {
+  return (
+    <button
+      onClick={onClick}
+      className={`w-full flex items-center gap-2 px-3 py-2 text-[12px] font-medium transition-colors ${
+        danger
+          ? "text-status-rose-text hover:bg-status-rose-bg"
+          : "text-on-surface-variant hover:text-on-surface hover:bg-surface-container-low"
+      }`}
+    >
+      {icon}
+      {label}
+    </button>
+  );
 }
 
 /* ── TreeNode ─────────────────────────────────────────────────────── */
@@ -56,8 +124,7 @@ function TreeNode({
   onAddChild, onRename, onDelete,
   drawings,
 }) {
-  const [open,     setOpen]     = useState(depth < 2);
-  const [hovering, setHovering] = useState(false);
+  const [open, setOpen] = useState(depth < 2);
   const addInputRef  = useRef(null);
   const editInputRef = useRef(null);
 
@@ -80,14 +147,14 @@ function TreeNode({
     if (node.children !== undefined) setOpen(o => !o);
   };
 
-  const handleAddSubmit = (e) => {
+  const handleAddSubmit = e => {
     e?.preventDefault();
     const val = addInputRef.current?.value?.trim();
     if (val) { onAddChild(path, val); if (!open) setOpen(true); }
     setAddingTo(null);
   };
 
-  const handleRenameSubmit = (e) => {
+  const handleRenameSubmit = e => {
     e?.preventDefault();
     const val = editInputRef.current?.value?.trim();
     if (val && val !== node.name) onRename(path, val);
@@ -101,11 +168,9 @@ function TreeNode({
         role="button"
         tabIndex={0}
         onClick={handleClick}
-        onMouseEnter={() => setHovering(true)}
-        onMouseLeave={() => setHovering(false)}
         onKeyDown={e => { if (!isEditing && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); handleClick(); } }}
         className={`
-          flex items-center gap-1.5 w-full rounded-lg px-2 py-[6px]
+          group flex items-center gap-1.5 w-full rounded-lg px-2 py-[6px]
           cursor-pointer transition-all duration-150
           ${isSelected ? "bg-primary/10 text-primary" : "hover:bg-surface-container text-on-surface-variant"}
           ${isRoot ? "text-[13px] font-semibold text-on-surface" : "text-[12.5px] font-medium"}
@@ -137,7 +202,7 @@ function TreeNode({
               onBlur={handleRenameSubmit}
               onKeyDown={e => { if (e.key === "Escape") setEditingPath(null); }}
             />
-            <button type="submit"                     className="p-0.5 text-primary"><Check size={12} /></button>
+            <button type="submit" className="p-0.5 text-primary"><Check size={12} /></button>
             <button type="button" onClick={e => { e.stopPropagation(); setEditingPath(null); }} className="p-0.5 text-on-surface-variant"><X size={12} /></button>
           </form>
         ) : (
@@ -151,30 +216,15 @@ function TreeNode({
           </span>
         )}
 
-        {/* Hover actions */}
-        {!isEditing && hovering && (
-          <div className="flex items-center gap-0.5 ml-auto shrink-0" onClick={e => e.stopPropagation()}>
-            <button
-              onClick={e => { e.stopPropagation(); setAddingTo(pathKey); setOpen(true); }}
-              title="Add subfolder"
-              className="p-0.5 rounded text-outline hover:text-primary hover:bg-primary/10 transition-colors"
-            ><FolderPlus size={12} /></button>
-
-            {!isRoot && (
-              <>
-                <button
-                  onClick={e => { e.stopPropagation(); setEditingPath(pathKey); }}
-                  title="Rename"
-                  className="p-0.5 rounded text-outline hover:text-primary hover:bg-primary/10 transition-colors"
-                ><Pencil size={12} /></button>
-                <button
-                  onClick={e => { e.stopPropagation(); onDelete(path); }}
-                  title="Delete folder"
-                  className="p-0.5 rounded text-outline hover:text-status-rose-text hover:bg-status-rose-bg transition-colors"
-                ><Trash2 size={12} /></button>
-              </>
-            )}
-          </div>
+        {/* MoreVertical menu — replaces individual icon buttons */}
+        {!isEditing && (
+          <FolderRowMenu
+            pathKey={pathKey}
+            isRoot={isRoot}
+            onAdd={() => { setAddingTo(pathKey); setOpen(true); }}
+            onRename={() => setEditingPath(pathKey)}
+            onDelete={() => onDelete(path)}
+          />
         )}
       </div>
 
@@ -225,13 +275,13 @@ function TreeNode({
 
 /* ── FolderBrowser ────────────────────────────────────────────────── */
 export default function FolderBrowser({ className = "", onFolderSelect, drawings = [] }) {
-  const [tree,        setTree]        = useState(loadTree);
-  const [selectedPath,setSelectedPath]= useState("");
-  const [filterText,  setFilterText]  = useState("");
-  const [addingTo,    setAddingTo]    = useState(null);
-  const [editingPath, setEditingPath] = useState(null);
+  const [tree,         setTree]         = useState(loadTree);
+  const [selectedPath, setSelectedPath] = useState("");
+  const [filterText,   setFilterText]   = useState("");
+  const [addingTo,     setAddingTo]     = useState(null);
+  const [editingPath,  setEditingPath]  = useState(null);
 
-  const updateTree = useCallback((updater) => {
+  const updateTree = useCallback(updater => {
     setTree(prev => {
       const next = updater(prev);
       try { localStorage.setItem(STORAGE_KEY, JSON.stringify(next)); } catch {}
@@ -261,7 +311,7 @@ export default function FolderBrowser({ className = "", onFolderSelect, drawings
     });
   }, [updateTree]);
 
-  const deleteNode = useCallback((path) => {
+  const deleteNode = useCallback(path => {
     updateTree(prev => {
       const next = structuredClone(prev);
       let parent = next;
@@ -271,13 +321,14 @@ export default function FolderBrowser({ className = "", onFolderSelect, drawings
     });
   }, [updateTree]);
 
-  const handleSelect = useCallback((pathKey) => {
+  const handleSelect = useCallback(pathKey => {
     setSelectedPath(pathKey);
     onFolderSelect?.(pathKey);
   }, [onFolderSelect]);
 
   return (
     <div className={`flex flex-col bg-white border border-border-slate rounded-xl overflow-hidden h-full ${className}`}>
+
       {/* Header */}
       <div className="flex items-center justify-between px-4 pt-4 pb-2">
         <div className="flex items-center gap-2">
@@ -321,14 +372,6 @@ export default function FolderBrowser({ className = "", onFolderSelect, drawings
           onDelete={deleteNode}
           drawings={drawings}
         />
-      </div>
-
-      {/* Footer hint */}
-      <div className="px-4 py-2.5 border-t border-border-slate flex items-center gap-1.5">
-        <FolderPlus size={12} className="text-outline" />
-        <span className="text-[10.5px] text-on-surface-variant">
-          Hover any folder to <span className="text-primary font-medium">add · rename · delete</span>
-        </span>
       </div>
 
       <style>{`

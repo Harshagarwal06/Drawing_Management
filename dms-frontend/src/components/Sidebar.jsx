@@ -13,11 +13,14 @@ export default function Sidebar({ activeProject, currentTab, onTabChange, onNewD
 
       {/* Logo */}
       <div className="flex items-center gap-3 mb-8 px-2">
-        <div className="w-10 h-10 bg-primary rounded-lg flex items-center justify-center text-white shrink-0">
-          <span className="material-symbols-outlined" style={{ fontVariationSettings: "'FILL' 1" }}>architecture</span>
-        </div>
+        <img src="/logo.png" alt="Unique Properties" className="h-9 w-auto object-contain shrink-0" />
         <div>
-          <h1 className="text-[20px] font-bold text-primary leading-tight">DrawVault</h1>
+          <h1
+            className="text-[18px] font-bold leading-tight"
+            style={{ background: "linear-gradient(90deg, #F4A223 0%, #C9A06A 50%, #1B6ABF 100%)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text" }}
+          >
+            Unique Properties
+          </h1>
           <p className="text-[12px] text-on-surface-variant">Enterprise Management</p>
         </div>
       </div>

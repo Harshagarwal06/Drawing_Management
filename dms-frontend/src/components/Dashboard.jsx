@@ -65,21 +65,9 @@ export default function Dashboard({
   return (
     <div className="space-y-8">
       {/* Page Header */}
-      <div className="flex justify-between items-end">
-        <div>
-          <h2 className="font-headline-lg text-headline-lg text-on-surface">Project Dashboard</h2>
-          <p className="font-body-md text-on-surface-variant mt-1">Real-time status overview of project documentation and delivery.</p>
-        </div>
-        <div className="flex gap-3">
-          <button className="px-4 py-2 border border-border-slate bg-white text-secondary font-label-md rounded-lg flex items-center gap-2 hover:bg-surface-container transition-all active:scale-[0.98]">
-            <span className="material-symbols-outlined text-[18px]">calendar_today</span>
-            This Quarter
-          </button>
-          <button className="px-4 py-2 bg-primary text-on-primary font-label-md rounded-lg flex items-center gap-2 hover:bg-primary-container transition-all active:scale-[0.98]">
-            <span className="material-symbols-outlined text-[18px]">file_download</span>
-            Export Report
-          </button>
-        </div>
+      <div>
+        <h2 className="font-headline-lg text-headline-lg text-on-surface">Project Dashboard</h2>
+        <p className="font-body-md text-on-surface-variant mt-1">Real-time status overview of project documentation and delivery.</p>
       </div>
 
       {/* Metric Cards */}
@@ -208,9 +196,6 @@ export default function Dashboard({
               })
             )}
           </div>
-          <button className="m-6 mt-0 py-3 border border-border-slate rounded-lg font-label-md text-secondary hover:bg-surface-container transition-all text-center text-[13px]">
-            View All Activity
-          </button>
         </div>
       </div>
 
@@ -235,8 +220,8 @@ export default function Dashboard({
             <table className="w-full text-left">
               <thead className="bg-surface-container-low border-b border-border-slate">
                 <tr>
-                  {["Sheet No.", "Title", "Rev", "Date", "Status", "Action"].map((h, i) => (
-                    <th key={h} className={`px-6 py-4 font-label-sm text-on-surface-variant uppercase tracking-wider text-[11px] ${i === 5 ? "text-right" : ""}`}>{h}</th>
+                  {["Sheet No.", "Title", "Rev", "Date", "Status"].map((h) => (
+                    <th key={h} className="px-6 py-4 font-label-sm text-on-surface-variant uppercase tracking-wider text-[11px]">{h}</th>
                   ))}
                 </tr>
               </thead>
@@ -251,11 +236,6 @@ export default function Dashboard({
                       <td className="px-6 py-4 font-body-md text-on-surface-variant text-[13px]">{d.issueDate ?? "—"}</td>
                       <td className="px-6 py-4">
                         <span className={`px-3 py-1 rounded-full font-label-sm text-[11px] ${s.bgCls} ${s.textCls}`}>{s.label}</span>
-                      </td>
-                      <td className="px-6 py-4 text-right">
-                        <button className="p-1 hover:bg-surface-container rounded transition-colors">
-                          <span className="material-symbols-outlined text-on-surface-variant text-[20px]">more_vert</span>
-                        </button>
                       </td>
                     </tr>
                   );
