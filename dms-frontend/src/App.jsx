@@ -9,6 +9,9 @@ import TransmittalsView from "./components/TransmittalsView";
 import ProjectSelector from "./components/ProjectSelector";
 import Toast from "./components/Toast";
 import LoginPage from "./components/LoginPage";
+import DocumentsView from "./components/DocumentsView";
+import AnalyticsView from "./components/AnalyticsView";
+import SettingsView from "./components/SettingsView";
 
 import { ROLES, OVERDUE_PURPOSES, MS_30_DAYS, MEP_SUBTYPES } from "./constants";
 
@@ -41,25 +44,25 @@ async function fetchTransmittals(projectId, token) {
 }
 
 export default function App() {
-  const [currentTab,      setCurrentTab]      = useState("dashboard");
-  const [projects,        setProjects]        = useState([]);
-  const [activeProject,   setActiveProject]   = useState(null);
-  const [showProjectModal,setShowProjectModal] = useState(false);
-  const [drawings,        setDrawings]        = useState([]);
-  const [transmittals,    setTransmittals]    = useState([]);
-  const [showModal,       setShowModal]       = useState(false);
-  const [showTransmittal, setShowTransmittal] = useState(false);
-  const [toast,           setToast]           = useState(null);
-  const [currentUser,     setCurrentUser]     = useState(null);
-  const [search,          setSearch]          = useState("");
-  const [filterDisc,      setFilterDisc]      = useState("All");
-  const [filterStat,      setFilterStat]      = useState("All");
-  const [sortKey,         setSortKey]         = useState("number");
-  const [sortDir,         setSortDir]         = useState("asc");
-  const [page,            setPage]            = useState(1);
-  const [activeTab,       setActiveTab]       = useState("Dashboard");
+  const [currentTab,       setCurrentTab]       = useState("dashboard");
+  const [projects,         setProjects]         = useState([]);
+  const [activeProject,    setActiveProject]    = useState(null);
+  const [showProjectModal, setShowProjectModal] = useState(false);
+  const [drawings,         setDrawings]         = useState([]);
+  const [transmittals,     setTransmittals]     = useState([]);
+  const [showModal,        setShowModal]        = useState(false);
+  const [modalFolder,      setModalFolder]      = useState("");
+  const [showTransmittal,  setShowTransmittal]  = useState(false);
+  const [toast,            setToast]            = useState(null);
+  const [currentUser,      setCurrentUser]      = useState(null);
+  const [search,           setSearch]           = useState("");
+  const [filterDisc,       setFilterDisc]       = useState("All");
+  const [filterStat,       setFilterStat]       = useState("All");
+  const [sortKey,          setSortKey]          = useState("number");
+  const [sortDir,          setSortDir]          = useState("asc");
+  const [page,             setPage]             = useState(1);
 
-  const activeRole = currentUser?.role || "Read-Only";
+  const activeRole   = currentUser?.role || "Read-Only";
   const isRestricted = activeRole === "Subcontractor" || activeRole === "Read-Only";
 
   /* ── Session persistence ── */
@@ -75,27 +78,27 @@ export default function App() {
     else localStorage.removeItem("dms_user");
   }, [currentUser]);
 
-  /* ── Handle 401 globally — clear session ── */
   const handleUnauthorized = () => {
     setCurrentUser(null);
     setToast({ msg: "Session expired — please log in again.", type: "error" });
   };
 
-  /* ── Bootstrap: load projects ── */
+  /* ── Bootstrap projects ── */
   useEffect(() => {
     if (!currentUser) return;
-    fetchProjects(currentUser.token).then(data => {
-      setProjects(data);
-      if (data.length > 0) setActiveProject(data[0]);
-    }).catch(err => { if (err.status === 401) handleUnauthorized(); });
+    fetchProjects(currentUser.token)
+      .then(data => { setProjects(data); if (data.length > 0) setActiveProject(data[0]); })
+      .catch(err => { if (err.status === 401) handleUnauthorized(); });
   }, [currentUser]);
 
-  /* ── Load collections when project changes ── */
+  /* ── Load drawings + transmittals when project changes ── */
   useEffect(() => {
     if (!activeProject || !currentUser) return;
-    fetchDrawings(activeProject.id, currentUser.token).then(setDrawings)
+    fetchDrawings(activeProject.id, currentUser.token)
+      .then(setDrawings)
       .catch(err => { if (err.status === 401) handleUnauthorized(); });
-    fetchTransmittals(activeProject.id, currentUser.token).then(setTransmittals)
+    fetchTransmittals(activeProject.id, currentUser.token)
+      .then(setTransmittals)
       .catch(err => { if (err.status === 401) handleUnauthorized(); });
   }, [activeProject]);
 
@@ -103,7 +106,6 @@ export default function App() {
   const totalDrawings     = drawings.length;
   const forConstruction   = drawings.filter(d => d.status === "S3").length;
   const pendingReviews    = drawings.filter(d => d.status === "S2").length;
-  const disciplineCount   = new Set(drawings.map(d => d.discipline)).size;
   const totalTransmittals = transmittals.length;
   const overdueTransmit   = transmittals.filter(t =>
     OVERDUE_PURPOSES.has(t.purpose) &&
@@ -115,14 +117,14 @@ export default function App() {
   /* ── Filter + sort ── */
   const filtered = useMemo(() => {
     let d = drawings.filter(row => {
-      const q = search.toLowerCase();
+      const q     = search.toLowerCase();
       const matchQ = !q ||
         row.number.toLowerCase().includes(q) ||
         row.title.toLowerCase().includes(q) ||
         row.originator.toLowerCase().includes(q);
       const matchD = filterDisc === "All" ||
-                     (filterDisc === "MEP" ? MEP_SUBTYPES.includes(row.discipline) : row.discipline === filterDisc);
-      const matchS = filterStat === "All" || row.status     === filterStat;
+        (filterDisc === "MEP" ? MEP_SUBTYPES.includes(row.discipline) : row.discipline === filterDisc);
+      const matchS = filterStat === "All" || row.status === filterStat;
       return matchQ && matchD && matchS;
     });
     return [...d].sort((a, b) => {
@@ -143,11 +145,11 @@ export default function App() {
     setPage(1);
   };
 
-  const handleSearch     = (v) => { setSearch(v);     setPage(1); };
-  const handleFilterDisc = (v) => { setFilterDisc(v); setPage(1); };
-  const handleFilterStat = (v) => { setFilterStat(v); setPage(1); };
+  const handleSearch     = v => { setSearch(v);     setPage(1); };
+  const handleFilterDisc = v => { setFilterDisc(v); setPage(1); };
+  const handleFilterStat = v => { setFilterStat(v); setPage(1); };
 
-  /* ── Upload: POST file, then re-fetch drawings ── */
+  /* ── Upload ── */
   const handleUpload = async (form, file) => {
     const fd = new FormData();
     fd.append("drawingFile",   file);
@@ -159,7 +161,7 @@ export default function App() {
     fd.append("status",        form.status);
     fd.append("notes",         form.notes || "");
     fd.append("projectId",     activeProject.id);
-
+    fd.append("folderPath",    form.folderPath || "");
     try {
       const res = await fetch(`${API}/api/upload`, { method: "POST", body: fd, headers: authHeaders(currentUser.token) });
       if (!res.ok) throw new Error(`Server responded ${res.status}`);
@@ -173,13 +175,13 @@ export default function App() {
     }
   };
 
-  /* ── Transmittal: POST to backend, then re-fetch both collections ── */
+  /* ── Transmittal ── */
   const handleTransmittal = async (formData) => {
     try {
       const res = await fetch(`${API}/api/transmittals`, {
         method:  "POST",
         headers: { "Content-Type": "application/json", ...authHeaders(currentUser.token) },
-        body:    JSON.stringify({
+        body: JSON.stringify({
           number:     nextTrnNumber,
           drawingIds: formData.drawingIds,
           recipients: formData.recipients,
@@ -190,8 +192,6 @@ export default function App() {
         }),
       });
       if (!res.ok) throw new Error(`Server responded ${res.status}`);
-
-      /* Re-fetch both so transmittal counts on drawings update too */
       const [freshDrawings, freshTransmittals] = await Promise.all([
         fetchDrawings(activeProject.id, currentUser.token),
         fetchTransmittals(activeProject.id, currentUser.token),
@@ -206,7 +206,7 @@ export default function App() {
     }
   };
 
-  /* ── Void/Supersede a drawing ── */
+  /* ── Void ── */
   const handleVoid = async (id) => {
     try {
       const res = await fetch(`${API}/api/drawings/${id}/void`, { method: "PATCH", headers: authHeaders(currentUser.token) });
@@ -218,113 +218,160 @@ export default function App() {
     }
   };
 
-  if (!currentUser) {
-    return <LoginPage onLogin={setCurrentUser} />;
-  }
+  if (!currentUser) return <LoginPage onLogin={setCurrentUser} />;
 
   return (
-    <div className="flex min-h-screen bg-background overflow-x-hidden selection:bg-primary/30 selection:text-primary">
-      <Sidebar activeProject={activeProject} onTabChange={setCurrentTab} currentTab={currentTab} />
+    /* ── Root shell ── */
+    <div className="bg-background text-on-surface font-outfit min-h-screen flex">
 
-      {/* TopNavBar */}
-      <header className="hidden md:flex fixed top-0 right-0 h-16 bg-surface/60 dark:bg-surface/60 backdrop-blur-md border-b border-white/5 bg-surface-container-lowest/30 items-center justify-between pl-72 pr-10 w-full z-40">
-        <div className="flex items-center gap-6">
-          <nav className="flex gap-6 h-full items-center">
-            <button 
-              onClick={() => setCurrentTab('dashboard')} 
-              className={`font-body-md text-body-md h-full flex items-center pt-[2px] ${currentTab === 'dashboard' ? 'text-primary font-bold border-b-2 border-primary' : 'text-on-surface-variant hover:text-on-surface transition-colors border-b-2 border-transparent'}`}
-            >
-              Project Overview
-            </button>
-            <button 
-              onClick={() => setCurrentTab('register')}
-              className={`font-body-md text-body-md h-full flex items-center pt-[2px] ${currentTab === 'register' ? 'text-primary font-bold border-b-2 border-primary' : 'text-on-surface-variant hover:text-on-surface transition-colors border-b-2 border-transparent'}`}
-            >
-              Drawing Register
-            </button>
-          </nav>
-        </div>
-        <div className="flex items-center gap-4">
-          <div className="relative focus-within:ring-2 focus-within:ring-primary/50 rounded-full hidden lg:block">
-            <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant text-sm">search</span>
-            <input className="bg-surface-container-highest/50 border border-white/10 rounded-full pl-9 pr-4 py-1.5 text-sm text-on-surface placeholder:text-on-surface-variant focus:outline-none focus:bg-surface-container-high w-64 transition-all" placeholder="Search..." type="text" value={search} onChange={e => handleSearch(e.target.value)} />
+      <Sidebar
+        activeProject={activeProject}
+        onTabChange={setCurrentTab}
+        currentTab={currentTab}
+        currentUser={currentUser}
+        onNewDrawing={!isRestricted ? () => { setModalFolder(""); setShowModal(true); } : undefined}
+      />
+
+      {/* ── Right column ── */}
+      <div className="flex flex-col flex-1" style={{ marginLeft: "280px" }}>
+
+        {/* Top App Bar — glassmorphism */}
+        <header className="bg-glass-surface/80 backdrop-blur-md border-b border-border-slate sticky top-0 z-40 h-16 flex items-center justify-between px-10">
+
+          {/* Search */}
+          <div className="relative w-full max-w-md">
+            <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant text-[20px]">search</span>
+            <input
+              type="text"
+              value={search}
+              onChange={e => handleSearch(e.target.value)}
+              placeholder="Search drawings, transmittals, or tasks…"
+              className="w-full pl-10 pr-4 py-2 bg-surface-container-low border border-border-slate rounded-lg text-body-sm text-on-surface placeholder:text-on-surface-variant focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/20 transition-all"
+            />
           </div>
-          <ProjectSelector
-            projects={projects}
-            activeProject={activeProject}
-            onChange={setActiveProject}
-            onNew={() => setShowProjectModal(true)}
-            isRestricted={isRestricted}
-          />
-          <button onClick={() => setCurrentUser(null)} className="p-1.5 hover:bg-white/5 rounded-md text-on-surface-variant hover:text-error transition-colors ml-2" title="Sign out">
-             <span className="material-symbols-outlined text-[18px]">logout</span>
-          </button>
-          <div className="w-8 h-8 rounded-full bg-surface-container-highest border border-white/10 overflow-hidden ml-2 cursor-pointer relative" title={currentUser.name}>
-            <div className="w-full h-full flex items-center justify-center bg-primary text-on-primary font-bold">{currentUser.name.charAt(0).toUpperCase()}</div>
+
+          {/* Nav tabs + actions */}
+          <div className="flex items-center gap-6 ml-8">
+            <nav className="hidden lg:flex items-center gap-8">
+              {[
+                { label: "Overview",         tab: "dashboard"    },
+                { label: "Drawing Register", tab: "register"     },
+                { label: "Transmittals",     tab: "transmittals" },
+              ].map(({ label, tab }) => (
+                <button
+                  key={tab}
+                  onClick={() => setCurrentTab(tab)}
+                  className={`text-body-md pb-1 border-b-2 transition-colors whitespace-nowrap ${
+                    currentTab === tab
+                      ? "text-primary font-bold border-primary"
+                      : "text-on-surface-variant font-medium hover:text-primary border-transparent"
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </nav>
+
+            <div className="flex items-center gap-1">
+              <button className="p-2 text-on-surface-variant hover:bg-surface-container rounded-full transition-colors" title="Notifications">
+                <span className="material-symbols-outlined text-[22px]">notifications</span>
+              </button>
+              <button className="p-2 text-on-surface-variant hover:bg-surface-container rounded-full transition-colors" title="Help">
+                <span className="material-symbols-outlined text-[22px]">help</span>
+              </button>
+
+              <ProjectSelector
+                projects={projects}
+                activeProject={activeProject}
+                onChange={setActiveProject}
+                onNew={() => setShowProjectModal(true)}
+                isRestricted={isRestricted}
+              />
+
+              <div className="h-6 w-px bg-border-slate mx-1" />
+
+              <button
+                onClick={() => setCurrentUser(null)}
+                className="p-2 text-on-surface-variant hover:bg-status-rose-bg hover:text-status-rose-text rounded-full transition-colors"
+                title="Sign out"
+              >
+                <span className="material-symbols-outlined text-[20px]">logout</span>
+              </button>
+
+              <div
+                className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-white text-[13px] font-bold cursor-pointer border border-border-slate ml-1"
+                title={currentUser.name}
+              >
+                {currentUser.name.charAt(0).toUpperCase()}
+              </div>
+            </div>
           </div>
-        </div>
-      </header>
+        </header>
 
-      {/* Main Canvas */}
-      <main className="flex-1 w-full pt-20 pb-10 md:pl-72 pr-4 md:pr-10 min-h-screen">
-        {currentTab === 'dashboard' ? (
-          <Dashboard
-            totalDrawings={totalDrawings}
-            totalTransmittals={totalTransmittals}
-            latestRevisions={pendingReviews}
-            overdueItems={overdueTransmit}
-            drawings={drawings}
-            activeProjectId={activeProject?.id}
-            token={currentUser?.token}
-          />
-        ) : currentTab === 'register' ? (
-          <MasterRegisterTable
-            drawings={pageRows}
-            allDrawings={drawings}
-            total={filtered.length}
-            page={page}
-            totalPages={totalPages}
-            search={search}
-            filterStat={filterStat}
-            filterDisc={filterDisc}
-            sortKey={sortKey}
-            sortDir={sortDir}
-            onPageChange={setPage}
-            onSearch={handleSearch}
-            onFilterStat={handleFilterStat}
-            onFilterDisc={handleFilterDisc}
-            onSort={handleSort}
-            onNewEntry={() => setShowModal(true)}
-            onVoid={handleVoid}
-          />
-        ) : currentTab === 'transmittals' ? (
-          <TransmittalsView transmittals={transmittals} drawings={drawings} />
-        ) : (
-          <PlaceholderView tab={currentTab} />
-        )}
-      </main>
+        {/* ── Main content ── */}
+        <main className="flex-1 p-margin-desktop">
+          {currentTab === "dashboard" ? (
+            <Dashboard
+              totalDrawings={totalDrawings}
+              totalTransmittals={totalTransmittals}
+              latestRevisions={pendingReviews}
+              overdueItems={overdueTransmit}
+              drawings={drawings}
+              activeProjectId={activeProject?.id}
+              token={currentUser?.token}
+              onViewRegister={() => setCurrentTab("register")}
+            />
+          ) : currentTab === "register" ? (
+            <MasterRegisterTable
+              drawings={pageRows}
+              allDrawings={drawings}
+              total={filtered.length}
+              page={page}
+              totalPages={totalPages}
+              search={search}
+              filterStat={filterStat}
+              filterDisc={filterDisc}
+              sortKey={sortKey}
+              sortDir={sortDir}
+              onPageChange={setPage}
+              onSearch={handleSearch}
+              onFilterStat={handleFilterStat}
+              onFilterDisc={handleFilterDisc}
+              onSort={handleSort}
+              onNewEntry={() => { setModalFolder(""); setShowModal(true); }}
+              onVoid={handleVoid}
+              isRestricted={isRestricted}
+            />
+          ) : currentTab === "transmittals" ? (
+            <TransmittalsView transmittals={transmittals} drawings={drawings} />
+          ) : currentTab === "documents" ? (
+            <DocumentsView 
+              drawings={drawings} 
+              onUpload={!isRestricted ? (folder) => { setModalFolder(folder); setShowModal(true); } : undefined} 
+            />
+          ) : currentTab === "analytics" ? (
+            <AnalyticsView drawings={drawings} transmittals={transmittals} />
+          ) : currentTab === "settings" ? (
+            <SettingsView currentUser={currentUser} onUserUpdate={setCurrentUser} token={currentUser?.token} />
+          ) : (
+            <PlaceholderView tab={currentTab} />
+          )}
+        </main>
+      </div>
 
-      {/* Action Floating Buttons */}
+      {/* ── New Transmittal FAB ── */}
       {!isRestricted && (
-        <div className="fixed bottom-6 right-6 flex gap-3 z-50">
-          <button onClick={() => setShowTransmittal(true)} className="flex items-center gap-2 bg-surface-container-highest text-on-surface px-4 py-2.5 rounded-full shadow-[0_10px_25px_-5px_rgba(0,0,0,0.5)] border border-white/10 hover:bg-white/10 transition-all">
-            <span className="material-symbols-outlined text-[18px]">send</span>
-            <span className="font-label-md text-label-md">Transmittal</span>
-          </button>
-          <button onClick={() => setShowModal(true)} className="flex items-center gap-2 bg-primary text-on-primary px-4 py-2.5 rounded-full shadow-[0_10px_25px_-5px_rgba(195,192,255,0.3)] hover:bg-primary/90 transition-all">
-            <span className="material-symbols-outlined text-[18px]">upload</span>
-            <span className="font-label-md text-label-md">Upload</span>
-          </button>
-        </div>
+        <button
+          onClick={() => setShowTransmittal(true)}
+          className="fixed bottom-6 right-6 z-50 flex items-center gap-2 bg-primary text-white px-5 py-3 rounded-full shadow-lg hover:bg-primary-container transition-all font-medium text-[14px] active:scale-[0.98]"
+        >
+          <span className="material-symbols-outlined text-[18px]">send</span>
+          New Transmittal
+        </button>
       )}
 
-      {/* Modals & Toasts */}
-      {showModal && (
-        <UploadModal 
-          onClose={() => setShowModal(false)}
-          onSubmit={handleUpload}
-        />
-      )}
+      {/* ── Modals & Toasts ── */}
+      {showModal && <UploadModal onClose={() => setShowModal(false)} onSubmit={handleUpload} initialFolder={modalFolder} />}
       {showTransmittal && (
         <TransmittalModal
           drawings={drawings}
@@ -333,20 +380,18 @@ export default function App() {
           trnNumber={nextTrnNumber}
         />
       )}
-      {toast && (
-        <Toast msg={toast.msg} type={toast.type} onDone={() => setToast(null)} />
-      )}
+      {toast && <Toast msg={toast.msg} type={toast.type} onDone={() => setToast(null)} />}
       {showProjectModal && (
         <ProjectModal
           onClose={() => setShowProjectModal(false)}
           onSubmit={async (data) => {
             const res = await fetch(`${API}/api/projects`, {
-              method: "POST",
+              method:  "POST",
               headers: { "Content-Type": "application/json", ...authHeaders(currentUser.token) },
-              body: JSON.stringify(data),
+              body:    JSON.stringify(data),
             });
             if (res.ok) {
-              const newProj = await res.json();
+              const newProj  = await res.json();
               const allProjs = await fetchProjects(currentUser.token);
               setProjects(allProjs);
               setActiveProject(newProj);
@@ -363,12 +408,14 @@ export default function App() {
 }
 
 function PlaceholderView({ tab }) {
-  const iconMap = { documents: "folder_open", analytics: "insights" };
+  const iconMap = { documents: "folder_open", analytics: "analytics", settings: "settings" };
   return (
-    <div className="flex flex-col items-center justify-center h-[60vh] gap-4 text-on-surface-variant">
-      <span className="material-symbols-outlined text-[64px] opacity-30">{iconMap[tab] || "construction"}</span>
-      <p className="font-headline-sm text-headline-sm capitalize">{tab}</p>
-      <p className="font-body-md text-body-md">This section is coming soon.</p>
+    <div className="flex flex-col items-center justify-center h-[60vh] gap-4">
+      <div className="w-20 h-20 rounded-2xl bg-white border border-border-slate flex items-center justify-center">
+        <span className="material-symbols-outlined text-[40px] text-on-surface-variant">{iconMap[tab] || "construction"}</span>
+      </div>
+      <p className="text-headline-sm font-semibold text-on-surface capitalize">{tab}</p>
+      <p className="text-body-md text-on-surface-variant">This section is coming soon.</p>
     </div>
   );
 }

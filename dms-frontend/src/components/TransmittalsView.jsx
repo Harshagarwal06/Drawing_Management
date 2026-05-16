@@ -1,9 +1,9 @@
 const PURPOSE_COLOR = {
-  "For Construction":      { dot: "bg-emerald-400", text: "text-emerald-400", bg: "bg-emerald-500/10 border-emerald-500/20" },
-  "For Approval":          { dot: "bg-amber-400",   text: "text-amber-400",   bg: "bg-amber-500/10 border-amber-500/20"   },
-  "For Information":       { dot: "bg-blue-400",    text: "text-blue-400",    bg: "bg-blue-500/10 border-blue-500/20"     },
-  "For Review & Comment":  { dot: "bg-purple-400",  text: "text-purple-400",  bg: "bg-purple-500/10 border-purple-500/20" },
-  "For Tender":            { dot: "bg-orange-400",  text: "text-orange-400",  bg: "bg-orange-500/10 border-orange-500/20" },
+  "For Construction":     { dot: "bg-emerald-500", text: "text-emerald-700", bg: "bg-emerald-50 border-emerald-200"  },
+  "For Approval":         { dot: "bg-amber-500",   text: "text-amber-700",   bg: "bg-amber-50 border-amber-200"     },
+  "For Information":      { dot: "bg-blue-500",    text: "text-blue-700",    bg: "bg-blue-50 border-blue-200"       },
+  "For Review & Comment": { dot: "bg-purple-500",  text: "text-purple-700",  bg: "bg-purple-50 border-purple-200"   },
+  "For Tender":           { dot: "bg-orange-500",  text: "text-orange-700",  bg: "bg-orange-50 border-orange-200"   },
 };
 
 export default function TransmittalsView({ transmittals = [], drawings = [] }) {
@@ -14,35 +14,37 @@ export default function TransmittalsView({ transmittals = [], drawings = [] }) {
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
         <div>
-          <h2 className="font-headline-lg text-headline-lg font-bold text-on-surface tracking-tight mb-2">Transmittals</h2>
+          <h2 className="font-headline-lg text-headline-lg font-bold text-on-surface tracking-tight mb-1">Transmittals</h2>
           <p className="font-body-md text-body-md text-on-surface-variant max-w-2xl">All issued document transmittals for this project.</p>
         </div>
         <div className="flex items-center gap-2">
-          <span className="font-label-sm text-label-sm text-on-surface-variant bg-surface-container border border-white/10 px-3 py-1 rounded-full">
+          <span className="font-label-sm text-label-sm text-on-surface-variant bg-surface-container border border-outline-variant px-3 py-1 rounded-full">
             {transmittals.length} issued
           </span>
         </div>
       </div>
 
       {transmittals.length === 0 ? (
-        <div className="flex flex-col items-center justify-center h-64 gap-4 text-on-surface-variant bg-surface-container-low/50 rounded-xl border border-white/5">
-          <span className="material-symbols-outlined text-[48px] opacity-30">send_and_archive</span>
-          <p className="font-body-md text-body-md">No transmittals issued yet.</p>
+        <div className="flex flex-col items-center justify-center h-64 gap-4 text-on-surface-variant bg-surface border border-outline-variant rounded-xl shadow-card">
+          <div className="w-16 h-16 rounded-2xl bg-surface-container border border-outline-variant flex items-center justify-center">
+            <span className="material-symbols-outlined text-[32px] text-outline">send_and_archive</span>
+          </div>
+          <p className="font-body-md text-body-md text-on-surface-variant">No transmittals issued yet.</p>
         </div>
       ) : (
-        <div className="flex flex-col gap-4">
+        <div className="flex flex-col gap-3">
           {transmittals.map(t => {
-            const colors = PURPOSE_COLOR[t.purpose] || { dot: "bg-on-surface-variant", text: "text-on-surface-variant", bg: "bg-surface-container-highest border-white/5" };
+            const colors = PURPOSE_COLOR[t.purpose] || { dot: "bg-outline", text: "text-on-surface-variant", bg: "bg-surface-container border-outline-variant" };
             const includedDrawings = (t.drawingIds || []).map(id => drawingMap[id]).filter(Boolean);
 
             return (
-              <div key={t.id} className="bg-surface-container-low/50 backdrop-blur-xl border border-white/5 rounded-xl p-5 shadow-[0_10px_25px_-5px_rgba(0,0,0,0.4)] hover:bg-white/[0.03] transition-colors">
+              <div key={t.id} className="bg-surface border border-outline-variant rounded-xl p-5 shadow-card hover:shadow-card-md transition-shadow">
                 <div className="flex flex-col md:flex-row md:items-start gap-4">
                   {/* Left: number + purpose */}
                   <div className="shrink-0 flex flex-col gap-2 min-w-[160px]">
                     <span className="font-mono font-bold text-on-surface text-sm">{t.number}</span>
                     <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border w-fit ${colors.bg} ${colors.text}`}>
-                      <div className={`w-1.5 h-1.5 rounded-full ${colors.dot}`}></div>
+                      <div className={`w-1.5 h-1.5 rounded-full ${colors.dot}`} />
                       <span className="text-[11px] font-medium">{t.purpose}</span>
                     </div>
                     <span className="font-label-sm text-label-sm text-on-surface-variant">{t.issuedAt}</span>
@@ -55,12 +57,12 @@ export default function TransmittalsView({ transmittals = [], drawings = [] }) {
                     </p>
                     <div className="flex flex-wrap gap-2">
                       {includedDrawings.map(d => (
-                        <span key={d.id} className="px-2 py-1 rounded bg-surface-container-highest border border-white/5 text-on-surface-variant text-[11px] font-mono">
+                        <span key={d.id} className="px-2 py-1 rounded bg-surface-container border border-outline-variant text-on-surface-variant text-[11px] font-mono">
                           {d.number} Rev {d.rev}
                         </span>
                       ))}
                       {(t.drawingIds?.length || 0) > includedDrawings.length && (
-                        <span className="px-2 py-1 rounded bg-surface-container-highest border border-white/5 text-outline text-[11px]">
+                        <span className="px-2 py-1 rounded bg-surface-container border border-outline-variant text-outline text-[11px]">
                           +{t.drawingIds.length - includedDrawings.length} more
                         </span>
                       )}
@@ -76,7 +78,7 @@ export default function TransmittalsView({ transmittals = [], drawings = [] }) {
                     <div className="flex flex-col gap-1">
                       {(t.recipients || []).map((r, i) => (
                         <div key={i} className="flex items-center gap-2">
-                          <div className="w-6 h-6 rounded-full bg-primary/20 border border-primary/30 flex items-center justify-center text-primary text-[10px] font-bold shrink-0">
+                          <div className="w-6 h-6 rounded-full bg-primary flex items-center justify-center text-on-primary text-[10px] font-bold shrink-0">
                             {r.charAt(0).toUpperCase()}
                           </div>
                           <span className="font-body-sm text-[12px] text-on-surface-variant truncate">{r}</span>

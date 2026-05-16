@@ -1,9 +1,9 @@
 import { useState, useRef } from "react";
-import { X, Upload, CheckCircle2, Loader2 } from "lucide-react";
+import { X, Upload, CheckCircle2, Loader2, FolderOpen } from "lucide-react";
 import Field from "./Field";
 import { STATUSES, ORIGINATORS, STATUS_META } from "../constants";
 
-export default function UploadModal({ onClose, onSubmit }) {
+export default function UploadModal({ onClose, onSubmit, initialFolder }) {
   const [form, setForm] = useState({
     drawingNumber: "",
     title: "",
@@ -12,6 +12,7 @@ export default function UploadModal({ onClose, onSubmit }) {
     originator: "",
     status: "S1",
     notes: "",
+    folderPath: initialFolder || "",
   });
   const [file, setFile]             = useState(null);
   const [dragging, setDragging]     = useState(false);
@@ -73,16 +74,24 @@ export default function UploadModal({ onClose, onSubmit }) {
   ].join(" ");
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(15,23,42,0.55)" }}>
-      <div className="modal-enter bg-white/90 backdrop-blur-xl rounded-2xl shadow-2xl border border-white/50 w-full max-w-2xl overflow-hidden">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(15,23,42,0.4)" }}>
+      <div className="modal-enter bg-surface rounded-2xl shadow-card-lg border border-outline-variant w-full max-w-2xl overflow-hidden">
 
         {/* Header */}
-        <div className="px-6 py-5 border-b border-slate-100 flex items-center justify-between bg-gradient-to-r from-slate-900 to-slate-800">
+        <div className="px-6 py-4 border-b border-outline-variant flex items-center justify-between bg-surface-container-low">
           <div>
-            <h2 className="text-base font-semibold text-white">Upload Drawing</h2>
-            <p className="text-xs text-slate-400 mt-0.5">Register a new drawing to the Master Drawing Register</p>
+            <div className="flex items-center gap-3">
+              <h2 className="text-base font-semibold text-on-surface">Upload Drawing</h2>
+              {initialFolder && (
+                <span className="px-2.5 py-1 rounded-md bg-white border border-border-slate text-[11px] font-medium text-on-surface-variant flex items-center gap-1.5 shadow-sm">
+                  <FolderOpen size={12} className="text-primary" />
+                  {initialFolder.replace(/\//g, ' / ')}
+                </span>
+              )}
+            </div>
+            <p className="text-xs text-on-surface-variant mt-0.5">Register a new drawing to the Master Drawing Register</p>
           </div>
-          <button onClick={onClose} className="text-slate-400 hover:text-white transition p-1 rounded-lg hover:bg-white/10">
+          <button onClick={onClose} className="text-on-surface-variant hover:text-on-surface transition p-1.5 rounded-lg hover:bg-surface-container">
             <X className="w-5 h-5" />
           </button>
         </div>

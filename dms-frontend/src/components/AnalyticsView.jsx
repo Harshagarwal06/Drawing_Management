@@ -45,7 +45,7 @@ export default function AnalyticsView({ drawings, transmittals }) {
       {/* KPI row */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {Object.entries(STATUS_META).map(([code, { label, color }]) => (
-          <div key={code} className="bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
+          <div key={code} className="bg-white border border-border-slate rounded-xl p-5 shadow-sm">
             <div className="flex items-center gap-2 mb-1">
               <span className="w-2 h-2 rounded-full" style={{ backgroundColor: color }} />
               <span className="font-label-sm text-[10px] text-on-surface-variant uppercase tracking-wide">{label}</span>
@@ -85,7 +85,7 @@ export default function AnalyticsView({ drawings, transmittals }) {
                       <span className="font-body-sm text-[12px] text-on-surface-variant">{label}</span>
                     </div>
                     <div className="flex items-center gap-3">
-                      <div className="w-24 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                      <div className="w-24 h-1.5 bg-surface-container rounded-full overflow-hidden">
                         <div className="h-full rounded-full" style={{ width: `${(statusCounts[code] / total) * 100}%`, backgroundColor: color }} />
                       </div>
                       <span className="font-mono text-[12px] text-on-surface w-6 text-right">{statusCounts[code]}</span>
@@ -139,7 +139,7 @@ export default function AnalyticsView({ drawings, transmittals }) {
             {discEntries.map(([disc, counts]) => (
               <div key={disc} className="flex items-center gap-4">
                 <span className="font-label-sm text-[11px] text-on-surface-variant w-32 shrink-0 truncate" title={disc}>{disc}</span>
-                <div className="flex-1 flex h-5 rounded-md overflow-hidden bg-gray-100">
+                <div className="flex-1 flex h-5 rounded-md overflow-hidden bg-surface-container">
                   {Object.entries(STATUS_META).map(([code, { color }]) =>
                     counts[code] > 0 ? (
                       <div
@@ -163,7 +163,7 @@ export default function AnalyticsView({ drawings, transmittals }) {
 
 function Card({ title, icon, children }) {
   return (
-    <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm">
+    <div className="bg-white border border-border-slate rounded-xl p-6 shadow-sm">
       <div className="flex items-center gap-2 mb-5">
         <span className="material-symbols-outlined text-primary text-[20px]">{icon}</span>
         <h2 className="font-headline-sm text-headline-sm text-on-surface font-semibold">{title}</h2>

@@ -3,17 +3,24 @@ import { useEffect, useState } from "react";
 const API = import.meta.env.VITE_API_URL;
 
 const STATUS_META = {
-  S3:   { label: "For Construction", color: "#34d399" },
-  S2:   { label: "For Approval",     color: "#fbbf24" },
-  S1:   { label: "For Information",  color: "#60a5fa" },
-  VOID: { label: "Void",             color: "#f87171" },
+  S3:   { label: "For Construction", color: "#059669" },
+  S2:   { label: "For Approval",     color: "#d97706" },
+  S1:   { label: "For Information",  color: "#2563eb" },
+  VOID: { label: "Void",             color: "#dc2626" },
+};
+
+const STATUS_DISPLAY = {
+  S3:   { label: "For Construction", textCls: "text-status-emerald-text", bgCls: "bg-status-emerald-bg" },
+  S2:   { label: "For Approval",     textCls: "text-status-amber-text",   bgCls: "bg-status-amber-bg"   },
+  S1:   { label: "For Information",  textCls: "text-blue-600",            bgCls: "bg-blue-50"           },
+  VOID: { label: "Void",             textCls: "text-status-rose-text",    bgCls: "bg-status-rose-bg"    },
 };
 
 const ACTIVITY_ICONS = {
-  upload:      { icon: "upload_file",       color: "text-primary",  bg: "bg-primary/10"  },
-  revision:    { icon: "history",           color: "text-blue-400", bg: "bg-blue-500/10" },
-  transmittal: { icon: "send_and_archive",  color: "text-tertiary", bg: "bg-tertiary/10" },
-  void:        { icon: "block",             color: "text-red-400",  bg: "bg-red-500/10"  },
+  upload:      { icon: "upload_file",      bgCls: "bg-primary-fixed/30",     textCls: "text-primary"              },
+  revision:    { icon: "edit",             bgCls: "bg-primary-fixed/30",     textCls: "text-primary"              },
+  transmittal: { icon: "check_circle",     bgCls: "bg-status-emerald-bg",    textCls: "text-status-emerald-text"  },
+  void:        { icon: "error",            bgCls: "bg-status-rose-bg",       textCls: "text-status-rose-text"     },
 };
 
 function timeAgo(iso) {
@@ -23,24 +30,26 @@ function timeAgo(iso) {
   if (m < 60) return `${m}m ago`;
   const h = Math.floor(m / 60);
   if (h < 24) return `${h}h ago`;
-  const d = Math.floor(h / 24);
-  return `${d}d ago`;
+  return `${Math.floor(h / 24)}d ago`;
 }
 
-export default function Dashboard({ totalDrawings, totalTransmittals, latestRevisions, overdueItems, drawings, activeProjectId, token }) {
+export default function Dashboard({
+  totalDrawings, totalTransmittals, latestRevisions, overdueItems,
+  drawings, activeProjectId, token, onViewRegister,
+}) {
   const [activity, setActivity] = useState([]);
 
   useEffect(() => {
     if (!activeProjectId || !token) return;
     fetch(`${API}/api/activity?projectId=${activeProjectId}`, {
-      headers: { Authorization: `Bearer ${token}` }
+      headers: { Authorization: `Bearer ${token}` },
     })
       .then(r => r.ok ? r.json() : [])
       .then(setActivity)
       .catch(() => {});
   }, [activeProjectId, token]);
 
-  /* ── Discipline breakdown ── */
+  /* Discipline breakdown */
   const byDisc = {};
   drawings.forEach(d => {
     if (!byDisc[d.discipline]) byDisc[d.discipline] = { S1: 0, S2: 0, S3: 0, VOID: 0, total: 0 };
@@ -50,160 +59,227 @@ export default function Dashboard({ totalDrawings, totalTransmittals, latestRevi
   const discEntries = Object.entries(byDisc).sort((a, b) => b[1].total - a[1].total);
   const maxTotal = Math.max(...discEntries.map(([, v]) => v.total), 1);
 
-  /* ── Status breakdown for donut-style summary ── */
-  const statusCounts = { S3: 0, S2: 0, S1: 0, VOID: 0 };
-  drawings.forEach(d => { if (statusCounts[d.status] !== undefined) statusCounts[d.status]++; });
+  /* Latest drawings (most recently uploaded) */
+  const latestDrawings = [...drawings].sort((a, b) => b.id - a.id).slice(0, 5);
 
   return (
-    <div className="max-w-[1600px] mx-auto space-y-8">
-      {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+    <div className="space-y-8">
+      {/* Page Header */}
+      <div className="flex justify-between items-end">
         <div>
-          <h1 className="font-display-lg text-display-lg text-on-surface tracking-tight">Dashboard</h1>
-          <p className="font-body-md text-body-md text-on-surface-variant mt-1">Project Status & Activity</p>
+          <h2 className="font-headline-lg text-headline-lg text-on-surface">Project Dashboard</h2>
+          <p className="font-body-md text-on-surface-variant mt-1">Real-time status overview of project documentation and delivery.</p>
+        </div>
+        <div className="flex gap-3">
+          <button className="px-4 py-2 border border-border-slate bg-white text-secondary font-label-md rounded-lg flex items-center gap-2 hover:bg-surface-container transition-all active:scale-[0.98]">
+            <span className="material-symbols-outlined text-[18px]">calendar_today</span>
+            This Quarter
+          </button>
+          <button className="px-4 py-2 bg-primary text-on-primary font-label-md rounded-lg flex items-center gap-2 hover:bg-primary-container transition-all active:scale-[0.98]">
+            <span className="material-symbols-outlined text-[18px]">file_download</span>
+            Export Report
+          </button>
         </div>
       </div>
 
       {/* Metric Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <MetricCard title="Total Drawings"      icon="architecture"     value={totalDrawings}     subValue={`${statusCounts.S3} for construction`} color="primary" />
-        <MetricCard title="Issued Transmittals" icon="send_and_archive" value={totalTransmittals}  subValue={overdueItems > 0 ? `${overdueItems} overdue` : "All on schedule"} color="tertiary" />
-        <MetricCard title="Pending Approval"    icon="pending_actions"  value={latestRevisions}   subValue="Awaiting review"   color="primary-container" />
-        <MetricCard title="Overdue Items"       icon="warning"          value={overdueItems}       subValue="Requires attention" color="rose" />
+        <MetricCard
+          icon="architecture"
+          badge={{ label: `${drawings.filter(d=>d.status==="S3").length} issued`, cls: "text-status-emerald-text bg-status-emerald-bg" }}
+          title="TOTAL DRAWINGS"
+          value={totalDrawings}
+          iconBg="bg-primary/5"
+          iconColor="text-primary"
+        />
+        <MetricCard
+          icon="move_to_inbox"
+          badge={{ label: "+recent", cls: "text-status-emerald-text bg-status-emerald-bg" }}
+          title="ISSUED TRANSMITTALS"
+          value={totalTransmittals}
+          iconBg="bg-primary/5"
+          iconColor="text-primary"
+        />
+        <MetricCard
+          icon="update"
+          badge={{ label: "Active", cls: "text-status-amber-text bg-status-amber-bg" }}
+          title="PENDING APPROVAL"
+          value={latestRevisions}
+          iconBg="bg-primary/5"
+          iconColor="text-primary"
+        />
+        <MetricCard
+          icon="warning"
+          badge={{ label: overdueItems > 0 ? "Critical" : "On Track", cls: overdueItems > 0 ? "text-status-rose-text bg-status-rose-bg" : "text-status-emerald-text bg-status-emerald-bg" }}
+          title="OVERDUE ITEMS"
+          value={overdueItems}
+          iconBg={overdueItems > 0 ? "bg-status-rose-bg" : "bg-status-emerald-bg"}
+          iconColor={overdueItems > 0 ? "text-status-rose-text" : "text-status-emerald-text"}
+        />
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-        {/* Left: chart + recent drawings */}
-        <div className="xl:col-span-2 space-y-6">
+      {/* Chart + Activity */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
 
-          {/* Discipline Breakdown Chart */}
-          <div className="bg-slate-900/70 dark:bg-white/5 backdrop-blur-xl border border-white/10 rounded-xl p-6 shadow-[0_20px_25px_-5px_rgba(0,0,0,0.5)]">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="font-headline-sm text-headline-sm text-on-surface font-semibold">Drawings by Discipline</h2>
-              <div className="flex items-center gap-4">
-                {Object.entries(STATUS_META).map(([code, { label, color }]) => (
-                  <div key={code} className="flex items-center gap-1.5">
-                    <span className="w-2 h-2 rounded-full" style={{ backgroundColor: color }} />
-                    <span className="font-label-sm text-[10px] text-on-surface-variant">{label}</span>
-                  </div>
-                ))}
-              </div>
+        {/* Chart (Discipline Breakdown) */}
+        <div className="lg:col-span-8 bg-white border border-border-slate rounded-xl p-8 flex flex-col">
+          <div className="flex justify-between items-center mb-8">
+            <div>
+              <h4 className="font-headline-md text-headline-md text-on-surface">Drawings by Discipline</h4>
+              <p className="font-body-sm text-on-surface-variant">Status breakdown per drawing type.</p>
             </div>
-
-            {discEntries.length === 0 ? (
-              <div className="flex flex-col items-center justify-center h-40 gap-3 text-on-surface-variant">
-                <span className="material-symbols-outlined text-[40px] opacity-30">bar_chart</span>
-                <p className="font-body-sm text-body-sm">Upload drawings to see the breakdown</p>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {discEntries.map(([disc, counts]) => (
-                  <div key={disc} className="flex items-center gap-4 group">
-                    <span className="font-label-sm text-[11px] text-on-surface-variant w-28 shrink-0 truncate" title={disc}>{disc}</span>
-                    <div className="flex-1 flex h-5 rounded-md overflow-hidden bg-surface-container">
-                      {Object.entries(STATUS_META).map(([code, { color }]) =>
-                        counts[code] > 0 ? (
-                          <div
-                            key={code}
-                            title={`${STATUS_META[code].label}: ${counts[code]}`}
-                            className="h-full transition-all"
-                            style={{ width: `${(counts[code] / maxTotal) * 100}%`, backgroundColor: color + "b3" }}
-                          />
-                        ) : null
-                      )}
-                    </div>
-                    <span className="font-mono text-[11px] text-on-surface-variant w-6 text-right shrink-0">{counts.total}</span>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Status Summary Row */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {Object.entries(STATUS_META).map(([code, { label, color }]) => (
-              <div key={code} className="bg-slate-900/70 dark:bg-white/5 backdrop-blur-xl border border-white/10 rounded-xl p-4 shadow-[0_10px_15px_-3px_rgba(0,0,0,0.4)]">
-                <div className="flex items-center gap-2 mb-2">
-                  <span className="w-2 h-2 rounded-full" style={{ backgroundColor: color }} />
-                  <span className="font-label-sm text-[10px] text-on-surface-variant uppercase tracking-wide">{label}</span>
+            <div className="flex gap-4">
+              {Object.entries(STATUS_META).map(([code, { label, color }]) => (
+                <div key={code} className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full" style={{ backgroundColor: color }} />
+                  <span className="font-label-sm text-on-surface-variant text-[11px]">{label}</span>
                 </div>
-                <p className="font-headline-sm text-headline-sm text-on-surface font-bold">{statusCounts[code]}</p>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
+
+          {discEntries.length === 0 ? (
+            <div className="flex-1 flex flex-col items-center justify-center h-40 gap-3 text-on-surface-variant">
+              <span className="material-symbols-outlined text-[48px] opacity-25">bar_chart</span>
+              <p className="font-body-sm text-body-sm">Upload drawings to see the breakdown</p>
+            </div>
+          ) : (
+            <div className="flex-1 flex items-end gap-3 h-52 w-full">
+              {discEntries.slice(0, 8).map(([disc, counts]) => (
+                <div key={disc} className="flex-1 flex flex-col justify-end items-center gap-1 h-full">
+                  <div className="w-full flex flex-col justify-end gap-0.5 flex-1">
+                    {Object.entries(STATUS_META).map(([code, { color }]) =>
+                      counts[code] > 0 ? (
+                        <div
+                          key={code}
+                          title={`${STATUS_META[code].label}: ${counts[code]}`}
+                          className="w-full rounded-t-sm transition-all"
+                          style={{
+                            height: `${(counts[code] / maxTotal) * 160}px`,
+                            backgroundColor: color,
+                            opacity: 0.85,
+                          }}
+                        />
+                      ) : null
+                    )}
+                  </div>
+                  <span className="text-center font-label-sm text-[10px] text-on-surface-variant mt-2 truncate w-full text-center">{disc.slice(0,4)}</span>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
-        {/* Right: Activity Feed */}
-        <div className="xl:col-span-1">
-          <div className="bg-slate-900/70 dark:bg-white/5 backdrop-blur-xl border border-white/10 rounded-xl p-6 shadow-[0_20px_25px_-5px_rgba(0,0,0,0.5)] flex flex-col" style={{ minHeight: "420px" }}>
-            <div className="flex items-center justify-between mb-5 shrink-0">
-              <h2 className="font-headline-sm text-headline-sm text-on-surface font-semibold">Activity Feed</h2>
-              <span className="font-label-sm text-[10px] text-outline uppercase tracking-wider">{activity.length} events</span>
-            </div>
-            <div className="flex-1 overflow-y-auto pr-1 space-y-1 custom-scrollbar">
-              {activity.length === 0 ? (
-                <div className="flex flex-col items-center justify-center h-40 gap-3 text-on-surface-variant">
-                  <span className="material-symbols-outlined text-[36px] opacity-30">notifications_none</span>
-                  <p className="font-body-sm text-body-sm text-center">Activity will appear here as you upload drawings and issue transmittals.</p>
-                </div>
-              ) : (
-                activity.map((item, i) => {
-                  const meta = ACTIVITY_ICONS[item.type] || ACTIVITY_ICONS.upload;
-                  return (
-                    <div key={item.id} className="flex gap-3 p-2.5 rounded-lg hover:bg-white/5 transition-colors">
-                      <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${meta.bg}`}>
-                        <span className={`material-symbols-outlined text-[16px] ${meta.color}`}>{meta.icon}</span>
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="font-label-sm text-[12px] text-on-surface leading-tight truncate">{item.title}</p>
-                        {item.detail && (
-                          <p className="font-body-sm text-[11px] text-on-surface-variant leading-tight mt-0.5 truncate">{item.detail}</p>
-                        )}
-                        <p className="font-label-sm text-[10px] text-outline mt-1">{timeAgo(item.created_at)}</p>
-                      </div>
-                    </div>
-                  );
-                })
-              )}
-            </div>
+        {/* Activity Feed — timeline style */}
+        <div className="lg:col-span-4 bg-white border border-border-slate rounded-xl flex flex-col">
+          <div className="p-6 border-b border-border-slate">
+            <h4 className="font-headline-md text-headline-md text-on-surface">Activity Feed</h4>
+            <p className="font-body-sm text-on-surface-variant">Recent project events and updates.</p>
           </div>
+          <div className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar">
+            {activity.length === 0 ? (
+              <div className="flex flex-col items-center justify-center h-40 gap-3 text-on-surface-variant">
+                <span className="material-symbols-outlined text-[36px] opacity-30">notifications_none</span>
+                <p className="font-body-sm text-body-sm text-center">Activity will appear here as you upload drawings and issue transmittals.</p>
+              </div>
+            ) : (
+              activity.map((item, i) => {
+                const meta = ACTIVITY_ICONS[item.type] || ACTIVITY_ICONS.upload;
+                const isLast = i === activity.length - 1;
+                return (
+                  <div key={item.id} className="flex gap-4 relative">
+                    {!isLast && (
+                      <div className="absolute left-4 top-8 bottom-0 w-px bg-border-slate -mb-6" />
+                    )}
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 z-10 ${meta.bgCls}`}>
+                      <span className={`material-symbols-outlined text-[18px] ${meta.textCls}`}>{meta.icon}</span>
+                    </div>
+                    <div>
+                      <p className="font-body-md text-on-surface text-[13px] leading-snug">{item.title}</p>
+                      {item.detail && (
+                        <p className="font-label-sm text-[11px] text-on-surface-variant mt-1">{item.detail} · {timeAgo(item.created_at)}</p>
+                      )}
+                      {!item.detail && (
+                        <p className="font-label-sm text-[11px] text-on-surface-variant mt-1">{timeAgo(item.created_at)}</p>
+                      )}
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+          <button className="m-6 mt-0 py-3 border border-border-slate rounded-lg font-label-md text-secondary hover:bg-surface-container transition-all text-center text-[13px]">
+            View All Activity
+          </button>
+        </div>
+      </div>
+
+      {/* Latest Drawing Revisions Table */}
+      <div className="bg-white border border-border-slate rounded-xl overflow-hidden">
+        <div className="p-6 border-b border-border-slate flex justify-between items-center">
+          <div>
+            <h4 className="font-headline-md text-headline-md text-on-surface">Latest Drawing Revisions</h4>
+            <p className="font-body-sm text-on-surface-variant">Recently uploaded and updated drawings.</p>
+          </div>
+          <button onClick={onViewRegister} className="text-primary font-label-md hover:underline text-[13px]">
+            View Register
+          </button>
+        </div>
+        <div className="overflow-x-auto">
+          {latestDrawings.length === 0 ? (
+            <div className="flex flex-col items-center justify-center h-32 gap-3 text-on-surface-variant">
+              <span className="material-symbols-outlined text-[36px] opacity-25">folder_open</span>
+              <p className="font-body-sm text-body-sm">No drawings uploaded yet.</p>
+            </div>
+          ) : (
+            <table className="w-full text-left">
+              <thead className="bg-surface-container-low border-b border-border-slate">
+                <tr>
+                  {["Sheet No.", "Title", "Rev", "Date", "Status", "Action"].map((h, i) => (
+                    <th key={h} className={`px-6 py-4 font-label-sm text-on-surface-variant uppercase tracking-wider text-[11px] ${i === 5 ? "text-right" : ""}`}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border-slate">
+                {latestDrawings.map(d => {
+                  const s = STATUS_DISPLAY[d.status] || { label: d.status, textCls: "text-on-surface-variant", bgCls: "bg-surface-container" };
+                  return (
+                    <tr key={d.id} className="hover:bg-surface-container-low transition-colors">
+                      <td className="px-6 py-4 font-body-md font-bold text-primary text-[13px]">{d.number}</td>
+                      <td className="px-6 py-4 font-body-md text-on-surface text-[13px] max-w-[260px] truncate">{d.title || "Untitled"}</td>
+                      <td className="px-6 py-4 font-body-md text-[13px]">Rev {d.rev}</td>
+                      <td className="px-6 py-4 font-body-md text-on-surface-variant text-[13px]">{d.issueDate ?? "—"}</td>
+                      <td className="px-6 py-4">
+                        <span className={`px-3 py-1 rounded-full font-label-sm text-[11px] ${s.bgCls} ${s.textCls}`}>{s.label}</span>
+                      </td>
+                      <td className="px-6 py-4 text-right">
+                        <button className="p-1 hover:bg-surface-container rounded transition-colors">
+                          <span className="material-symbols-outlined text-on-surface-variant text-[20px]">more_vert</span>
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          )}
         </div>
       </div>
     </div>
   );
 }
 
-function MetricCard({ title, icon, value, subValue, color }) {
-  const colorMap = {
-    "primary":           "bg-primary text-primary",
-    "tertiary":          "bg-tertiary text-tertiary",
-    "primary-container": "bg-primary-container text-primary-container",
-    "rose":              "bg-rose-500 text-rose-500",
-  };
-  const glowMap = {
-    "primary":           "bg-primary/10 group-hover:bg-primary/20",
-    "tertiary":          "bg-tertiary/10 group-hover:bg-tertiary/20",
-    "primary-container": "bg-primary-container/10 group-hover:bg-primary-container/20",
-    "rose":              "bg-rose-500/10 group-hover:bg-rose-500/20",
-  };
+function MetricCard({ icon, badge, title, value, iconBg, iconColor }) {
   return (
-    <div className={`relative overflow-hidden rounded-xl bg-slate-900/70 dark:bg-white/5 backdrop-blur-xl border ${color === "rose" ? "border-rose-500/20" : "border-white/10"} p-6 shadow-[0_20px_25px_-5px_rgba(0,0,0,0.5)] group hover:-translate-y-1 transition-transform duration-300`}>
-      <div className={`absolute top-0 right-0 w-32 h-32 rounded-full blur-3xl -mr-10 -mt-10 transition-colors ${glowMap[color]}`} />
-      <div className="relative z-10 flex flex-col h-full justify-between gap-4">
-        <div className="flex items-start justify-between">
-          <span className={`font-label-sm text-label-sm uppercase tracking-wider ${color === "rose" ? "text-rose-400" : "text-on-surface-variant"}`}>{title}</span>
-          <div className={`w-8 h-8 rounded-full flex items-center justify-center ${colorMap[color]} bg-opacity-10`}>
-            <span className="material-symbols-outlined text-[18px]">{icon}</span>
-          </div>
+    <div className="bg-white border border-border-slate p-6 rounded-xl hover:shadow-md transition-shadow">
+      <div className="flex justify-between items-start mb-4">
+        <div className={`p-2 rounded-lg ${iconBg} ${iconColor}`}>
+          <span className="material-symbols-outlined text-[22px]" style={{ fontVariationSettings: "'FILL' 0" }}>{icon}</span>
         </div>
-        <div>
-          <div className="font-headline-lg text-headline-lg text-on-surface font-bold">{value}</div>
-          <div className={`flex items-center gap-1 mt-1 font-body-sm text-body-sm ${color === "rose" ? "text-rose-400" : "text-emerald-400"}`}>
-            <span className="material-symbols-outlined text-[14px]">info</span>
-            <span>{subValue}</span>
-          </div>
-        </div>
+        <span className={`px-2 py-1 rounded-full font-label-sm text-[10px] ${badge.cls}`}>{badge.label}</span>
       </div>
+      <p className="font-label-sm text-on-surface-variant mb-1 uppercase tracking-wider">{title}</p>
+      <h3 className="font-headline-md text-headline-md text-on-surface font-bold">{value}</h3>
     </div>
   );
 }

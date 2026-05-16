@@ -48,7 +48,8 @@ db.exec(`
     issue_date   TEXT,
     originator   TEXT,
     transmittals INTEGER DEFAULT 0,
-    path         TEXT
+    path         TEXT,
+    folder_path  TEXT    DEFAULT ''
   );
 
   CREATE TABLE IF NOT EXISTS transmittals (
@@ -78,8 +79,9 @@ db.exec(`
   );
 `);
 
-// Add project_id columns if upgrading from an older schema
+// Add columns if upgrading from an older schema
 try { db.exec('ALTER TABLE drawings ADD COLUMN project_id INTEGER DEFAULT 1;');     } catch {}
+try { db.exec("ALTER TABLE drawings ADD COLUMN folder_path TEXT DEFAULT '';");       } catch {}
 try { db.exec('ALTER TABLE transmittals ADD COLUMN project_id INTEGER DEFAULT 1;'); } catch {}
 
 /* ── Seed projects ──────────────────────────────────────────────── */
@@ -226,6 +228,7 @@ app.get('/api/drawings', (req, res) => {
       originator:   r.originator,
       transmittals: r.transmittals,
       path:         r.path,
+      folderPath:   r.folder_path || '',
     })));
   } catch (err) {
     console.error('❌ GET /api/drawings error:', err);
@@ -237,20 +240,21 @@ app.get('/api/drawings', (req, res) => {
 app.post('/api/upload', requireWriteAccess, upload.single('drawingFile'), (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'No file uploaded.' });
 
-  const { drawingNumber, title, discipline, originator, revision, status, projectId } = req.body;
+  const { drawingNumber, title, discipline, originator, revision, status, projectId, folderPath } = req.body;
   const pId      = projectId || 1;
+  const fPath    = folderPath || '';
   const filePath = `/uploads/${req.file.filename}`;
   const today    = new Date().toISOString().split('T')[0];
 
   try {
     const existing = db.prepare('SELECT id FROM drawings WHERE number = ?').get(drawingNumber);
     if (existing) {
-      db.prepare(`UPDATE drawings SET title=?, discipline=?, rev=?, status=?, issue_date=?, originator=?, path=?, project_id=? WHERE number=?`)
-        .run(title, discipline, revision, status, today, originator, filePath, pId, drawingNumber);
+      db.prepare(`UPDATE drawings SET title=?, discipline=?, rev=?, status=?, issue_date=?, originator=?, path=?, project_id=?, folder_path=? WHERE number=?`)
+        .run(title, discipline, revision, status, today, originator, filePath, pId, fPath, drawingNumber);
       console.log(`✅ Updated drawing ${drawingNumber} → Rev ${revision}`);
     } else {
-      db.prepare(`INSERT INTO drawings (number,title,discipline,rev,status,issue_date,originator,transmittals,path,project_id) VALUES (?,?,?,?,?,?,?,0,?,?)`)
-        .run(drawingNumber, title || 'Untitled', discipline, revision, status || 'S1', today, originator, filePath, pId);
+      db.prepare(`INSERT INTO drawings (number,title,discipline,rev,status,issue_date,originator,transmittals,path,project_id,folder_path) VALUES (?,?,?,?,?,?,?,0,?,?,?)`)
+        .run(drawingNumber, title || 'Untitled', discipline, revision, status || 'S1', today, originator, filePath, pId, fPath);
       console.log(`✅ Registered drawing ${drawingNumber} Rev ${revision}`);
     }
     db.prepare('INSERT INTO activity_log (project_id,type,title,detail,created_at) VALUES (?,?,?,?,?)')
