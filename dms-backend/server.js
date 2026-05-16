@@ -322,6 +322,72 @@ app.patch('/api/drawings/:id/void', requireWriteAccess, (req, res) => {
   }
 });
 
+/* ── GET /api/users ─────────────────────────────────────────────── */
+app.get('/api/users', (req, res) => {
+  if (req.user.role !== 'Document Controller') return res.status(403).json({ error: 'Access denied.' });
+  try {
+    const rows = db.prepare('SELECT id, username, name, role, avatar FROM users ORDER BY id ASC').all();
+    res.json(rows);
+  } catch (err) {
+    console.error('❌ GET /api/users error:', err);
+    res.status(500).json({ error: 'Failed to fetch users.' });
+  }
+});
+
+/* ── POST /api/users ─────────────────────────────────────────────── */
+const VALID_ROLES = ['Document Controller', 'Project Manager', 'Internal User', 'Subcontractor', 'Read-Only'];
+
+app.post('/api/users', async (req, res) => {
+  if (req.user.role !== 'Document Controller') return res.status(403).json({ error: 'Access denied.' });
+  const { username, password, name, role } = req.body;
+  if (!username || !password || !name || !role) return res.status(400).json({ error: 'username, password, name, and role are required.' });
+  if (!VALID_ROLES.includes(role)) return res.status(400).json({ error: `Invalid role. Must be one of: ${VALID_ROLES.join(', ')}` });
+  try {
+    const avatar = name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2);
+    const hashed = await bcrypt.hash(password, SALT_ROUNDS);
+    const result = db.prepare('INSERT INTO users (username, password, name, role, avatar) VALUES (?, ?, ?, ?, ?)').run(username, hashed, name, role, avatar);
+    res.status(201).json({ id: result.lastInsertRowid, username, name, role, avatar });
+  } catch (err) {
+    if (err.message?.includes('UNIQUE constraint')) return res.status(409).json({ error: `Username "${username}" is already taken.` });
+    console.error('❌ POST /api/users error:', err);
+    res.status(500).json({ error: 'Failed to create user.' });
+  }
+});
+
+/* ── PATCH /api/users/:id/role ──────────────────────────────────── */
+app.patch('/api/users/:id/role', (req, res) => {
+  if (req.user.role !== 'Document Controller') return res.status(403).json({ error: 'Access denied.' });
+  const { role } = req.body;
+  if (!VALID_ROLES.includes(role)) return res.status(400).json({ error: `Invalid role.` });
+  try {
+    const info = db.prepare('UPDATE users SET role = ? WHERE id = ?').run(role, req.params.id);
+    if (info.changes === 0) return res.status(404).json({ error: 'User not found.' });
+    res.json({ id: req.params.id, role });
+  } catch (err) {
+    console.error('❌ PATCH /api/users/:id/role error:', err);
+    res.status(500).json({ error: 'Failed to update role.' });
+  }
+});
+
+/* ── PATCH /api/users/me/password ───────────────────────────────── */
+app.patch('/api/users/me/password', async (req, res) => {
+  const { currentPassword, newPassword } = req.body;
+  if (!currentPassword || !newPassword) return res.status(400).json({ error: 'currentPassword and newPassword are required.' });
+  if (newPassword.length < 6) return res.status(400).json({ error: 'New password must be at least 6 characters.' });
+  try {
+    const user = db.prepare('SELECT * FROM users WHERE id = ?').get(req.user.id);
+    if (!user) return res.status(404).json({ error: 'User not found.' });
+    const match = await bcrypt.compare(currentPassword, user.password);
+    if (!match) return res.status(401).json({ error: 'Current password is incorrect.' });
+    const hashed = await bcrypt.hash(newPassword, SALT_ROUNDS);
+    db.prepare('UPDATE users SET password = ? WHERE id = ?').run(hashed, req.user.id);
+    res.json({ message: 'Password updated successfully.' });
+  } catch (err) {
+    console.error('❌ PATCH /api/users/me/password error:', err);
+    res.status(500).json({ error: 'Failed to update password.' });
+  }
+});
+
 /* ── POST /api/login ────────────────────────────────────────────── */
 app.post('/api/login', loginLimiter, async (req, res) => {
   const { username, password } = req.body;

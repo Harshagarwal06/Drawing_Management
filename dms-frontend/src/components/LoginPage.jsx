@@ -52,9 +52,8 @@ export default function LoginPage({ onLogin }) {
         <div className="bg-surface/40 backdrop-blur-xl border border-white/10 rounded-2xl p-8 shadow-[0_20px_40px_-10px_rgba(0,0,0,0.7)] relative overflow-hidden">
           <div className="absolute top-0 left-0 w-full h-[1px] bg-gradient-to-r from-transparent via-primary/50 to-transparent"></div>
           <div className="text-center mb-8">
-            <div className="flex items-center justify-center gap-2 mb-2">
-              <span className="material-symbols-outlined text-primary text-[28px]" style={{ fontVariationSettings: "'FILL' 1" }}>architecture</span>
-              <h1 className="font-headline-md text-headline-md text-on-surface tracking-tight">Unique Properties</h1>
+            <div className="flex items-center justify-center mb-3">
+              <img src="/logo.png" alt="Unique Properties" className="h-10 w-auto object-contain" />
             </div>
             <p className="font-body-sm text-body-sm text-on-surface-variant">Secure Project Workspace</p>
           </div>

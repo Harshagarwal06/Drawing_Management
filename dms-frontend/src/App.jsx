@@ -10,7 +10,7 @@ import ProjectSelector from "./components/ProjectSelector";
 import Toast from "./components/Toast";
 import LoginPage from "./components/LoginPage";
 
-import { ROLES, OVERDUE_PURPOSES, MS_30_DAYS } from "./constants";
+import { ROLES, OVERDUE_PURPOSES, MS_30_DAYS, MEP_SUBTYPES } from "./constants";
 
 const API = import.meta.env.VITE_API_URL;
 const PER_PAGE = 8;
@@ -120,7 +120,8 @@ export default function App() {
         row.number.toLowerCase().includes(q) ||
         row.title.toLowerCase().includes(q) ||
         row.originator.toLowerCase().includes(q);
-      const matchD = filterDisc === "All" || row.discipline === filterDisc;
+      const matchD = filterDisc === "All" ||
+                     (filterDisc === "MEP" ? MEP_SUBTYPES.includes(row.discipline) : row.discipline === filterDisc);
       const matchS = filterStat === "All" || row.status     === filterStat;
       return matchQ && matchD && matchS;
     });

@@ -69,12 +69,15 @@ export const STATUS_META = {
 export const DISCIPLINE_COLORS = {
   Architecture: "bg-violet-100 text-violet-700",
   Structure:    "bg-orange-100 text-orange-700",
-  MEP:          "bg-cyan-100 text-cyan-700",
+  Electrical:   "bg-cyan-100 text-cyan-700",
+  Plumbing:     "bg-sky-100 text-sky-700",
+  Fire:         "bg-red-100 text-red-700",
   Civil:        "bg-teal-100 text-teal-700",
   Interior:     "bg-pink-100 text-pink-700",
 };
 
-export const DISCIPLINES  = ["Architecture", "Structure", "MEP", "Civil", "Interior"];
+export const DISCIPLINES  = ["Architecture", "Structure", "Electrical", "Plumbing", "Fire", "Civil", "Interior"];
+export const MEP_SUBTYPES = ["Electrical", "Plumbing", "Fire"];
 export const STATUSES     = ["S1", "S2", "S3", "VOID"];
 export const ORIGINATORS  = ["HDA Architects", "Turner Eng.", "AirFlow MEP", "Terrain Civil", "Spatial Studio", "GreenAxis"];
 export const ROLES        = ["Document Controller", "Project Manager", "Internal User", "Subcontractor", "Read-Only"];

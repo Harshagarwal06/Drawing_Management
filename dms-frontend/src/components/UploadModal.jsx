@@ -1,7 +1,7 @@
 import { useState, useRef } from "react";
 import { X, Upload, CheckCircle2, Loader2 } from "lucide-react";
 import Field from "./Field";
-import { DISCIPLINES, STATUSES, ORIGINATORS, STATUS_META } from "../constants";
+import { STATUSES, ORIGINATORS, STATUS_META } from "../constants";
 
 export default function UploadModal({ onClose, onSubmit }) {
   const [form, setForm] = useState({
@@ -162,10 +162,18 @@ export default function UploadModal({ onClose, onSubmit }) {
           </Field>
 
           <div className="grid grid-cols-2 gap-4">
-            <Field errors={errors} label="Discipline" id="discipline" req>
+            <Field errors={errors} label="Drawing Type" id="discipline" req>
               <select id="discipline" className={inputCls("discipline")} value={form.discipline} onChange={e => set("discipline", e.target.value)}>
-                <option value="">Select discipline</option>
-                {DISCIPLINES.map(d => <option key={d}>{d}</option>)}
+                <option value="">Select drawing type</option>
+                <option>Architecture</option>
+                <option>Structure</option>
+                <optgroup label="MEP">
+                  <option>Electrical</option>
+                  <option>Plumbing</option>
+                  <option>Fire</option>
+                </optgroup>
+                <option>Civil</option>
+                <option>Interior</option>
               </select>
             </Field>
             <Field errors={errors} label="Originator" id="originator" req>

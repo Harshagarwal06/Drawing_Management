@@ -43,8 +43,9 @@ export default function MasterRegisterTable({
 }) {
   const [discOpen, setDiscOpen] = useState(false);
 
-  /* derive unique disciplines from ALL drawings (not just current page) */
-  const disciplines = ["All", ...Array.from(new Set(allDrawings.map(d => d.discipline).filter(Boolean))).sort()];
+  const MEP_SUBTYPES  = ["Electrical", "Plumbing", "Fire"];
+  const KNOWN_TYPES   = new Set(["Architecture", "Structure", ...MEP_SUBTYPES, "Civil", "Interior"]);
+  const extraTypes    = Array.from(new Set(allDrawings.map(d => d.discipline).filter(d => d && !KNOWN_TYPES.has(d))));
 
   const activeFilters = (filterStat !== "All" ? 1 : 0) + (filterDisc !== "All" ? 1 : 0) + (search ? 1 : 0);
 
@@ -104,7 +105,7 @@ export default function MasterRegisterTable({
       </div>
 
       {/* ── Toolbar ── */}
-      <div className="bg-surface-container-low border border-white/5 rounded-xl p-3 flex flex-wrap gap-3 items-center backdrop-blur-md shadow-lg">
+      <div className="relative z-20 bg-surface-container-low border border-white/5 rounded-xl p-3 flex flex-wrap gap-3 items-center backdrop-blur-md shadow-lg">
         {/* Search */}
         <div className="relative flex-1 min-w-[200px] max-w-xs group">
           <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant text-[18px] group-focus-within:text-primary transition-colors">search</span>
@@ -122,7 +123,7 @@ export default function MasterRegisterTable({
           )}
         </div>
 
-        {/* Discipline Dropdown */}
+        {/* Drawing Type Dropdown */}
         <div className="relative">
           <button
             onClick={() => setDiscOpen(o => !o)}
@@ -133,23 +134,23 @@ export default function MasterRegisterTable({
             }`}
           >
             <span className="material-symbols-outlined text-[16px]">category</span>
-            {filterDisc === "All" ? "All Disciplines" : filterDisc}
+            {filterDisc === "All" ? "Drawing Type" : filterDisc}
             <span className="material-symbols-outlined text-[14px]">{discOpen ? "expand_less" : "expand_more"}</span>
           </button>
           {discOpen && (
-            <div className="absolute top-full left-0 mt-1 w-52 bg-surface-container border border-white/10 rounded-xl shadow-[0_16px_32px_-8px_rgba(0,0,0,0.8)] z-30 py-1 backdrop-blur-xl">
-              {disciplines.map(d => (
-                <button
-                  key={d}
-                  onClick={() => { onFilterDisc?.(d); setDiscOpen(false); }}
-                  className={`w-full text-left px-3 py-2 font-label-sm text-[12px] transition-colors flex items-center gap-2 ${
-                    filterDisc === d ? "text-primary bg-primary/10" : "text-on-surface-variant hover:text-on-surface hover:bg-white/5"
-                  }`}
-                >
-                  {filterDisc === d && <span className="material-symbols-outlined text-[14px]">check</span>}
-                  {filterDisc !== d && <span className="w-[14px]" />}
-                  {d}
-                </button>
+            <div className="absolute top-full left-0 mt-1.5 w-52 bg-surface-container-low border border-white/10 rounded-xl shadow-[0_16px_32px_-8px_rgba(0,0,0,0.9)] z-50 py-1.5 overflow-hidden backdrop-blur-xl">
+              <TypeItem label="All"          active={filterDisc === "All"} onClick={() => { onFilterDisc?.("All"); setDiscOpen(false); }} />
+              <TypeItem label="Architecture" active={filterDisc === "Architecture"} onClick={() => { onFilterDisc?.("Architecture"); setDiscOpen(false); }} />
+              <TypeItem label="Structure"    active={filterDisc === "Structure"}    onClick={() => { onFilterDisc?.("Structure");    setDiscOpen(false); }} />
+              {/* MEP group */}
+              <TypeItem label="MEP" active={filterDisc === "MEP"} onClick={() => { onFilterDisc?.("MEP"); setDiscOpen(false); }} isGroup />
+              {MEP_SUBTYPES.map(d => (
+                <TypeItem key={d} label={d} active={filterDisc === d} onClick={() => { onFilterDisc?.(d); setDiscOpen(false); }} indent />
+              ))}
+              <TypeItem label="Civil"    active={filterDisc === "Civil"}    onClick={() => { onFilterDisc?.("Civil");    setDiscOpen(false); }} />
+              <TypeItem label="Interior" active={filterDisc === "Interior"} onClick={() => { onFilterDisc?.("Interior"); setDiscOpen(false); }} />
+              {extraTypes.map(d => (
+                <TypeItem key={d} label={d} active={filterDisc === d} onClick={() => { onFilterDisc?.(d); setDiscOpen(false); }} />
               ))}
             </div>
           )}
@@ -197,7 +198,7 @@ export default function MasterRegisterTable({
                 {[
                   { key: "number",    label: "Drawing No." },
                   { key: "title",     label: "Title"       },
-                  { key: "discipline",label: "Discipline"  },
+                  { key: "discipline",label: "Drawing Type" },
                   { key: "rev",       label: "Rev"         },
                   { key: "status",    label: "Status"      },
                   { key: "issueDate", label: "Date"        },
@@ -342,5 +343,30 @@ export default function MasterRegisterTable({
         </div>
       </div>
     </div>
+  );
+}
+
+function TypeItem({ label, active, onClick, isGroup = false, indent = false }) {
+  return (
+    <button
+      onClick={onClick}
+      className={`w-full text-left flex items-center gap-2 transition-colors text-[12px]
+        ${indent ? "pl-7 pr-3 py-1.5" : "px-3 py-2"}
+        ${active
+          ? "text-primary bg-primary/10 font-semibold"
+          : isGroup
+            ? "text-on-surface font-medium hover:bg-white/5"
+            : "text-on-surface-variant hover:text-on-surface hover:bg-white/5"
+        }`}
+    >
+      {indent
+        ? <span className="w-1 h-1 rounded-full bg-on-surface-variant/40 shrink-0" />
+        : <span className={`material-symbols-outlined text-[13px] ${active ? "opacity-100" : "opacity-0"}`}>check</span>
+      }
+      {label}
+      {isGroup && !active && (
+        <span className="ml-auto text-[9px] text-outline uppercase tracking-wider">all</span>
+      )}
+    </button>
   );
 }
