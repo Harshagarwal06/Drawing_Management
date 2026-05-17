@@ -105,13 +105,12 @@ insertProject.run('Unique Youtopia — Kharadi',        'YOUTOPIA',  now);
 
 /* ── Seed users (hashed passwords) ─────────────────────────────── */
 const SALT_ROUNDS = 10;
-const userCount = db.prepare('SELECT COUNT(*) as count FROM users').get().count;
-if (userCount === 0) {
-  const ins = db.prepare('INSERT INTO users (username, password, name, role, avatar, allowed_projects) VALUES (?, ?, ?, ?, ?, ?)');
-  ins.run('director',  bcrypt.hashSync('director123',  SALT_ROUNDS), 'Harsh Agarwal',   'Director',           'HA', '*');
-  ins.run('architect', bcrypt.hashSync('arch123',      SALT_ROUNDS), 'Priya Sharma',    'In House Architect', 'PS', '*');
-  ins.run('team',      bcrypt.hashSync('team123',      SALT_ROUNDS), 'Carlos Mendez',   'Project Team',       'CM', '[1]');
-}
+
+// Always ensure the 3 canonical demo accounts exist (INSERT OR IGNORE = safe to run every boot)
+const ensureUser = db.prepare('INSERT OR IGNORE INTO users (username, password, name, role, avatar, allowed_projects) VALUES (?, ?, ?, ?, ?, ?)');
+ensureUser.run('director',  bcrypt.hashSync('director123', SALT_ROUNDS), 'Harsh Agarwal', 'Director',           'HA', '*');
+ensureUser.run('architect', bcrypt.hashSync('arch123',     SALT_ROUNDS), 'Priya Sharma',  'In House Architect', 'PS', '*');
+ensureUser.run('team',      bcrypt.hashSync('team123',     SALT_ROUNDS), 'Carlos Mendez', 'Project Team',       'CM', '[1]');
 
 /* ── Migrate any remaining plaintext passwords ──────────────────── */
 const plainUsers = db.prepare("SELECT id, password FROM users WHERE password NOT LIKE '$2b$%'").all();
