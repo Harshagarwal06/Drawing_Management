@@ -80,7 +80,7 @@ export const DISCIPLINES  = ["Architecture", "Structure", "Electrical", "Plumbin
 export const MEP_SUBTYPES = ["Electrical", "Plumbing", "Fire"];
 export const STATUSES     = ["S1", "S2", "S3", "VOID"];
 export const ORIGINATORS  = ["HDA Architects", "Turner Eng.", "AirFlow MEP", "Terrain Civil", "Spatial Studio", "GreenAxis"];
-export const ROLES        = ["Document Controller", "Project Manager", "Internal User", "Subcontractor", "Read-Only"];
+export const ROLES        = ["Director", "In House Architect", "Project Team"];
 
 export const MOCK_RECIPIENTS = [
   { id: "r1",  name: "James Whitfield",     role: "Project Manager",     avatar: "JW" },

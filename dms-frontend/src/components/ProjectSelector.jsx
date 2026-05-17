@@ -21,21 +21,21 @@ export default function ProjectSelector({ projects, activeProject, onChange, onN
       {/* Trigger */}
       <button
         onClick={() => setOpen(o => !o)}
-        className="flex items-center gap-2 bg-surface-container-low hover:bg-surface-container border border-outline-variant rounded-lg px-3 py-1.5 transition-all focus:outline-none focus:ring-2 focus:ring-primary/20"
+        className="flex items-center gap-3 bg-surface-container-low hover:bg-surface-container border border-outline-variant rounded-xl px-4 py-2.5 transition-all focus:outline-none focus:ring-2 focus:ring-primary/20 min-w-[200px]"
       >
         <span
-          className="w-2 h-2 rounded-full shrink-0"
+          className="w-3 h-3 rounded-full shrink-0"
           style={{ backgroundColor: dot(activeIdx) }}
         />
-        <div className="flex flex-col items-start min-w-0 text-left">
-          <span className="font-mono text-[11px] font-bold text-primary leading-none tracking-wide">
+        <div className="flex flex-col items-start min-w-0 text-left flex-1">
+          <span className="font-mono text-[12px] font-bold text-primary leading-none tracking-wide">
             {activeProject?.code ?? "—"}
           </span>
-          <span className="text-[10px] text-on-surface-variant leading-none mt-[3px] truncate max-w-[120px]">
+          <span className="text-[11px] text-on-surface-variant leading-none mt-1 truncate max-w-[180px]">
             {shortName(activeProject?.name)}
           </span>
         </div>
-        <span className={`material-symbols-outlined text-[16px] text-on-surface-variant transition-transform duration-200 ml-0.5 ${open ? "rotate-180" : ""}`}>
+        <span className={`material-symbols-outlined text-[18px] text-on-surface-variant transition-transform duration-200 ${open ? "rotate-180" : ""}`}>
           expand_more
         </span>
       </button>

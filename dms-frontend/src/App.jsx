@@ -62,8 +62,9 @@ export default function App() {
   const [sortDir,          setSortDir]          = useState("asc");
   const [page,             setPage]             = useState(1);
 
-  const activeRole   = currentUser?.role || "Read-Only";
-  const isRestricted = activeRole === "Subcontractor" || activeRole === "Read-Only";
+  const activeRole   = currentUser?.role || "Project Team";
+  const isRestricted = activeRole === "Project Team";
+  const isDirector   = activeRole === "Director";
 
   /* ── Session persistence ── */
   useEffect(() => {
@@ -261,7 +262,7 @@ export default function App() {
               activeProject={activeProject}
               onChange={setActiveProject}
               onNew={() => setShowProjectModal(true)}
-              isRestricted={isRestricted}
+              isRestricted={!isDirector}
             />
 
             <div className="h-6 w-px bg-border-slate mx-1" />

@@ -2,24 +2,22 @@ import { useState, useEffect } from "react";
 
 const API = import.meta.env.VITE_API_URL;
 
-const ROLES = ['Document Controller', 'Project Manager', 'Internal User', 'Subcontractor', 'Read-Only'];
+const ROLES = ['Director', 'In House Architect', 'Project Team'];
 
 const ROLE_COLOR = {
-  'Document Controller': 'bg-primary/10 text-primary',
-  'Project Manager':     'bg-blue-50 text-blue-700',
-  'Internal User':       'bg-status-emerald-bg text-status-emerald-text',
-  'Subcontractor':       'bg-status-amber-bg text-status-amber-text',
-  'Read-Only':           'bg-surface-container text-on-surface-variant',
+  'Director':            'bg-primary/10 text-primary',
+  'In House Architect':  'bg-status-emerald-bg text-status-emerald-text',
+  'Project Team':        'bg-status-amber-bg text-status-amber-text',
 };
 
 export default function SettingsView({ currentUser, onUserUpdate, token }) {
-  const isAdmin = currentUser?.role === 'Document Controller';
+  const isAdmin = currentUser?.role === 'Director';
 
   const [pwForm,     setPwForm]     = useState({ currentPassword: '', newPassword: '', confirm: '' });
   const [pwMsg,      setPwMsg]      = useState(null);
   const [pwLoading,  setPwLoading]  = useState(false);
   const [users,      setUsers]      = useState([]);
-  const [newUser,    setNewUser]    = useState({ username: '', password: '', name: '', role: 'Internal User' });
+  const [newUser,    setNewUser]    = useState({ username: '', password: '', name: '', role: 'In House Architect', allowedProjects: '*' });
   const [userMsg,    setUserMsg]    = useState(null);
   const [userLoading,setUserLoading]= useState(false);
   const [addOpen,    setAddOpen]    = useState(false);
@@ -50,11 +48,11 @@ export default function SettingsView({ currentUser, onUserUpdate, token }) {
 
   useEffect(() => { loadUsers(); }, []);
 
-  const handleRoleChange = async (userId, role) => {
+  const handleRoleChange = async (userId, role, allowedProjects) => {
     await fetch(`${API}/api/users/${userId}/role`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ role }),
+      body: JSON.stringify({ role, allowedProjects: role === 'Director' ? '*' : allowedProjects }),
     });
     loadUsers();
   };
@@ -66,12 +64,12 @@ export default function SettingsView({ currentUser, onUserUpdate, token }) {
       const res = await fetch(`${API}/api/users`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify(newUser),
+        body: JSON.stringify({ ...newUser, allowedProjects: newUser.role === 'Director' ? '*' : newUser.allowedProjects }),
       });
       const data = await res.json();
       if (res.ok) {
         setUserMsg({ type: 'success', text: `User "${newUser.username}" created.` });
-        setNewUser({ username: '', password: '', name: '', role: 'Internal User' });
+        setNewUser({ username: '', password: '', name: '', role: 'In House Architect', allowedProjects: '*' });
         setAddOpen(false); loadUsers();
       } else setUserMsg({ type: 'error', text: data.error || 'Failed to create user.' });
     } catch { setUserMsg({ type: 'error', text: 'Cannot connect to server.' }); }
@@ -138,9 +136,12 @@ export default function SettingsView({ currentUser, onUserUpdate, token }) {
                   <p className="text-[14px] font-medium text-on-surface">{u.name}</p>
                   <p className="text-[11px] text-on-surface-variant">@{u.username}</p>
                 </div>
+                <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold shrink-0 hidden sm:block ${ROLE_COLOR[u.role] || 'bg-surface-container text-on-surface-variant'}`}>
+                  {u.role}
+                </span>
                 <select
                   value={u.role}
-                  onChange={e => handleRoleChange(u.id, e.target.value)}
+                  onChange={e => handleRoleChange(u.id, e.target.value, u.allowedProjects)}
                   disabled={u.id === currentUser?.id}
                   className="bg-white border border-border-slate rounded-lg px-2 py-1 text-[12px] text-on-surface focus:outline-none focus:ring-1 focus:ring-primary/20 disabled:opacity-50"
                 >

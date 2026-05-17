@@ -1,8 +1,8 @@
 const NAV_ITEMS = [
   { tab: "dashboard",    icon: "dashboard",     label: "Dashboard"        },
+  { tab: "documents",    icon: "description",   label: "Documents"        },
   { tab: "register",     icon: "architecture",  label: "Drawing Register" },
   { tab: "transmittals", icon: "move_to_inbox", label: "Transmittals"     },
-  { tab: "documents",    icon: "description",   label: "Documents"        },
   { tab: "analytics",   icon: "analytics",      label: "Analytics"        },
 ];
 

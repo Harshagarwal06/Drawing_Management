@@ -1,4 +1,5 @@
 import { useState, useCallback, useRef, useEffect } from "react";
+import { createPortal } from "react-dom";
 import {
   ChevronRight, ChevronDown, Folder, FolderOpen,
   FolderPlus, Search, LayoutGrid, Pencil, Trash2,
@@ -48,30 +49,54 @@ function loadTree() {
   return DEFAULT_TREE();
 }
 
-/* ── FolderRowMenu — MoreVertical dropdown for a single folder row ── */
-function FolderRowMenu({ pathKey, isRoot, onAdd, onRename, onDelete }) {
-  const [open, setOpen] = useState(false);
-  const ref = useRef(null);
+/* ── FolderRowMenu — MoreVertical dropdown rendered via portal ── */
+function FolderRowMenu({ isRoot, onAdd, onRename, onDelete }) {
+  const [open, setOpen]       = useState(false);
+  const [menuPos, setMenuPos] = useState({ top: 0, left: 0 });
+  const btnRef                = useRef(null);
+  const menuRef               = useRef(null);
 
+  /* Close on outside click */
   useEffect(() => {
     if (!open) return;
-    const close = e => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    const close = e => {
+      if (
+        menuRef.current && !menuRef.current.contains(e.target) &&
+        btnRef.current  && !btnRef.current.contains(e.target)
+      ) setOpen(false);
+    };
     document.addEventListener("mousedown", close);
     return () => document.removeEventListener("mousedown", close);
   }, [open]);
 
+  const handleButtonClick = e => {
+    e.stopPropagation();
+    if (!open && btnRef.current) {
+      const r = btnRef.current.getBoundingClientRect();
+      /* Align menu so its right edge lines up with the button's right edge */
+      setMenuPos({ top: r.bottom + 4, left: r.right - 176 /* w-44 = 176px */ });
+    }
+    setOpen(o => !o);
+  };
+
   return (
-    <div ref={ref} className="relative shrink-0" onClick={e => e.stopPropagation()}>
+    <>
       <button
-        onClick={e => { e.stopPropagation(); setOpen(o => !o); }}
-        className="p-0.5 rounded text-outline hover:text-on-surface hover:bg-surface-container transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100"
+        ref={btnRef}
+        onClick={handleButtonClick}
+        className="p-0.5 rounded text-outline hover:text-on-surface hover:bg-surface-container transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100 shrink-0"
         title="Folder options"
       >
         <MoreVertical size={13} />
       </button>
 
-      {open && (
-        <div className="absolute right-0 top-full mt-1 w-44 bg-white border border-border-slate rounded-xl shadow-lg z-50 py-1 overflow-hidden">
+      {open && createPortal(
+        <div
+          ref={menuRef}
+          style={{ position: "fixed", top: menuPos.top, left: menuPos.left, zIndex: 9999 }}
+          className="w-44 bg-white border border-border-slate rounded-xl shadow-lg py-1 overflow-hidden"
+          onClick={e => e.stopPropagation()}
+        >
           <FolderMenuItem
             icon={<FolderPlus size={13} />}
             label="Add subfolder"
@@ -93,9 +118,10 @@ function FolderRowMenu({ pathKey, isRoot, onAdd, onRename, onDelete }) {
               />
             </>
           )}
-        </div>
+        </div>,
+        document.body
       )}
-    </div>
+    </>
   );
 }
 
@@ -216,10 +242,9 @@ function TreeNode({
           </span>
         )}
 
-        {/* MoreVertical menu — replaces individual icon buttons */}
+        {/* MoreVertical menu — portal-based, never clipped */}
         {!isEditing && (
           <FolderRowMenu
-            pathKey={pathKey}
             isRoot={isRoot}
             onAdd={() => { setAddingTo(pathKey); setOpen(true); }}
             onRename={() => setEditingPath(pathKey)}

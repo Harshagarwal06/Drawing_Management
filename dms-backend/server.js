@@ -83,6 +83,16 @@ db.exec(`
 try { db.exec('ALTER TABLE drawings ADD COLUMN project_id INTEGER DEFAULT 1;');     } catch {}
 try { db.exec("ALTER TABLE drawings ADD COLUMN folder_path TEXT DEFAULT '';");       } catch {}
 try { db.exec('ALTER TABLE transmittals ADD COLUMN project_id INTEGER DEFAULT 1;'); } catch {}
+try { db.exec("ALTER TABLE users ADD COLUMN allowed_projects TEXT DEFAULT '*';");   } catch {}
+
+// ── Migrate legacy role names → 3-role system ──────────────────────────────
+try {
+  db.prepare("UPDATE users SET role = 'Director'          WHERE role = 'Document Controller'").run();
+  db.prepare("UPDATE users SET role = 'In House Architect' WHERE role IN ('Project Manager','Internal User')").run();
+  db.prepare("UPDATE users SET role = 'Project Team'       WHERE role IN ('Subcontractor','Read-Only')").run();
+  // Give Project Team members limited access (first project) if they still have wildcard
+  db.prepare("UPDATE users SET allowed_projects = '[1]' WHERE role = 'Project Team' AND allowed_projects = '*'").run();
+} catch (e) { console.log('Role migration note:', e.message); }
 
 /* ── Seed projects ──────────────────────────────────────────────── */
 const insertProject = db.prepare('INSERT OR IGNORE INTO projects (name, code, created_at) VALUES (?, ?, ?)');
@@ -97,11 +107,10 @@ insertProject.run('Unique Youtopia — Kharadi',        'YOUTOPIA',  now);
 const SALT_ROUNDS = 10;
 const userCount = db.prepare('SELECT COUNT(*) as count FROM users').get().count;
 if (userCount === 0) {
-  const ins = db.prepare('INSERT INTO users (username, password, name, role, avatar) VALUES (?, ?, ?, ?, ?)');
-  ins.run('admin',  bcrypt.hashSync('admin123',  SALT_ROUNDS), 'Harsh Agarwal',  'Document Controller', 'HA');
-  ins.run('pm',     bcrypt.hashSync('pm123',     SALT_ROUNDS), 'James Whitfield', 'Project Manager',     'JW');
-  ins.run('sub',    bcrypt.hashSync('sub123',    SALT_ROUNDS), 'Carlos Mendez',   'Subcontractor',       'CM');
-  ins.run('viewer', bcrypt.hashSync('viewer123', SALT_ROUNDS), 'Client Board',    'Read-Only',           'CB');
+  const ins = db.prepare('INSERT INTO users (username, password, name, role, avatar, allowed_projects) VALUES (?, ?, ?, ?, ?, ?)');
+  ins.run('director',  bcrypt.hashSync('director123',  SALT_ROUNDS), 'Harsh Agarwal',   'Director',           'HA', '*');
+  ins.run('architect', bcrypt.hashSync('arch123',      SALT_ROUNDS), 'Priya Sharma',    'In House Architect', 'PS', '*');
+  ins.run('team',      bcrypt.hashSync('team123',      SALT_ROUNDS), 'Carlos Mendez',   'Project Team',       'CM', '[1]');
 }
 
 /* ── Migrate any remaining plaintext passwords ──────────────────── */
@@ -142,13 +151,34 @@ function verifyToken(req, res, next) {
   }
 }
 
-/* ── RBAC middleware — blocks Subcontractor / Read-Only from writes ─ */
+/* ── RBAC: block Project Team from write operations ─────────────── */
 function requireWriteAccess(req, res, next) {
-  const restricted = ['Subcontractor', 'Read-Only'];
-  if (restricted.includes(req.user?.role)) {
-    return res.status(403).json({ error: 'Access denied — insufficient permissions for this action.' });
+  if (req.user?.role === 'Project Team') {
+    return res.status(403).json({ error: 'Access denied — Project Team members have read-only access.' });
   }
   next();
+}
+
+/* ── RBAC: Director-only actions ────────────────────────────────── */
+function requireDirector(req, res, next) {
+  if (req.user?.role !== 'Director') {
+    return res.status(403).json({ error: 'Access denied — Directors only.' });
+  }
+  next();
+}
+
+/* ── RBAC: check user has access to the requested project ───────── */
+function requireProjectAccess(req, res, next) {
+  const allowed   = req.user?.allowedProjects;
+  if (allowed === '*') return next();
+  const projectId = parseInt(req.query.projectId || req.body?.projectId || 1, 10);
+  try {
+    const ids = JSON.parse(allowed || '[]');
+    if (ids.includes(projectId)) return next();
+    return res.status(403).json({ error: 'Access denied — you do not have access to this project.' });
+  } catch {
+    return res.status(403).json({ error: 'Invalid project access configuration.' });
+  }
 }
 
 /* ── Login rate limiter — max 10 attempts per 15 min ────────────── */
@@ -189,10 +219,17 @@ app.get('/api/activity', (req, res) => {
   }
 });
 
-/* ── GET /api/projects ──────────────────────────────────────────── */
+/* ── GET /api/projects — filtered by user's allowed projects ─────── */
 app.get('/api/projects', (req, res) => {
   try {
-    res.json(db.prepare('SELECT * FROM projects ORDER BY id ASC').all());
+    const allowed = req.user?.allowedProjects;
+    if (allowed === '*') {
+      return res.json(db.prepare('SELECT * FROM projects ORDER BY id ASC').all());
+    }
+    const ids = JSON.parse(allowed || '[]');
+    if (ids.length === 0) return res.json([]);
+    const placeholders = ids.map(() => '?').join(',');
+    res.json(db.prepare(`SELECT * FROM projects WHERE id IN (${placeholders}) ORDER BY id ASC`).all(ids));
   } catch (err) {
     console.error('❌ GET /api/projects error:', err);
     res.status(500).json({ error: 'Failed to fetch projects.' });
@@ -200,7 +237,7 @@ app.get('/api/projects', (req, res) => {
 });
 
 /* ── POST /api/projects ─────────────────────────────────────────── */
-app.post('/api/projects', requireWriteAccess, (req, res) => {
+app.post('/api/projects', requireDirector, (req, res) => {
   const { name, code } = req.body;
   if (!name || !code) return res.status(400).json({ error: 'Name and code required.' });
   try {
@@ -213,7 +250,7 @@ app.post('/api/projects', requireWriteAccess, (req, res) => {
 });
 
 /* ── GET /api/drawings ──────────────────────────────────────────── */
-app.get('/api/drawings', (req, res) => {
+app.get('/api/drawings', requireProjectAccess, (req, res) => {
   const projectId = req.query.projectId || 1;
   try {
     const rows = db.prepare('SELECT * FROM drawings WHERE project_id = ? ORDER BY id DESC').all(projectId);
@@ -269,7 +306,7 @@ app.post('/api/upload', requireWriteAccess, upload.single('drawingFile'), (req, 
 });
 
 /* ── GET /api/transmittals ──────────────────────────────────────── */
-app.get('/api/transmittals', (req, res) => {
+app.get('/api/transmittals', requireProjectAccess, (req, res) => {
   const projectId = req.query.projectId || 1;
   try {
     const rows = db.prepare('SELECT * FROM transmittals WHERE project_id = ? ORDER BY id DESC').all(projectId);
@@ -327,11 +364,10 @@ app.patch('/api/drawings/:id/void', requireWriteAccess, (req, res) => {
 });
 
 /* ── GET /api/users ─────────────────────────────────────────────── */
-app.get('/api/users', (req, res) => {
-  if (req.user.role !== 'Document Controller') return res.status(403).json({ error: 'Access denied.' });
+app.get('/api/users', requireDirector, (req, res) => {
   try {
-    const rows = db.prepare('SELECT id, username, name, role, avatar FROM users ORDER BY id ASC').all();
-    res.json(rows);
+    const rows = db.prepare('SELECT id, username, name, role, avatar, allowed_projects FROM users ORDER BY id ASC').all();
+    res.json(rows.map(u => ({ ...u, allowedProjects: u.allowed_projects })));
   } catch (err) {
     console.error('❌ GET /api/users error:', err);
     res.status(500).json({ error: 'Failed to fetch users.' });
@@ -339,18 +375,18 @@ app.get('/api/users', (req, res) => {
 });
 
 /* ── POST /api/users ─────────────────────────────────────────────── */
-const VALID_ROLES = ['Document Controller', 'Project Manager', 'Internal User', 'Subcontractor', 'Read-Only'];
+const VALID_ROLES = ['Director', 'In House Architect', 'Project Team'];
 
-app.post('/api/users', async (req, res) => {
-  if (req.user.role !== 'Document Controller') return res.status(403).json({ error: 'Access denied.' });
-  const { username, password, name, role } = req.body;
+app.post('/api/users', requireDirector, async (req, res) => {
+  const { username, password, name, role, allowedProjects } = req.body;
   if (!username || !password || !name || !role) return res.status(400).json({ error: 'username, password, name, and role are required.' });
   if (!VALID_ROLES.includes(role)) return res.status(400).json({ error: `Invalid role. Must be one of: ${VALID_ROLES.join(', ')}` });
+  const ap = role === 'Director' ? '*' : (allowedProjects || '*');
   try {
     const avatar = name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2);
     const hashed = await bcrypt.hash(password, SALT_ROUNDS);
-    const result = db.prepare('INSERT INTO users (username, password, name, role, avatar) VALUES (?, ?, ?, ?, ?)').run(username, hashed, name, role, avatar);
-    res.status(201).json({ id: result.lastInsertRowid, username, name, role, avatar });
+    const result = db.prepare('INSERT INTO users (username, password, name, role, avatar, allowed_projects) VALUES (?, ?, ?, ?, ?, ?)').run(username, hashed, name, role, avatar, ap);
+    res.status(201).json({ id: result.lastInsertRowid, username, name, role, avatar, allowedProjects: ap });
   } catch (err) {
     if (err.message?.includes('UNIQUE constraint')) return res.status(409).json({ error: `Username "${username}" is already taken.` });
     console.error('❌ POST /api/users error:', err);
@@ -358,18 +394,18 @@ app.post('/api/users', async (req, res) => {
   }
 });
 
-/* ── PATCH /api/users/:id/role ──────────────────────────────────── */
-app.patch('/api/users/:id/role', (req, res) => {
-  if (req.user.role !== 'Document Controller') return res.status(403).json({ error: 'Access denied.' });
-  const { role } = req.body;
-  if (!VALID_ROLES.includes(role)) return res.status(400).json({ error: `Invalid role.` });
+/* ── PATCH /api/users/:id — update role + allowed_projects ─────── */
+app.patch('/api/users/:id/role', requireDirector, (req, res) => {
+  const { role, allowedProjects } = req.body;
+  if (!VALID_ROLES.includes(role)) return res.status(400).json({ error: 'Invalid role.' });
+  const ap = role === 'Director' ? '*' : (allowedProjects ?? '*');
   try {
-    const info = db.prepare('UPDATE users SET role = ? WHERE id = ?').run(role, req.params.id);
+    const info = db.prepare('UPDATE users SET role = ?, allowed_projects = ? WHERE id = ?').run(role, ap, req.params.id);
     if (info.changes === 0) return res.status(404).json({ error: 'User not found.' });
-    res.json({ id: req.params.id, role });
+    res.json({ id: req.params.id, role, allowedProjects: ap });
   } catch (err) {
     console.error('❌ PATCH /api/users/:id/role error:', err);
-    res.status(500).json({ error: 'Failed to update role.' });
+    res.status(500).json({ error: 'Failed to update user.' });
   }
 });
 
@@ -400,12 +436,13 @@ app.post('/api/login', loginLimiter, async (req, res) => {
     if (!user) return res.status(401).json({ error: 'Invalid username or password' });
     const match = await bcrypt.compare(password, user.password);
     if (!match) return res.status(401).json({ error: 'Invalid username or password' });
+    const allowedProjects = user.allowed_projects ?? '*';
     const token = jwt.sign(
-      { id: user.id, username: user.username, name: user.name, role: user.role, avatar: user.avatar },
+      { id: user.id, username: user.username, name: user.name, role: user.role, avatar: user.avatar, allowedProjects },
       JWT_SECRET,
       { expiresIn: '7d' }
     );
-    res.json({ id: user.id, username: user.username, name: user.name, role: user.role, avatar: user.avatar, token });
+    res.json({ id: user.id, username: user.username, name: user.name, role: user.role, avatar: user.avatar, allowedProjects, token });
   } catch (err) {
     console.error('❌ POST /api/login error:', err);
     res.status(500).json({ error: 'Login failed' });

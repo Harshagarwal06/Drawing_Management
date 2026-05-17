@@ -2,10 +2,9 @@ import { useState } from "react";
 import { Loader2 } from "lucide-react";
 
 const DEMO_USERS = [
-  { label: "Admin",  username: "admin",  password: "admin123" },
-  { label: "PM",     username: "pm",     password: "pm123"    },
-  { label: "Sub",    username: "sub",    password: "sub123"   },
-  { label: "Viewer", username: "viewer", password: "viewer123"},
+  { label: "Director",   username: "director",  password: "director123" },
+  { label: "Architect",  username: "architect", password: "arch123"     },
+  { label: "Team",       username: "team",      password: "team123"     },
 ];
 
 export default function LoginPage({ onLogin }) {
@@ -13,7 +12,7 @@ export default function LoginPage({ onLogin }) {
   const [password, setPassword] = useState("admin123");
   const [error,    setError]    = useState("");
   const [loading,  setLoading]  = useState(false);
-  const [activeDemo, setActiveDemo] = useState("Admin");
+  const [activeDemo, setActiveDemo] = useState("Director");
 
   const handleDemoClick = (demo) => {
     setActiveDemo(demo.label);
