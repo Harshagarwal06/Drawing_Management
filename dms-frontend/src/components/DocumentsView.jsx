@@ -365,16 +365,58 @@ export default function DocumentsView({ drawings, onUpload }) {
   const isEmpty = subfolders.length === 0 && currentFiles.length === 0;
 
   return (
-    <div className="max-w-[1400px] mx-auto space-y-4">
+    <div className="max-w-[1400px] mx-auto space-y-3">
 
-      {/* ── Page header ── */}
-      <div className="flex items-center justify-between gap-4">
-        <div>
-          <h1 className="text-headline-lg font-semibold text-on-surface">Documents</h1>
-          <p className="text-body-md text-on-surface-variant mt-0.5">Browse your project drawing files</p>
-        </div>
+      {/* ── Unified breadcrumb header ── */}
+      <div className="flex items-center justify-between gap-6">
 
+        {/* Left — interactive breadcrumb acts as the page title */}
+        <nav className="flex items-center gap-0 flex-wrap min-w-0">
+          {/* Home icon — always navigates to root */}
+          <button
+            onClick={() => setSegments([])}
+            className="p-1 rounded-md text-on-surface-variant hover:text-on-surface hover:bg-surface-container transition-colors mr-1 shrink-0"
+            title="Documents root"
+          >
+            <Home size={17} />
+          </button>
+
+          {/* "Documents" root crumb */}
+          <button
+            onClick={() => setSegments([])}
+            className={`rounded px-1 py-0.5 transition-colors leading-none ${
+              segments.length === 0
+                ? "text-on-surface font-bold text-2xl pointer-events-none"
+                : "text-[13px] font-medium text-on-surface-variant hover:text-on-surface"
+            }`}
+          >
+            Documents
+          </button>
+
+          {/* Intermediate + current segments */}
+          {segments.map((seg, i) => {
+            const isLast = i === segments.length - 1;
+            return (
+              <div key={i} className="flex items-center">
+                <span className="mx-2 text-slate-300 font-light select-none text-lg">/</span>
+                <button
+                  onClick={() => !isLast && navigateTo(i + 1)}
+                  className={`rounded px-1 py-0.5 transition-colors leading-none ${
+                    isLast
+                      ? "text-on-surface font-bold text-2xl pointer-events-none"
+                      : "text-[13px] font-medium text-on-surface-variant hover:text-on-surface hover:bg-surface-container"
+                  }`}
+                >
+                  {seg}
+                </button>
+              </div>
+            );
+          })}
+        </nav>
+
+        {/* Right — action controls */}
         <div className="flex items-center gap-2 shrink-0">
+
           {/* View toggle */}
           <div className="flex items-center bg-surface-container-low border border-border-slate rounded-lg p-0.5">
             <button
@@ -396,55 +438,24 @@ export default function DocumentsView({ drawings, onUpload }) {
           {/* New folder */}
           <button
             onClick={() => setAddingFolder(true)}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-border-slate hover:bg-surface-container text-[13px] font-medium text-on-surface-variant transition-colors"
+            className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-border-slate bg-white hover:bg-surface-container text-[13px] font-medium text-on-surface-variant transition-colors"
           >
-            <FolderPlus size={15} />
+            <FolderPlus size={14} />
             New Folder
           </button>
 
-          {/* Upload */}
+          {/* Upload Here */}
           {onUpload && (
             <button
               onClick={() => onUpload(currentFolderPath)}
               className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-primary text-white hover:bg-primary-container text-[13px] font-medium shadow-sm transition-all active:scale-[0.98]"
             >
-              <Upload size={15} />
+              <Upload size={14} />
               Upload Here
             </button>
           )}
         </div>
       </div>
-
-      {/* ── Breadcrumb ── */}
-      <nav className="flex items-center gap-1 flex-wrap">
-        <button
-          onClick={() => setSegments([])}
-          className={`flex items-center gap-1 px-2 py-1 rounded-lg text-[13px] font-medium transition-colors ${
-            segments.length === 0
-              ? "text-primary bg-primary/8"
-              : "text-on-surface-variant hover:text-on-surface hover:bg-surface-container"
-          }`}
-        >
-          <Home size={14} />
-          {tree.name}
-        </button>
-
-        {segments.map((seg, i) => (
-          <div key={i} className="flex items-center gap-1">
-            <ChevronRight size={14} className="text-outline shrink-0" />
-            <button
-              onClick={() => navigateTo(i + 1)}
-              className={`px-2 py-1 rounded-lg text-[13px] font-medium transition-colors ${
-                i === segments.length - 1
-                  ? "text-primary bg-primary/8"
-                  : "text-on-surface-variant hover:text-on-surface hover:bg-surface-container"
-              }`}
-            >
-              {seg}
-            </button>
-          </div>
-        ))}
-      </nav>
 
       {/* ── Content card ── */}
       <div className="bg-white border border-border-slate rounded-xl overflow-hidden">
