@@ -62,9 +62,10 @@ export default function App() {
   const [sortDir,          setSortDir]          = useState("asc");
   const [page,             setPage]             = useState(1);
 
-  const activeRole   = currentUser?.role || "Project Team";
-  const isRestricted = activeRole === "Project Team";
-  const isDirector   = activeRole === "Director";
+  const activeRole    = currentUser?.role || "Project Team";
+  const isRestricted  = activeRole === "Project Team";
+  const isDirector    = activeRole === "Director";
+  const isProjectTeam = activeRole === "Project Team";
 
   /* ── Session persistence ── */
   useEffect(() => {
@@ -262,13 +263,25 @@ export default function App() {
               <span className="material-symbols-outlined text-[22px]">help</span>
             </button>
 
-            <ProjectSelector
-              projects={projects}
-              activeProject={activeProject}
-              onChange={setActiveProject}
-              onNew={() => setShowProjectModal(true)}
-              isRestricted={!isDirector}
-            />
+            {isProjectTeam ? (
+              <div className="flex items-center gap-3 bg-surface-container-low border border-outline-variant rounded-xl px-4 py-2.5 min-w-[200px]">
+                <span className="w-3 h-3 rounded-full shrink-0 bg-primary" />
+                <div className="flex flex-col items-start min-w-0 text-left flex-1">
+                  <span className="font-mono text-[12px] font-bold text-primary leading-none tracking-wide">{activeProject?.code ?? "—"}</span>
+                  <span className="text-[11px] text-on-surface-variant leading-none mt-1 truncate max-w-[180px]">
+                    {activeProject?.name?.split("—")[1]?.trim() ?? activeProject?.name ?? ""}
+                  </span>
+                </div>
+              </div>
+            ) : (
+              <ProjectSelector
+                projects={projects}
+                activeProject={activeProject}
+                onChange={setActiveProject}
+                onNew={() => setShowProjectModal(true)}
+                isRestricted={!isDirector}
+              />
+            )}
 
             <div className="h-6 w-px bg-border-slate mx-1" />
 
