@@ -61,16 +61,16 @@ export default function UploadModal({ onClose, onSubmit, initialFolder }) {
   };
 
   const inputCls = (key) =>
-    `w-full border rounded-lg px-3 py-2.5 text-sm text-slate-700 outline-none transition focus:ring-2 focus:ring-blue-500 focus:border-transparent placeholder:text-slate-300 ${
-      errors[key] ? "border-red-400 bg-red-50" : "border-slate-200 bg-white"
+    `w-full border rounded-lg px-3 py-2.5 text-sm text-on-surface outline-none transition focus:ring-2 focus:ring-primary/20 focus:border-primary placeholder:text-on-surface-variant ${
+      errors[key] ? "border-status-rose-text bg-status-rose-bg" : "border-border-slate bg-white"
     }`;
 
   const dropZoneCls = [
     "border-2 border-dashed rounded-xl p-5 text-center transition cursor-pointer group select-none",
-    dragging   ? "border-blue-500 bg-blue-50 scale-[1.01]"
-    : errors.file ? "border-red-400 bg-red-50"
-    : file        ? "border-emerald-400 bg-emerald-50"
-                  : "border-slate-200 bg-slate-50 hover:border-blue-400 hover:bg-blue-50",
+    dragging      ? "border-primary bg-primary/5 scale-[1.01]"
+    : errors.file ? "border-status-rose-text bg-status-rose-bg"
+    : file        ? "border-status-emerald-text bg-status-emerald-bg"
+                  : "border-border-slate bg-surface-container-low hover:border-primary hover:bg-primary/5",
   ].join(" ");
 
   return (
@@ -236,7 +236,7 @@ export default function UploadModal({ onClose, onSubmit, initialFolder }) {
             <button
               type="submit"
               disabled={submitting}
-              className="px-5 py-2 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition flex items-center gap-2 disabled:opacity-60"
+              className="px-5 py-2 text-sm font-semibold text-white bg-primary hover:bg-primary-container rounded-lg transition flex items-center gap-2 disabled:opacity-60"
             >
               {submitting ? (
                 <><Loader2 className="w-4 h-4 animate-spin" />Uploading…</>

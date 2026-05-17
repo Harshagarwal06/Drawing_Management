@@ -163,14 +163,18 @@ export default function App() {
     fd.append("folderPath",    form.folderPath || "");
     try {
       const res = await fetch(`${API}/api/upload`, { method: "POST", body: fd, headers: authHeaders(currentUser.token) });
-      if (!res.ok) throw new Error(`Server responded ${res.status}`);
+      if (res.status === 401) { handleUnauthorized(); return; }
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || `Server responded ${res.status}`);
+      }
       await res.json();
       setDrawings(await fetchDrawings(activeProject.id, currentUser.token));
       setShowModal(false);
       setToast({ msg: `"${form.drawingNumber}" registered successfully.`, type: "success" });
-    } catch {
+    } catch (err) {
       setShowModal(false);
-      setToast({ msg: "Upload failed — is the backend server running?", type: "error" });
+      setToast({ msg: err.message || "Upload failed — is the backend server running?", type: "error" });
     }
   };
 
@@ -190,6 +194,7 @@ export default function App() {
           projectId:  activeProject.id,
         }),
       });
+      if (res.status === 401) { handleUnauthorized(); return; }
       if (!res.ok) throw new Error(`Server responded ${res.status}`);
       const [freshDrawings, freshTransmittals] = await Promise.all([
         fetchDrawings(activeProject.id, currentUser.token),

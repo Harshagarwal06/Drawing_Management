@@ -79,10 +79,51 @@ db.exec(`
   );
 `);
 
+// ── Migrate drawings table: drop global UNIQUE on number (now per-project) ──
+try {
+  const schema = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='drawings'").get()?.sql || '';
+  if (schema.includes('UNIQUE')) {
+    db.exec(`
+      PRAGMA foreign_keys=OFF;
+      BEGIN;
+      CREATE TABLE drawings_v2 (
+        id           INTEGER PRIMARY KEY AUTOINCREMENT,
+        number       TEXT    NOT NULL,
+        title        TEXT    NOT NULL,
+        discipline   TEXT,
+        rev          TEXT,
+        status       TEXT    DEFAULT 'S1',
+        issue_date   TEXT,
+        originator   TEXT,
+        transmittals INTEGER DEFAULT 0,
+        path         TEXT,
+        folder_path  TEXT    DEFAULT '',
+        project_id   INTEGER DEFAULT 1
+      );
+      INSERT INTO drawings_v2 SELECT id,number,title,discipline,rev,status,issue_date,originator,transmittals,path,folder_path,COALESCE(project_id,1) FROM drawings;
+      DROP TABLE drawings;
+      ALTER TABLE drawings_v2 RENAME TO drawings;
+      COMMIT;
+      PRAGMA foreign_keys=ON;
+    `);
+    console.log('✅ Migrated drawings: removed global UNIQUE constraint on number');
+  }
+} catch (e) { console.warn('drawings migration note:', e.message); }
+
 // Add columns if upgrading from an older schema
 try { db.exec('ALTER TABLE drawings ADD COLUMN project_id INTEGER DEFAULT 1;');     } catch {}
 try { db.exec("ALTER TABLE drawings ADD COLUMN folder_path TEXT DEFAULT '';");       } catch {}
 try { db.exec('ALTER TABLE transmittals ADD COLUMN project_id INTEGER DEFAULT 1;'); } catch {}
+
+// Performance indexes (safe to run every boot — IF NOT EXISTS)
+try {
+  db.exec(`
+    CREATE INDEX IF NOT EXISTS idx_drawings_project_id      ON drawings(project_id);
+    CREATE INDEX IF NOT EXISTS idx_drawings_status          ON drawings(status);
+    CREATE INDEX IF NOT EXISTS idx_transmittals_project_id  ON transmittals(project_id);
+    CREATE INDEX IF NOT EXISTS idx_activity_project_id      ON activity_log(project_id);
+  `);
+} catch (e) { console.warn('Index creation note:', e.message); }
 try { db.exec("ALTER TABLE users ADD COLUMN allowed_projects TEXT DEFAULT '*';");   } catch {}
 
 // ── Migrate legacy role names → 3-role system ──────────────────────────────
@@ -207,7 +248,7 @@ app.get('/api/health', (req, res) => {
 });
 
 /* ── GET /api/activity ──────────────────────────────────────────── */
-app.get('/api/activity', (req, res) => {
+app.get('/api/activity', requireProjectAccess, (req, res) => {
   const projectId = req.query.projectId || 1;
   try {
     const rows = db.prepare('SELECT * FROM activity_log WHERE project_id = ? ORDER BY id DESC LIMIT 30').all(projectId);
@@ -283,7 +324,7 @@ app.post('/api/upload', requireWriteAccess, upload.single('drawingFile'), (req, 
   const today    = new Date().toISOString().split('T')[0];
 
   try {
-    const existing = db.prepare('SELECT id FROM drawings WHERE number = ?').get(drawingNumber);
+    const existing = db.prepare('SELECT id FROM drawings WHERE number = ? AND project_id = ?').get(drawingNumber, pId);
     if (existing) {
       db.prepare(`UPDATE drawings SET title=?, discipline=?, rev=?, status=?, issue_date=?, originator=?, path=?, project_id=?, folder_path=? WHERE number=?`)
         .run(title, discipline, revision, status, today, originator, filePath, pId, fPath, drawingNumber);
@@ -309,15 +350,12 @@ app.get('/api/transmittals', requireProjectAccess, (req, res) => {
   const projectId = req.query.projectId || 1;
   try {
     const rows = db.prepare('SELECT * FROM transmittals WHERE project_id = ? ORDER BY id DESC').all(projectId);
-    res.json(rows.map(r => ({
-      id:         r.id,
-      number:     r.number,
-      drawingIds: JSON.parse(r.drawing_ids),
-      recipients: JSON.parse(r.recipients),
-      purpose:    r.purpose,
-      remarks:    r.remarks,
-      issuedAt:   r.issued_at,
-    })));
+    res.json(rows.map(r => {
+      let drawingIds = [], recipients = [];
+      try { drawingIds = JSON.parse(r.drawing_ids); } catch {}
+      try { recipients = JSON.parse(r.recipients);  } catch {}
+      return { id: r.id, number: r.number, drawingIds, recipients, purpose: r.purpose, remarks: r.remarks, issuedAt: r.issued_at };
+    }));
   } catch (err) {
     console.error('❌ GET /api/transmittals error:', err);
     res.status(500).json({ error: 'Failed to fetch transmittals.' });
@@ -333,8 +371,11 @@ app.post('/api/transmittals', requireWriteAccess, (req, res) => {
   try {
     const result = db.prepare(`INSERT INTO transmittals (number,drawing_ids,recipients,purpose,remarks,issued_at,project_id) VALUES (?,?,?,?,?,?,?)`)
       .run(number, JSON.stringify(drawingIds), JSON.stringify(recipients), purpose, remarks || '', issuedAt || new Date().toISOString().split('T')[0], pId);
-    const updateCount = db.prepare('UPDATE drawings SET transmittals = transmittals + 1 WHERE id = ?');
-    for (const id of drawingIds) updateCount.run(id);
+    // Single bulk UPDATE instead of N+1 loop
+    if (drawingIds.length > 0) {
+      const placeholders = drawingIds.map(() => '?').join(',');
+      db.prepare(`UPDATE drawings SET transmittals = transmittals + 1 WHERE id IN (${placeholders})`).run(drawingIds);
+    }
     db.prepare('INSERT INTO activity_log (project_id,type,title,detail,created_at) VALUES (?,?,?,?,?)')
       .run(pId, 'transmittal', `${number} issued`, `${drawingIds.length} drawing(s) — ${purpose}`, new Date().toISOString());
     console.log(`✅ Transmittal ${number} saved`);

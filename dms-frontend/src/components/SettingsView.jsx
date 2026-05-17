@@ -49,11 +49,15 @@ export default function SettingsView({ currentUser, onUserUpdate, token }) {
   useEffect(() => { loadUsers(); }, []);
 
   const handleRoleChange = async (userId, role, allowedProjects) => {
-    await fetch(`${API}/api/users/${userId}/role`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ role, allowedProjects: role === 'Director' ? '*' : allowedProjects }),
-    });
+    try {
+      const res = await fetch(`${API}/api/users/${userId}/role`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ role, allowedProjects: role === 'Director' ? '*' : allowedProjects }),
+      });
+      if (res.ok) setUserMsg({ type: 'success', text: 'Role updated successfully.' });
+      else setUserMsg({ type: 'error', text: 'Failed to update role.' });
+    } catch { setUserMsg({ type: 'error', text: 'Cannot connect to server.' }); }
     loadUsers();
   };
 

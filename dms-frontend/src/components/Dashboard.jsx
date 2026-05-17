@@ -37,16 +37,18 @@ export default function Dashboard({
   totalDrawings, totalTransmittals, latestRevisions, overdueItems,
   drawings, activeProjectId, token, onViewRegister,
 }) {
-  const [activity, setActivity] = useState([]);
+  const [activity, setActivity]           = useState([]);
+  const [activityError, setActivityError] = useState(false);
 
   useEffect(() => {
     if (!activeProjectId || !token) return;
+    setActivityError(false);
     fetch(`${API}/api/activity?projectId=${activeProjectId}`, {
       headers: { Authorization: `Bearer ${token}` },
     })
-      .then(r => r.ok ? r.json() : [])
+      .then(r => r.ok ? r.json() : Promise.reject())
       .then(setActivity)
-      .catch(() => {});
+      .catch(() => setActivityError(true));
   }, [activeProjectId, token]);
 
   /* Discipline breakdown */
@@ -59,8 +61,14 @@ export default function Dashboard({
   const discEntries = Object.entries(byDisc).sort((a, b) => b[1].total - a[1].total);
   const maxTotal = Math.max(...discEntries.map(([, v]) => v.total), 1);
 
-  /* Latest drawings (most recently uploaded) */
-  const latestDrawings = [...drawings].sort((a, b) => b.id - a.id).slice(0, 5);
+  /* Latest drawings — sorted by issue date descending, fall back to id */
+  const latestDrawings = [...drawings]
+    .sort((a, b) => {
+      const da = a.issueDate ? new Date(a.issueDate).getTime() : 0;
+      const db = b.issueDate ? new Date(b.issueDate).getTime() : 0;
+      return db - da || b.id - a.id;
+    })
+    .slice(0, 5);
 
   return (
     <div className="space-y-8">
@@ -165,7 +173,12 @@ export default function Dashboard({
             <p className="font-body-sm text-on-surface-variant">Recent project events and updates.</p>
           </div>
           <div className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar">
-            {activity.length === 0 ? (
+            {activityError ? (
+              <div className="flex flex-col items-center justify-center h-40 gap-3 text-on-surface-variant">
+                <span className="material-symbols-outlined text-[36px] opacity-30">wifi_off</span>
+                <p className="font-body-sm text-body-sm text-center text-status-rose-text">Could not load activity — check your connection.</p>
+              </div>
+            ) : activity.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-40 gap-3 text-on-surface-variant">
                 <span className="material-symbols-outlined text-[36px] opacity-30">notifications_none</span>
                 <p className="font-body-sm text-body-sm text-center">Activity will appear here as you upload drawings and issue transmittals.</p>

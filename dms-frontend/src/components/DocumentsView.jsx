@@ -262,15 +262,20 @@ export default function DocumentsView({ drawings, onUpload }) {
   const [tree,         setTree]         = useState(loadTree);
   const [segments,     setSegments]     = useState([]);   // path below root
   const [viewMode,     setViewMode]     = useState("grid");
-  const [renamingIdx,  setRenamingIdx]  = useState(null); // child index being renamed
-  const [renameVal,    setRenameVal]    = useState("");
-  const [addingFolder, setAddingFolder] = useState(false);
-  const [newFolderVal, setNewFolderVal] = useState("");
+  const [renamingIdx,    setRenamingIdx]    = useState(null); // child index being renamed
+  const [renameVal,      setRenameVal]      = useState("");
+  const [addingFolder,   setAddingFolder]   = useState(false);
+  const [newFolderVal,   setNewFolderVal]   = useState("");
+  const [addingSubIdx,   setAddingSubIdx]   = useState(null); // child idx receiving a new subfolder
+  const [newSubVal,      setNewSubVal]      = useState("");
+  const [confirmDelIdx,  setConfirmDelIdx]  = useState(null); // child idx pending delete confirm
   const addInputRef    = useRef(null);
   const renameInputRef = useRef(null);
+  const subInputRef    = useRef(null);
 
-  useEffect(() => { if (addingFolder)   addInputRef.current?.focus();   }, [addingFolder]);
+  useEffect(() => { if (addingFolder)        addInputRef.current?.focus();    }, [addingFolder]);
   useEffect(() => { if (renamingIdx !== null) renameInputRef.current?.focus(); }, [renamingIdx]);
+  useEffect(() => { if (addingSubIdx !== null) subInputRef.current?.focus();   }, [addingSubIdx]);
 
   const updateTree = updater => {
     setTree(prev => {
@@ -348,6 +353,13 @@ export default function DocumentsView({ drawings, onUpload }) {
         child.children.push({ name, children: [] });
       return next;
     });
+  };
+
+  const commitSubfolder = (childIdx) => {
+    const name = newSubVal.trim();
+    if (name) addSubfolder(childIdx, name);
+    setAddingSubIdx(null);
+    setNewSubVal("");
   };
 
   const isEmpty = subfolders.length === 0 && currentFiles.length === 0;
@@ -463,6 +475,25 @@ export default function DocumentsView({ drawings, onUpload }) {
                     const childPath = `${currentFolderPath}/${child.name}`;
                     const fileCount = countFilesUnder(child, childPath);
 
+                    // Delete confirmation inline
+                    if (confirmDelIdx === idx) {
+                      return (
+                        <div key={idx} className="flex items-center gap-2 bg-status-rose-bg border border-status-rose-text/30 rounded-xl px-4 py-3">
+                          <Trash2 size={14} className="text-status-rose-text shrink-0" />
+                          <p className="flex-1 text-[12px] font-medium text-status-rose-text">Delete "{child.name}"?</p>
+                          <button onClick={() => { deleteFolder(idx); setConfirmDelIdx(null); }}
+                            className="px-2.5 py-1 rounded-lg bg-status-rose-text text-white text-[11px] font-semibold hover:opacity-90 transition-opacity">
+                            Delete
+                          </button>
+                          <button onClick={() => setConfirmDelIdx(null)}
+                            className="px-2.5 py-1 rounded-lg border border-status-rose-text/30 text-status-rose-text text-[11px] font-medium hover:bg-status-rose-text/10 transition-colors">
+                            Cancel
+                          </button>
+                        </div>
+                      );
+                    }
+
+                    // Rename inline
                     if (renamingIdx === idx) {
                       return (
                         <div key={idx}
@@ -486,6 +517,29 @@ export default function DocumentsView({ drawings, onUpload }) {
                       );
                     }
 
+                    // Add subfolder inline
+                    if (addingSubIdx === idx) {
+                      return (
+                        <div key={idx} className="flex items-center gap-2 border border-primary rounded-xl px-4 py-3 bg-primary/5">
+                          <FolderPlus size={14} className="text-primary shrink-0" />
+                          <input
+                            ref={subInputRef}
+                            value={newSubVal}
+                            onChange={e => setNewSubVal(e.target.value)}
+                            placeholder={`Subfolder inside "${child.name}"…`}
+                            onBlur={() => commitSubfolder(idx)}
+                            onKeyDown={e => {
+                              if (e.key === "Enter") commitSubfolder(idx);
+                              if (e.key === "Escape") { setAddingSubIdx(null); setNewSubVal(""); }
+                            }}
+                            className="flex-1 bg-transparent text-[13px] font-medium text-on-surface placeholder:text-outline outline-none"
+                          />
+                          <button onClick={() => commitSubfolder(idx)} className="p-0.5 text-primary"><Check size={13} /></button>
+                          <button onClick={() => { setAddingSubIdx(null); setNewSubVal(""); }} className="p-0.5 text-on-surface-variant"><X size={13} /></button>
+                        </div>
+                      );
+                    }
+
                     return (
                       <FolderCard
                         key={idx}
@@ -493,12 +547,9 @@ export default function DocumentsView({ drawings, onUpload }) {
                         fileCount={fileCount}
                         viewMode={viewMode}
                         onClick={() => navigateInto(child.name)}
-                        onAdd={() => {
-                          const name = window.prompt(`New subfolder inside "${child.name}":`);
-                          if (name?.trim()) addSubfolder(idx, name.trim());
-                        }}
+                        onAdd={() => { setAddingSubIdx(idx); setNewSubVal(""); }}
                         onRename={() => { setRenamingIdx(idx); setRenameVal(child.name); }}
-                        onDelete={() => deleteFolder(idx)}
+                        onDelete={() => setConfirmDelIdx(idx)}
                       />
                     );
                   })}

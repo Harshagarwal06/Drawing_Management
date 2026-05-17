@@ -13,7 +13,7 @@ export default function ProjectSelector({ projects, activeProject, onChange, onN
     return () => document.removeEventListener("mousedown", close);
   }, []);
 
-  const activeIdx = projects.findIndex(p => p.id === activeProject?.id);
+  const activeIdx = Math.max(0, projects.findIndex(p => p.id === activeProject?.id));
   const shortName = (name) => name?.split("—")[1]?.trim() ?? name ?? "Select project";
 
   return (

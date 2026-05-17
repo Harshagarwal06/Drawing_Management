@@ -148,7 +148,7 @@ function TreeNode({
   addingTo, setAddingTo,
   editingPath, setEditingPath,
   onAddChild, onRename, onDelete,
-  drawings,
+  drawings, filterText,
 }) {
   const [open, setOpen] = useState(depth < 2);
   const addInputRef  = useRef(null);
@@ -274,25 +274,28 @@ function TreeNode({
 
       {/* Children */}
       <div className={`overflow-hidden transition-all duration-200 ease-in-out ${open ? "max-h-[2000px] opacity-100" : "max-h-0 opacity-0"}`}>
-        {node.children?.map((child, idx) => (
-          <TreeNode
-            key={`${child.name}-${idx}`}
-            node={child}
-            depth={depth + 1}
-            path={[...path, idx]}
-            namePath={[...namePath, child.name]}
-            selectedPath={selectedPath}
-            onSelect={onSelect}
-            addingTo={addingTo}
-            setAddingTo={setAddingTo}
-            editingPath={editingPath}
-            setEditingPath={setEditingPath}
-            onAddChild={onAddChild}
-            onRename={onRename}
-            onDelete={onDelete}
-            drawings={drawings}
-          />
-        ))}
+        {node.children
+          ?.filter(child => !filterText || child.name.toLowerCase().includes(filterText.toLowerCase()))
+          .map((child, idx) => (
+            <TreeNode
+              key={`${child.name}-${idx}`}
+              node={child}
+              depth={depth + 1}
+              path={[...path, idx]}
+              namePath={[...namePath, child.name]}
+              selectedPath={selectedPath}
+              onSelect={onSelect}
+              addingTo={addingTo}
+              setAddingTo={setAddingTo}
+              editingPath={editingPath}
+              setEditingPath={setEditingPath}
+              onAddChild={onAddChild}
+              onRename={onRename}
+              onDelete={onDelete}
+              drawings={drawings}
+              filterText={filterText}
+            />
+          ))}
       </div>
     </div>
   );
@@ -396,6 +399,7 @@ export default function FolderBrowser({ className = "", onFolderSelect, drawings
           onRename={renameNode}
           onDelete={deleteNode}
           drawings={drawings}
+          filterText={filterText}
         />
       </div>
 
