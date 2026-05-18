@@ -1,15 +1,17 @@
 import { useState, useRef, useEffect } from "react";
 import { createPortal } from "react-dom";
 import {
-  Folder, FolderOpen, ChevronRight, Home, LayoutGrid, List,
+  Folder, FolderOpen, ChevronRight, ChevronDown, Home, LayoutGrid, List,
   MoreVertical, FolderPlus, Pencil, Trash2, Eye, Download,
-  Check, X, FileText, Upload,
+  Check, X, Upload, Search, Layers, FileText, Send, Clock,
 } from "lucide-react";
 
-const API          = import.meta.env.VITE_API_URL;
-const STORAGE_KEY  = "uniqueproperties_folder_tree";
+const API         = import.meta.env.VITE_API_URL;
+const STORAGE_KEY = "uniqueproperties_folder_tree";
+const PALETTE     = ["#3525cd", "#2563eb", "#059669", "#d97706", "#9333ea"];
+const projectDot  = idx => PALETTE[idx % PALETTE.length];
 
-/* ─────────────────────────── helpers ─────────────────────────── */
+/* ─────────────────────────── Tree helpers ──────────────────────────── */
 const DEFAULT_TREE = () => ({
   name: "Project",
   children: [
@@ -47,8 +49,6 @@ function loadTree() {
 function saveTree(tree) {
   try { localStorage.setItem(STORAGE_KEY, JSON.stringify(tree)); } catch {}
 }
-
-/** Walk the tree along `segments` (relative to root) and return that node */
 function getNode(tree, segments) {
   let node = tree;
   for (const seg of segments) {
@@ -58,32 +58,198 @@ function getNode(tree, segments) {
   }
   return node;
 }
-
-/** Count total descendant nodes */
 function countDescendants(node) {
   let n = 0;
   for (const c of node.children ?? []) n += 1 + countDescendants(c);
   return n;
 }
 
+/* ─────────────────────────── Style maps ────────────────────────────── */
 const STATUS_PILL  = {
-  S3: "bg-status-emerald-bg text-status-emerald-text",
-  S2: "bg-status-amber-bg   text-status-amber-text",
-  S1: "bg-blue-50           text-blue-700",
-  VOID: "bg-status-rose-bg  text-status-rose-text",
+  S3:   "bg-status-emerald-bg text-status-emerald-text",
+  S2:   "bg-status-amber-bg   text-status-amber-text",
+  S1:   "bg-blue-50           text-blue-700",
+  VOID: "bg-status-rose-bg    text-status-rose-text",
 };
 const STATUS_LABEL = {
   S3: "For Construction", S2: "For Approval", S1: "For Information", VOID: "Void",
 };
 const EXT_STYLE = {
-  PDF: "bg-red-50   text-red-600",
-  DWG: "bg-blue-50  text-blue-700",
+  PDF: "bg-red-50    text-red-600",
+  DWG: "bg-blue-50   text-blue-700",
   DXF: "bg-indigo-50 text-indigo-600",
   IFC: "bg-purple-50 text-purple-600",
   RVT: "bg-orange-50 text-orange-600",
 };
 
-/* ─────────────────────────── FolderMenu ──────────────────────── */
+/* ─────────────────────── SwitchProjectDropdown ─────────────────────── */
+function SwitchProjectDropdown({ projects, activeProject, onProjectChange }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+
+  useEffect(() => {
+    const close = e => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    document.addEventListener("mousedown", close);
+    return () => document.removeEventListener("mousedown", close);
+  }, []);
+
+  return (
+    <div className="relative shrink-0" ref={ref}>
+      <button
+        onClick={() => setOpen(o => !o)}
+        className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-border-slate bg-white hover:bg-surface-container text-[13px] font-medium text-on-surface transition-colors shadow-sm"
+      >
+        <span className="material-symbols-outlined text-[17px] text-primary">sync_alt</span>
+        Switch Project
+        <ChevronDown
+          size={13}
+          className={`text-on-surface-variant transition-transform duration-200 ${open ? "rotate-180" : ""}`}
+        />
+      </button>
+
+      {open && (
+        <div className="absolute right-0 top-full mt-2 w-72 bg-surface border border-outline-variant rounded-xl shadow-card-lg z-50 overflow-hidden">
+          <div className="px-4 pt-3 pb-2 border-b border-border-slate">
+            <p className="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest">
+              Switch Project
+            </p>
+          </div>
+          <div className="py-1 max-h-60 overflow-y-auto custom-scrollbar">
+            {projects.map((p, idx) => {
+              const isActive = p.id === activeProject?.id;
+              return (
+                <button
+                  key={p.id}
+                  onClick={() => { onProjectChange(p); setOpen(false); }}
+                  className={`w-full flex items-center gap-3 px-4 py-3 text-left transition-colors ${
+                    isActive ? "bg-primary/10" : "hover:bg-surface-container-low"
+                  }`}
+                >
+                  <span
+                    className="w-2.5 h-2.5 rounded-full shrink-0"
+                    style={{ backgroundColor: projectDot(idx) }}
+                  />
+                  <div className="flex-1 min-w-0">
+                    <p className={`font-mono text-[12px] font-bold leading-tight ${isActive ? "text-primary" : "text-on-surface"}`}>
+                      {p.code}
+                    </p>
+                    <p className="text-[11px] text-on-surface-variant truncate mt-0.5">
+                      {p.name?.split("—")[1]?.trim() ?? p.name}
+                    </p>
+                  </div>
+                  {isActive && (
+                    <span className="material-symbols-outlined text-[16px] text-primary shrink-0">check_circle</span>
+                  )}
+                </button>
+              );
+            })}
+            {projects.length === 0 && (
+              <p className="px-4 py-4 text-[12px] text-on-surface-variant">No projects available.</p>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ──────────────────────────── StatChip ─────────────────────────────── */
+function StatChip({ label, value, Icon, colorCls }) {
+  return (
+    <div className="flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl bg-surface-container-low border border-border-slate min-w-0">
+      <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${colorCls}`}>
+        <Icon size={14} />
+      </div>
+      <div className="min-w-0">
+        <p className="text-[10px] text-on-surface-variant leading-none truncate">{label}</p>
+        <p className="text-[16px] font-bold text-on-surface leading-tight mt-0.5">{value}</p>
+      </div>
+    </div>
+  );
+}
+
+/* ─────────────────────── ProjectWorkspaceBar ───────────────────────── */
+function ProjectWorkspaceBar({
+  activeProject, projects, onProjectChange,
+  totalFolders, totalDrawings, totalTransmittals, pendingApprovals,
+  isProjectTeam,
+}) {
+  const shortName = activeProject?.name?.split("—")[1]?.trim() ?? activeProject?.name ?? "No project selected";
+  const activeIdx = Math.max(0, projects.findIndex(p => p.id === activeProject?.id));
+
+  return (
+    <div className="bg-white border border-border-slate rounded-xl p-5 shadow-sm">
+      <div className="flex flex-col gap-4 xl:flex-row xl:items-center">
+
+        {/* Project identity */}
+        <div className="flex-1 min-w-0">
+          <p className="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest mb-2">
+            Project Workspace
+          </p>
+          <div className="flex items-center gap-2.5 flex-wrap">
+            <span
+              className="w-3 h-3 rounded-full shrink-0"
+              style={{ backgroundColor: projectDot(activeIdx) }}
+            />
+            <span className="font-mono font-bold text-primary text-[20px] leading-none">
+              {activeProject?.code ?? "—"}
+            </span>
+            <span className="text-[20px] font-bold text-on-surface leading-none truncate max-w-[220px]">
+              {shortName}
+            </span>
+            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-status-emerald-bg text-status-emerald-text border border-status-emerald-text/25 shrink-0">
+              Active Project
+            </span>
+          </div>
+          <p className="text-[12px] text-on-surface-variant mt-1.5">
+            Document control workspace for this project
+          </p>
+        </div>
+
+        {/* Stats */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 xl:flex xl:items-center gap-2">
+          <StatChip
+            label="Folders"
+            value={totalFolders}
+            Icon={Layers}
+            colorCls="bg-primary/10 text-primary"
+          />
+          <StatChip
+            label="Drawings"
+            value={totalDrawings}
+            Icon={FileText}
+            colorCls="bg-blue-50 text-blue-600"
+          />
+          <StatChip
+            label="Transmittals"
+            value={totalTransmittals}
+            Icon={Send}
+            colorCls="bg-status-emerald-bg text-status-emerald-text"
+          />
+          <StatChip
+            label="Pending Approval"
+            value={pendingApprovals}
+            Icon={Clock}
+            colorCls={pendingApprovals > 0
+              ? "bg-status-amber-bg text-status-amber-text"
+              : "bg-surface-container text-on-surface-variant"}
+          />
+        </div>
+
+        {/* Switch project — hidden for Project Team */}
+        {!isProjectTeam && (
+          <SwitchProjectDropdown
+            projects={projects}
+            activeProject={activeProject}
+            onProjectChange={onProjectChange}
+          />
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ─────────────────────────── FolderMenu ────────────────────────────── */
 function FolderMenu({ onAdd, onRename, onDelete }) {
   const [open, setOpen] = useState(false);
   const [pos,  setPos]  = useState({ top: 0, left: 0 });
@@ -148,7 +314,7 @@ function FolderMenu({ onAdd, onRename, onDelete }) {
   );
 }
 
-/* ─────────────────────────── FolderCard ─────────────────────── */
+/* ─────────────────────────── FolderCard ────────────────────────────── */
 function FolderCard({ node, fileCount, onClick, onAdd, onRename, onDelete, viewMode }) {
   const subCount = countDescendants(node);
 
@@ -194,11 +360,11 @@ function FolderCard({ node, fileCount, onClick, onAdd, onRename, onDelete, viewM
   );
 }
 
-/* ─────────────────────────── FileCard ───────────────────────── */
+/* ─────────────────────────── FileCard ──────────────────────────────── */
 function FileCard({ d, viewMode }) {
-  const filename = d.path?.split("/").pop() ?? "";
-  const ext      = filename.split(".").pop().toUpperCase();
-  const extStyle = EXT_STYLE[ext] ?? "bg-surface-container text-on-surface-variant";
+  const filename    = d.path?.split("/").pop() ?? "";
+  const ext         = filename.split(".").pop().toUpperCase();
+  const extStyle    = EXT_STYLE[ext] ?? "bg-surface-container text-on-surface-variant";
   const statusPill  = STATUS_PILL[d.status]  ?? "bg-surface-container text-on-surface-variant";
   const statusLabel = STATUS_LABEL[d.status] ?? d.status;
 
@@ -230,7 +396,6 @@ function FileCard({ d, viewMode }) {
 
   return (
     <div className="group bg-white border border-border-slate rounded-xl overflow-hidden hover:shadow-md transition-all duration-150 cursor-default">
-      {/* Top colour band */}
       <div className={`h-1.5 ${d.status === "S3" ? "bg-status-emerald-text" : d.status === "S2" ? "bg-status-amber-text" : d.status === "VOID" ? "bg-status-rose-text" : "bg-blue-400"}`} />
       <div className="p-4">
         <div className="flex items-start justify-between gap-2 mb-3">
@@ -257,25 +422,35 @@ function FileCard({ d, viewMode }) {
   );
 }
 
-/* ─────────────────────────── DocumentsView ──────────────────── */
-export default function DocumentsView({ drawings, onUpload }) {
-  const [tree,         setTree]         = useState(loadTree);
-  const [segments,     setSegments]     = useState([]);   // path below root
-  const [viewMode,     setViewMode]     = useState("grid");
-  const [renamingIdx,    setRenamingIdx]    = useState(null); // child index being renamed
-  const [renameVal,      setRenameVal]      = useState("");
-  const [addingFolder,   setAddingFolder]   = useState(false);
-  const [newFolderVal,   setNewFolderVal]   = useState("");
-  const [addingSubIdx,   setAddingSubIdx]   = useState(null); // child idx receiving a new subfolder
-  const [newSubVal,      setNewSubVal]      = useState("");
-  const [confirmDelIdx,  setConfirmDelIdx]  = useState(null); // child idx pending delete confirm
+/* ─────────────────────────── DocumentsView ─────────────────────────── */
+export default function DocumentsView({
+  drawings,
+  onUpload,
+  projects      = [],
+  activeProject,
+  onProjectChange,
+  transmittals  = [],
+  isProjectTeam = false,
+}) {
+  const [tree,          setTree]          = useState(loadTree);
+  const [segments,      setSegments]      = useState([]);
+  const [viewMode,      setViewMode]      = useState("grid");
+  const [renamingIdx,   setRenamingIdx]   = useState(null);
+  const [renameVal,     setRenameVal]     = useState("");
+  const [addingFolder,  setAddingFolder]  = useState(false);
+  const [newFolderVal,  setNewFolderVal]  = useState("");
+  const [addingSubIdx,  setAddingSubIdx]  = useState(null);
+  const [newSubVal,     setNewSubVal]     = useState("");
+  const [confirmDelIdx, setConfirmDelIdx] = useState(null);
+  const [localSearch,   setLocalSearch]   = useState("");
+
   const addInputRef    = useRef(null);
   const renameInputRef = useRef(null);
   const subInputRef    = useRef(null);
 
-  useEffect(() => { if (addingFolder)        addInputRef.current?.focus();    }, [addingFolder]);
-  useEffect(() => { if (renamingIdx !== null) renameInputRef.current?.focus(); }, [renamingIdx]);
-  useEffect(() => { if (addingSubIdx !== null) subInputRef.current?.focus();   }, [addingSubIdx]);
+  useEffect(() => { if (addingFolder)         addInputRef.current?.focus();    }, [addingFolder]);
+  useEffect(() => { if (renamingIdx !== null)  renameInputRef.current?.focus(); }, [renamingIdx]);
+  useEffect(() => { if (addingSubIdx !== null) subInputRef.current?.focus();    }, [addingSubIdx]);
 
   const updateTree = updater => {
     setTree(prev => {
@@ -285,31 +460,28 @@ export default function DocumentsView({ drawings, onUpload }) {
     });
   };
 
-  /** Get the current node in the tree */
-  const currentNode = getNode(tree, segments);
-  const subfolders  = currentNode?.children ?? [];
-
-  /** Full folder path string for the current location (matches drawing.folderPath) */
+  /* ── Derived from tree + location ── */
+  const currentNode       = getNode(tree, segments);
+  const subfolders        = currentNode?.children ?? [];
   const currentFolderPath = [tree.name, ...segments].join("/");
+  const currentFiles      = drawings.filter(d => (d.folderPath || "") === currentFolderPath && d.path);
 
-  /** Files whose folderPath matches exactly this level */
-  const currentFiles = drawings.filter(d => (d.folderPath || "") === currentFolderPath && d.path);
-
-  /** Count files anywhere under a subfolder (recursive) */
   const countFilesUnder = (node, basePath) => {
-    const nodePath = basePath;
-    let count = drawings.filter(d => (d.folderPath || "") === nodePath && d.path).length;
-    for (const child of node.children ?? []) {
+    let count = drawings.filter(d => (d.folderPath || "") === basePath && d.path).length;
+    for (const child of node.children ?? [])
       count += countFilesUnder(child, `${basePath}/${child.name}`);
-    }
     return count;
   };
+
+  /* ── Workspace bar stats ── */
+  const totalFolders     = countDescendants(tree);
+  const pendingApprovals = drawings.filter(d => d.status === "S2").length;
 
   /* ── Navigation ── */
   const navigateInto = name => setSegments(s => [...s, name]);
   const navigateTo   = idx  => setSegments(s => s.slice(0, idx));
 
-  /* ── Folder CRUD (operates on currentNode's children) ── */
+  /* ── Folder CRUD ── */
   const addFolder = () => {
     const name = newFolderVal.trim();
     if (!name) { setAddingFolder(false); setNewFolderVal(""); return; }
@@ -328,8 +500,7 @@ export default function DocumentsView({ drawings, onUpload }) {
     const name = renameVal.trim();
     if (!name) { setRenamingIdx(null); return; }
     updateTree(next => {
-      const node = getNode(next, segments);
-      node.children[idx].name = name;
+      getNode(next, segments).children[idx].name = name;
       return next;
     });
     setRenamingIdx(null);
@@ -337,8 +508,7 @@ export default function DocumentsView({ drawings, onUpload }) {
 
   const deleteFolder = idx => {
     updateTree(next => {
-      const node = getNode(next, segments);
-      node.children.splice(idx, 1);
+      getNode(next, segments).children.splice(idx, 1);
       return next;
     });
   };
@@ -346,8 +516,7 @@ export default function DocumentsView({ drawings, onUpload }) {
   const addSubfolder = (childIdx, name) => {
     if (!name) return;
     updateTree(next => {
-      const node = getNode(next, segments);
-      const child = node.children[childIdx];
+      const child = getNode(next, segments).children[childIdx];
       if (!child.children) child.children = [];
       if (!child.children.some(c => c.name === name))
         child.children.push({ name, children: [] });
@@ -355,197 +524,280 @@ export default function DocumentsView({ drawings, onUpload }) {
     });
   };
 
-  const commitSubfolder = (childIdx) => {
+  const commitSubfolder = childIdx => {
     const name = newSubVal.trim();
     if (name) addSubfolder(childIdx, name);
     setAddingSubIdx(null);
     setNewSubVal("");
   };
 
-  const isEmpty = subfolders.length === 0 && currentFiles.length === 0;
+  /* ── Local search — preserves originalIdx for all CRUD ops ── */
+  const filteredSubfolderEntries = subfolders
+    .map((child, originalIdx) => ({ child, originalIdx }))
+    .filter(({ child }) =>
+      !localSearch || child.name.toLowerCase().includes(localSearch.toLowerCase())
+    );
+
+  const filteredFiles = currentFiles.filter(d => {
+    if (!localSearch) return true;
+    const q        = localSearch.toLowerCase();
+    const filename = d.path?.split("/").pop()?.toLowerCase() ?? "";
+    return (
+      d.number?.toLowerCase().includes(q) ||
+      d.title?.toLowerCase().includes(q)  ||
+      d.rev?.toLowerCase().includes(q)    ||
+      d.status?.toLowerCase().includes(q) ||
+      filename.includes(q)
+    );
+  });
+
+  const searchActive = localSearch.length > 0;
+  const noResults    = searchActive && filteredSubfolderEntries.length === 0 && filteredFiles.length === 0 && !addingFolder;
+  const actualEmpty  = !searchActive && subfolders.length === 0 && currentFiles.length === 0 && !addingFolder;
 
   return (
-    <div className="max-w-[1400px] mx-auto space-y-3">
+    <div className="max-w-[1400px] mx-auto space-y-4">
 
-      {/* ── Unified breadcrumb header ── */}
-      <div className="flex items-center justify-between gap-6">
+      {/* ── Project Workspace Bar ── */}
+      <ProjectWorkspaceBar
+        activeProject={activeProject}
+        projects={projects}
+        onProjectChange={onProjectChange}
+        totalFolders={totalFolders}
+        totalDrawings={drawings.length}
+        totalTransmittals={transmittals.length}
+        pendingApprovals={pendingApprovals}
+        isProjectTeam={isProjectTeam}
+      />
 
-        {/* Left — interactive breadcrumb acts as the page title */}
-        <nav className="flex items-center gap-0 flex-wrap min-w-0">
-          {/* Home icon — always navigates to root */}
-          <button
-            onClick={() => setSegments([])}
-            className="p-1 rounded-md text-on-surface-variant hover:text-on-surface hover:bg-surface-container transition-colors mr-1 shrink-0"
-            title="Documents root"
-          >
-            <Home size={17} />
-          </button>
+      {/* ── Page header ── */}
+      <div>
+        <h1 className="text-headline-lg font-semibold text-on-surface">Documents</h1>
+        <p className="text-body-md text-on-surface-variant mt-0.5">
+          Organize drawings, folders, revisions, and files.
+        </p>
+      </div>
 
-          {/* "Documents" root crumb */}
-          <button
-            onClick={() => setSegments([])}
-            className={`rounded px-1 py-0.5 transition-colors leading-none ${
-              segments.length === 0
-                ? "text-on-surface font-bold text-2xl pointer-events-none"
-                : "text-[13px] font-medium text-on-surface-variant hover:text-on-surface"
-            }`}
-          >
-            Documents
-          </button>
+      {/* ── Breadcrumb ── */}
+      <nav className="flex items-center gap-0 flex-wrap min-w-0">
+        <button
+          onClick={() => setSegments([])}
+          className="p-1 rounded-md text-on-surface-variant hover:text-on-surface hover:bg-surface-container transition-colors mr-1 shrink-0"
+          title="Documents root"
+        >
+          <Home size={17} />
+        </button>
+        <button
+          onClick={() => setSegments([])}
+          className={`rounded px-1 py-0.5 transition-colors leading-none ${
+            segments.length === 0
+              ? "text-on-surface font-bold text-2xl pointer-events-none"
+              : "text-[13px] font-medium text-on-surface-variant hover:text-on-surface"
+          }`}
+        >
+          Documents
+        </button>
+        {segments.map((seg, i) => {
+          const isLast = i === segments.length - 1;
+          return (
+            <div key={i} className="flex items-center">
+              <span className="mx-2 text-slate-300 font-light select-none text-lg">/</span>
+              <button
+                onClick={() => !isLast && navigateTo(i + 1)}
+                className={`rounded px-1 py-0.5 transition-colors leading-none ${
+                  isLast
+                    ? "text-on-surface font-bold text-2xl pointer-events-none"
+                    : "text-[13px] font-medium text-on-surface-variant hover:text-on-surface hover:bg-surface-container"
+                }`}
+              >
+                {seg}
+              </button>
+            </div>
+          );
+        })}
+      </nav>
 
-          {/* Intermediate + current segments */}
-          {segments.map((seg, i) => {
-            const isLast = i === segments.length - 1;
-            return (
-              <div key={i} className="flex items-center">
-                <span className="mx-2 text-slate-300 font-light select-none text-lg">/</span>
-                <button
-                  onClick={() => !isLast && navigateTo(i + 1)}
-                  className={`rounded px-1 py-0.5 transition-colors leading-none ${
-                    isLast
-                      ? "text-on-surface font-bold text-2xl pointer-events-none"
-                      : "text-[13px] font-medium text-on-surface-variant hover:text-on-surface hover:bg-surface-container"
-                  }`}
-                >
-                  {seg}
-                </button>
-              </div>
-            );
-          })}
-        </nav>
+      {/* ── Toolbar: search + view + actions ── */}
+      <div className="flex items-center gap-2 flex-wrap">
 
-        {/* Right — action controls */}
-        <div className="flex items-center gap-2 shrink-0">
-
-          {/* View toggle */}
-          <div className="flex items-center bg-surface-container-low border border-border-slate rounded-lg p-0.5">
+        {/* Local search */}
+        <div className="relative flex-1 min-w-[160px] max-w-xs">
+          <Search
+            size={14}
+            className="absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant pointer-events-none"
+          />
+          <input
+            type="text"
+            value={localSearch}
+            onChange={e => setLocalSearch(e.target.value)}
+            placeholder="Search in this folder…"
+            className="w-full pl-9 pr-8 py-2 text-[13px] bg-white border border-border-slate rounded-lg text-on-surface placeholder:text-on-surface-variant focus:outline-none focus:ring-1 focus:ring-primary/20 focus:border-primary transition-all"
+          />
+          {localSearch && (
             <button
-              onClick={() => setViewMode("grid")}
-              className={`p-1.5 rounded-md transition-colors ${viewMode === "grid" ? "bg-white shadow-sm text-primary" : "text-on-surface-variant hover:text-on-surface"}`}
-              title="Grid view"
+              onClick={() => setLocalSearch("")}
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-on-surface-variant hover:text-on-surface transition-colors"
             >
-              <LayoutGrid size={15} />
-            </button>
-            <button
-              onClick={() => setViewMode("list")}
-              className={`p-1.5 rounded-md transition-colors ${viewMode === "list" ? "bg-white shadow-sm text-primary" : "text-on-surface-variant hover:text-on-surface"}`}
-              title="List view"
-            >
-              <List size={15} />
-            </button>
-          </div>
-
-          {/* New folder */}
-          <button
-            onClick={() => setAddingFolder(true)}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-border-slate bg-white hover:bg-surface-container text-[13px] font-medium text-on-surface-variant transition-colors"
-          >
-            <FolderPlus size={14} />
-            New Folder
-          </button>
-
-          {/* Upload Here */}
-          {onUpload && (
-            <button
-              onClick={() => onUpload(currentFolderPath)}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-primary text-white hover:bg-primary-container text-[13px] font-medium shadow-sm transition-all active:scale-[0.98]"
-            >
-              <Upload size={14} />
-              Upload Here
+              <X size={13} />
             </button>
           )}
         </div>
+
+        {/* View toggle */}
+        <div className="flex items-center bg-surface-container-low border border-border-slate rounded-lg p-0.5 shrink-0">
+          <button
+            onClick={() => setViewMode("grid")}
+            className={`p-1.5 rounded-md transition-colors ${viewMode === "grid" ? "bg-white shadow-sm text-primary" : "text-on-surface-variant hover:text-on-surface"}`}
+            title="Grid view"
+          >
+            <LayoutGrid size={15} />
+          </button>
+          <button
+            onClick={() => setViewMode("list")}
+            className={`p-1.5 rounded-md transition-colors ${viewMode === "list" ? "bg-white shadow-sm text-primary" : "text-on-surface-variant hover:text-on-surface"}`}
+            title="List view"
+          >
+            <List size={15} />
+          </button>
+        </div>
+
+        {/* New Folder */}
+        <button
+          onClick={() => setAddingFolder(true)}
+          className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-border-slate bg-white hover:bg-surface-container text-[13px] font-medium text-on-surface-variant transition-colors shrink-0"
+        >
+          <FolderPlus size={14} />
+          New Folder
+        </button>
+
+        {/* Upload Here */}
+        {onUpload && (
+          <button
+            onClick={() => onUpload(currentFolderPath)}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-primary text-white hover:bg-primary-container text-[13px] font-medium shadow-sm transition-all active:scale-[0.98] shrink-0"
+          >
+            <Upload size={14} />
+            Upload Here
+          </button>
+        )}
       </div>
 
       {/* ── Content card ── */}
       <div className="bg-white border border-border-slate rounded-xl overflow-hidden">
 
-        {isEmpty && !addingFolder ? (
+        {/* Empty / no-results states */}
+        {(actualEmpty || noResults) ? (
           <div className="flex flex-col items-center justify-center h-64 gap-3 text-on-surface-variant">
             <div className="w-16 h-16 rounded-2xl bg-surface-container-low flex items-center justify-center">
-              <FolderOpen size={32} className="text-outline" />
+              {noResults
+                ? <Search size={28} className="text-outline" />
+                : <FolderOpen size={32} className="text-outline" />}
             </div>
-            <p className="text-[15px] font-semibold text-on-surface">This folder is empty</p>
-            <p className="text-[13px] text-on-surface-variant">Create a subfolder or upload drawings here</p>
+            <p className="text-[15px] font-semibold text-on-surface">
+              {noResults ? "No results found" : "This folder is empty"}
+            </p>
+            <p className="text-[13px] text-on-surface-variant text-center max-w-xs">
+              {noResults
+                ? `No folders or files match "${localSearch}"`
+                : "Create a subfolder or upload drawings here"}
+            </p>
+            {noResults && (
+              <button
+                onClick={() => setLocalSearch("")}
+                className="text-[13px] font-medium text-primary hover:underline"
+              >
+                Clear search
+              </button>
+            )}
           </div>
         ) : (
           <div className="p-5 space-y-6">
 
             {/* ── Folders section ── */}
-            {(subfolders.length > 0 || addingFolder) && (
+            {(filteredSubfolderEntries.length > 0 || addingFolder) && (
               <div>
-                <p className="text-[11px] font-semibold text-on-surface-variant uppercase tracking-wider mb-3">
-                  Folders
-                </p>
+                <div className="flex items-center gap-2 mb-3">
+                  <p className="text-[11px] font-semibold text-on-surface-variant uppercase tracking-wider">
+                    Folders
+                  </p>
+                  {searchActive && filteredSubfolderEntries.length < subfolders.length && (
+                    <span className="text-[10px] text-on-surface-variant bg-surface-container px-1.5 py-0.5 rounded-full">
+                      {filteredSubfolderEntries.length} of {subfolders.length}
+                    </span>
+                  )}
+                </div>
 
                 <div className={viewMode === "grid"
                   ? "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3"
                   : "space-y-0.5"
                 }>
-                  {subfolders.map((child, idx) => {
+                  {/* Render filtered folders using originalIdx for all CRUD ops */}
+                  {filteredSubfolderEntries.map(({ child, originalIdx }) => {
                     const childPath = `${currentFolderPath}/${child.name}`;
                     const fileCount = countFilesUnder(child, childPath);
 
-                    // Delete confirmation inline
-                    if (confirmDelIdx === idx) {
+                    /* Delete confirmation */
+                    if (confirmDelIdx === originalIdx) {
                       return (
-                        <div key={idx} className="flex items-center gap-2 bg-status-rose-bg border border-status-rose-text/30 rounded-xl px-4 py-3">
+                        <div key={originalIdx} className="flex items-center gap-2 bg-status-rose-bg border border-status-rose-text/30 rounded-xl px-4 py-3">
                           <Trash2 size={14} className="text-status-rose-text shrink-0" />
                           <p className="flex-1 text-[12px] font-medium text-status-rose-text">Delete "{child.name}"?</p>
-                          <button onClick={() => { deleteFolder(idx); setConfirmDelIdx(null); }}
-                            className="px-2.5 py-1 rounded-lg bg-status-rose-text text-white text-[11px] font-semibold hover:opacity-90 transition-opacity">
+                          <button
+                            onClick={() => { deleteFolder(originalIdx); setConfirmDelIdx(null); }}
+                            className="px-2.5 py-1 rounded-lg bg-status-rose-text text-white text-[11px] font-semibold hover:opacity-90 transition-opacity"
+                          >
                             Delete
                           </button>
-                          <button onClick={() => setConfirmDelIdx(null)}
-                            className="px-2.5 py-1 rounded-lg border border-status-rose-text/30 text-status-rose-text text-[11px] font-medium hover:bg-status-rose-text/10 transition-colors">
+                          <button
+                            onClick={() => setConfirmDelIdx(null)}
+                            className="px-2.5 py-1 rounded-lg border border-status-rose-text/30 text-status-rose-text text-[11px] font-medium hover:bg-status-rose-text/10 transition-colors"
+                          >
                             Cancel
                           </button>
                         </div>
                       );
                     }
 
-                    // Rename inline
-                    if (renamingIdx === idx) {
+                    /* Rename inline */
+                    if (renamingIdx === originalIdx) {
                       return (
-                        <div key={idx}
-                          className="flex items-center gap-2 bg-surface-container-low border border-primary rounded-xl px-4 py-3"
-                        >
+                        <div key={originalIdx} className="flex items-center gap-2 bg-surface-container-low border border-primary rounded-xl px-4 py-3">
                           <Folder size={16} className="text-primary shrink-0" />
                           <input
                             ref={renameInputRef}
                             value={renameVal}
                             onChange={e => setRenameVal(e.target.value)}
-                            onBlur={() => renameFolder(idx)}
+                            onBlur={() => renameFolder(originalIdx)}
                             onKeyDown={e => {
-                              if (e.key === "Enter") renameFolder(idx);
+                              if (e.key === "Enter")  renameFolder(originalIdx);
                               if (e.key === "Escape") setRenamingIdx(null);
                             }}
                             className="flex-1 bg-transparent text-[13px] font-medium text-on-surface outline-none"
                           />
-                          <button onClick={() => renameFolder(idx)} className="p-0.5 text-primary"><Check size={13} /></button>
+                          <button onClick={() => renameFolder(originalIdx)} className="p-0.5 text-primary"><Check size={13} /></button>
                           <button onClick={() => setRenamingIdx(null)} className="p-0.5 text-on-surface-variant"><X size={13} /></button>
                         </div>
                       );
                     }
 
-                    // Add subfolder inline
-                    if (addingSubIdx === idx) {
+                    /* Add subfolder inline */
+                    if (addingSubIdx === originalIdx) {
                       return (
-                        <div key={idx} className="flex items-center gap-2 border border-primary rounded-xl px-4 py-3 bg-primary/5">
+                        <div key={originalIdx} className="flex items-center gap-2 border border-primary rounded-xl px-4 py-3 bg-primary/5">
                           <FolderPlus size={14} className="text-primary shrink-0" />
                           <input
                             ref={subInputRef}
                             value={newSubVal}
                             onChange={e => setNewSubVal(e.target.value)}
                             placeholder={`Subfolder inside "${child.name}"…`}
-                            onBlur={() => commitSubfolder(idx)}
+                            onBlur={() => commitSubfolder(originalIdx)}
                             onKeyDown={e => {
-                              if (e.key === "Enter") commitSubfolder(idx);
+                              if (e.key === "Enter")  commitSubfolder(originalIdx);
                               if (e.key === "Escape") { setAddingSubIdx(null); setNewSubVal(""); }
                             }}
                             className="flex-1 bg-transparent text-[13px] font-medium text-on-surface placeholder:text-outline outline-none"
                           />
-                          <button onClick={() => commitSubfolder(idx)} className="p-0.5 text-primary"><Check size={13} /></button>
+                          <button onClick={() => commitSubfolder(originalIdx)} className="p-0.5 text-primary"><Check size={13} /></button>
                           <button onClick={() => { setAddingSubIdx(null); setNewSubVal(""); }} className="p-0.5 text-on-surface-variant"><X size={13} /></button>
                         </div>
                       );
@@ -553,21 +805,21 @@ export default function DocumentsView({ drawings, onUpload }) {
 
                     return (
                       <FolderCard
-                        key={idx}
+                        key={originalIdx}
                         node={child}
                         fileCount={fileCount}
                         viewMode={viewMode}
                         onClick={() => navigateInto(child.name)}
-                        onAdd={() => { setAddingSubIdx(idx); setNewSubVal(""); }}
-                        onRename={() => { setRenamingIdx(idx); setRenameVal(child.name); }}
-                        onDelete={() => setConfirmDelIdx(idx)}
+                        onAdd={() => { setAddingSubIdx(originalIdx); setNewSubVal(""); }}
+                        onRename={() => { setRenamingIdx(originalIdx); setRenameVal(child.name); }}
+                        onDelete={() => setConfirmDelIdx(originalIdx)}
                       />
                     );
                   })}
 
-                  {/* Inline new folder input */}
+                  {/* New folder input — always shown at end when active */}
                   {addingFolder && (
-                    <div className={`flex items-center gap-2 border border-primary rounded-xl px-4 py-3 bg-primary/5 ${viewMode === "list" ? "" : ""}`}>
+                    <div className="flex items-center gap-2 border border-primary rounded-xl px-4 py-3 bg-primary/5">
                       <Folder size={16} className="text-primary shrink-0" />
                       <input
                         ref={addInputRef}
@@ -576,7 +828,7 @@ export default function DocumentsView({ drawings, onUpload }) {
                         placeholder="Folder name…"
                         onBlur={addFolder}
                         onKeyDown={e => {
-                          if (e.key === "Enter") addFolder();
+                          if (e.key === "Enter")  addFolder();
                           if (e.key === "Escape") { setAddingFolder(false); setNewFolderVal(""); }
                         }}
                         className="flex-1 bg-transparent text-[13px] font-medium text-on-surface placeholder:text-outline outline-none"
@@ -590,25 +842,31 @@ export default function DocumentsView({ drawings, onUpload }) {
             )}
 
             {/* ── Files section ── */}
-            {currentFiles.length > 0 && (
+            {filteredFiles.length > 0 && (
               <div>
-                <p className="text-[11px] font-semibold text-on-surface-variant uppercase tracking-wider mb-3">
-                  Files — {currentFiles.length}
-                </p>
-
+                <div className="flex items-center gap-2 mb-3">
+                  <p className="text-[11px] font-semibold text-on-surface-variant uppercase tracking-wider">
+                    Files — {filteredFiles.length}
+                  </p>
+                  {searchActive && filteredFiles.length < currentFiles.length && (
+                    <span className="text-[10px] text-on-surface-variant bg-surface-container px-1.5 py-0.5 rounded-full">
+                      {filteredFiles.length} of {currentFiles.length}
+                    </span>
+                  )}
+                </div>
                 {viewMode === "grid" ? (
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-                    {currentFiles.map(d => <FileCard key={d.id} d={d} viewMode="grid" />)}
+                    {filteredFiles.map(d => <FileCard key={d.id} d={d} viewMode="grid" />)}
                   </div>
                 ) : (
                   <div className="space-y-0.5">
-                    {currentFiles.map(d => <FileCard key={d.id} d={d} viewMode="list" />)}
+                    {filteredFiles.map(d => <FileCard key={d.id} d={d} viewMode="list" />)}
                   </div>
                 )}
               </div>
             )}
 
-            {/* Files exist here but have no uploaded file */}
+            {/* Drawings in this folder that have no uploaded file yet */}
             {(() => {
               const missing = drawings.filter(d => (d.folderPath || "") === currentFolderPath && !d.path);
               if (!missing.length) return null;
