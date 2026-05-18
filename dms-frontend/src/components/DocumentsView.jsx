@@ -97,12 +97,12 @@ function SwitchProjectDropdown({ projects, activeProject, onProjectChange }) {
     <div className="relative shrink-0" ref={ref}>
       <button
         onClick={() => setOpen(o => !o)}
-        className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-border-slate bg-white hover:bg-surface-container text-[13px] font-medium text-on-surface transition-colors shadow-sm"
+        className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-border-slate bg-white hover:bg-surface-container text-[12px] font-medium text-on-surface transition-colors shadow-sm"
       >
-        <span className="material-symbols-outlined text-[17px] text-primary">sync_alt</span>
+        <span className="material-symbols-outlined text-[15px] text-primary">sync_alt</span>
         Switch Project
         <ChevronDown
-          size={13}
+          size={12}
           className={`text-on-surface-variant transition-transform duration-200 ${open ? "rotate-180" : ""}`}
         />
       </button>
@@ -156,13 +156,13 @@ function SwitchProjectDropdown({ projects, activeProject, onProjectChange }) {
 /* ──────────────────────────── StatChip ─────────────────────────────── */
 function StatChip({ label, value, Icon, colorCls }) {
   return (
-    <div className="flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl bg-surface-container-low border border-border-slate min-w-0">
-      <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${colorCls}`}>
-        <Icon size={14} />
+    <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-surface-container-low border border-border-slate w-[118px] shrink-0">
+      <div className={`w-6 h-6 rounded-md flex items-center justify-center shrink-0 ${colorCls}`}>
+        <Icon size={13} />
       </div>
       <div className="min-w-0">
         <p className="text-[10px] text-on-surface-variant leading-none truncate">{label}</p>
-        <p className="text-[16px] font-bold text-on-surface leading-tight mt-0.5">{value}</p>
+        <p className="text-[14px] font-bold text-on-surface leading-tight mt-0.5">{value}</p>
       </div>
     </div>
   );
@@ -178,36 +178,28 @@ function ProjectWorkspaceBar({
   const activeIdx = Math.max(0, projects.findIndex(p => p.id === activeProject?.id));
 
   return (
-    <div className="bg-white border border-border-slate rounded-xl p-5 shadow-sm">
-      <div className="flex flex-col gap-4 xl:flex-row xl:items-center">
+    <div className="bg-white border border-border-slate rounded-xl px-5 py-3.5 shadow-sm">
+      <div className="flex items-center gap-4 flex-wrap xl:flex-nowrap">
 
         {/* Project identity */}
-        <div className="flex-1 min-w-0">
-          <p className="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest mb-2">
-            Project Workspace
-          </p>
-          <div className="flex items-center gap-2.5 flex-wrap">
-            <span
-              className="w-3 h-3 rounded-full shrink-0"
-              style={{ backgroundColor: projectDot(activeIdx) }}
-            />
-            <span className="font-mono font-bold text-primary text-[20px] leading-none">
-              {activeProject?.code ?? "—"}
-            </span>
-            <span className="text-[20px] font-bold text-on-surface leading-none truncate max-w-[220px]">
-              {shortName}
-            </span>
-            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-status-emerald-bg text-status-emerald-text border border-status-emerald-text/25 shrink-0">
-              Active Project
-            </span>
-          </div>
-          <p className="text-[12px] text-on-surface-variant mt-1.5">
-            Document control workspace for this project
-          </p>
+        <div className="flex items-center gap-2.5 flex-1 min-w-0">
+          <span
+            className="w-2.5 h-2.5 rounded-full shrink-0"
+            style={{ backgroundColor: projectDot(activeIdx) }}
+          />
+          <span className="font-mono font-bold text-primary text-[15px] leading-none shrink-0">
+            {activeProject?.code ?? "—"}
+          </span>
+          <span className="text-[15px] font-semibold text-on-surface leading-none truncate">
+            {shortName}
+          </span>
+          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-status-emerald-bg text-status-emerald-text border border-status-emerald-text/25 shrink-0">
+            Active
+          </span>
         </div>
 
         {/* Stats */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 xl:flex xl:items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <StatChip
             label="Folders"
             value={totalFolders}
@@ -227,7 +219,7 @@ function ProjectWorkspaceBar({
             colorCls="bg-status-emerald-bg text-status-emerald-text"
           />
           <StatChip
-            label="Pending Approval"
+            label="Pending"
             value={pendingApprovals}
             Icon={Clock}
             colorCls={pendingApprovals > 0
@@ -478,8 +470,9 @@ export default function DocumentsView({
   const pendingApprovals = drawings.filter(d => d.status === "S2").length;
 
   /* ── Navigation ── */
-  const navigateInto = name => setSegments(s => [...s, name]);
-  const navigateTo   = idx  => setSegments(s => s.slice(0, idx));
+  const navigateInto = name => { setSegments(s => [...s, name]); setLocalSearch(""); };
+  const navigateTo   = idx  => { setSegments(s => s.slice(0, idx)); setLocalSearch(""); };
+  const navigateRoot = ()   => { setSegments([]); setLocalSearch(""); };
 
   /* ── Folder CRUD ── */
   const addFolder = () => {
@@ -555,6 +548,11 @@ export default function DocumentsView({
   const noResults    = searchActive && filteredSubfolderEntries.length === 0 && filteredFiles.length === 0 && !addingFolder;
   const actualEmpty  = !searchActive && subfolders.length === 0 && currentFiles.length === 0 && !addingFolder;
 
+  /* ── Folder summary line ── */
+  const folderWord  = subfolders.length === 1 ? "folder"  : "folders";
+  const drawingWord = currentFiles.length === 1 ? "drawing" : "drawings";
+  const summaryLine = `${subfolders.length} ${folderWord} · ${currentFiles.length} ${drawingWord} in this location`;
+
   return (
     <div className="max-w-[1400px] mx-auto space-y-4">
 
@@ -570,7 +568,7 @@ export default function DocumentsView({
         isProjectTeam={isProjectTeam}
       />
 
-      {/* ── Page header ── */}
+      {/* ── Single page title ── */}
       <div>
         <h1 className="text-headline-lg font-semibold text-on-surface">Documents</h1>
         <p className="text-body-md text-on-surface-variant mt-0.5">
@@ -578,112 +576,132 @@ export default function DocumentsView({
         </p>
       </div>
 
-      {/* ── Breadcrumb ── */}
-      <nav className="flex items-center gap-0 flex-wrap min-w-0">
-        <button
-          onClick={() => setSegments([])}
-          className="p-1 rounded-md text-on-surface-variant hover:text-on-surface hover:bg-surface-container transition-colors mr-1 shrink-0"
-          title="Documents root"
-        >
-          <Home size={17} />
-        </button>
-        <button
-          onClick={() => setSegments([])}
-          className={`rounded px-1 py-0.5 transition-colors leading-none ${
-            segments.length === 0
-              ? "text-on-surface font-bold text-2xl pointer-events-none"
-              : "text-[13px] font-medium text-on-surface-variant hover:text-on-surface"
-          }`}
-        >
-          Documents
-        </button>
-        {segments.map((seg, i) => {
-          const isLast = i === segments.length - 1;
-          return (
-            <div key={i} className="flex items-center">
-              <span className="mx-2 text-slate-300 font-light select-none text-lg">/</span>
-              <button
-                onClick={() => !isLast && navigateTo(i + 1)}
-                className={`rounded px-1 py-0.5 transition-colors leading-none ${
-                  isLast
-                    ? "text-on-surface font-bold text-2xl pointer-events-none"
-                    : "text-[13px] font-medium text-on-surface-variant hover:text-on-surface hover:bg-surface-container"
-                }`}
-              >
-                {seg}
-              </button>
-            </div>
-          );
-        })}
-      </nav>
-
-      {/* ── Toolbar: search + view + actions ── */}
-      <div className="flex items-center gap-2 flex-wrap">
-
-        {/* Local search */}
-        <div className="relative flex-1 min-w-[160px] max-w-xs">
-          <Search
-            size={14}
-            className="absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant pointer-events-none"
-          />
-          <input
-            type="text"
-            value={localSearch}
-            onChange={e => setLocalSearch(e.target.value)}
-            placeholder="Search in this folder…"
-            className="w-full pl-9 pr-8 py-2 text-[13px] bg-white border border-border-slate rounded-lg text-on-surface placeholder:text-on-surface-variant focus:outline-none focus:ring-1 focus:ring-primary/20 focus:border-primary transition-all"
-          />
-          {localSearch && (
-            <button
-              onClick={() => setLocalSearch("")}
-              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-on-surface-variant hover:text-on-surface transition-colors"
-            >
-              <X size={13} />
-            </button>
-          )}
-        </div>
-
-        {/* View toggle */}
-        <div className="flex items-center bg-surface-container-low border border-border-slate rounded-lg p-0.5 shrink-0">
-          <button
-            onClick={() => setViewMode("grid")}
-            className={`p-1.5 rounded-md transition-colors ${viewMode === "grid" ? "bg-white shadow-sm text-primary" : "text-on-surface-variant hover:text-on-surface"}`}
-            title="Grid view"
-          >
-            <LayoutGrid size={15} />
-          </button>
-          <button
-            onClick={() => setViewMode("list")}
-            className={`p-1.5 rounded-md transition-colors ${viewMode === "list" ? "bg-white shadow-sm text-primary" : "text-on-surface-variant hover:text-on-surface"}`}
-            title="List view"
-          >
-            <List size={15} />
-          </button>
-        </div>
-
-        {/* New Folder */}
-        <button
-          onClick={() => setAddingFolder(true)}
-          className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-border-slate bg-white hover:bg-surface-container text-[13px] font-medium text-on-surface-variant transition-colors shrink-0"
-        >
-          <FolderPlus size={14} />
-          New Folder
-        </button>
-
-        {/* Upload Here */}
-        {onUpload && (
-          <button
-            onClick={() => onUpload(currentFolderPath)}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-primary text-white hover:bg-primary-container text-[13px] font-medium shadow-sm transition-all active:scale-[0.98] shrink-0"
-          >
-            <Upload size={14} />
-            Upload Here
-          </button>
-        )}
-      </div>
-
       {/* ── Content card ── */}
       <div className="bg-white border border-border-slate rounded-xl overflow-hidden">
+
+        {/* Card header: breadcrumb (left) + toolbar (right) */}
+        <div className="flex items-center gap-3 px-5 py-3 border-b border-border-slate flex-wrap gap-y-2">
+
+          {/* Breadcrumb */}
+          <nav className="flex items-center gap-1 flex-1 min-w-0 flex-wrap">
+            <button
+              onClick={navigateRoot}
+              className="p-1 rounded-md text-on-surface-variant hover:text-primary hover:bg-surface-container transition-colors shrink-0"
+              title="Root"
+            >
+              <Home size={14} />
+            </button>
+
+            <ChevronRight size={13} className="text-outline shrink-0" />
+
+            <button
+              onClick={navigateRoot}
+              className={`px-1.5 py-0.5 rounded text-[12px] font-medium transition-colors leading-none ${
+                segments.length === 0
+                  ? "text-on-surface font-semibold pointer-events-none"
+                  : "text-on-surface-variant hover:text-on-surface hover:bg-surface-container"
+              }`}
+            >
+              Documents
+            </button>
+
+            {segments.map((seg, i) => {
+              const isLast = i === segments.length - 1;
+              return (
+                <div key={i} className="flex items-center gap-1">
+                  <ChevronRight size={13} className="text-outline shrink-0" />
+                  <button
+                    onClick={() => !isLast && navigateTo(i + 1)}
+                    className={`px-1.5 py-0.5 rounded text-[12px] font-medium transition-colors leading-none ${
+                      isLast
+                        ? "text-on-surface font-semibold pointer-events-none"
+                        : "text-on-surface-variant hover:text-on-surface hover:bg-surface-container"
+                    }`}
+                  >
+                    {seg}
+                  </button>
+                </div>
+              );
+            })}
+          </nav>
+
+          {/* Toolbar: search + view toggle + New Folder + Upload Here */}
+          <div className="flex items-center gap-2 shrink-0 flex-wrap">
+
+            {/* Local search */}
+            <div className="relative">
+              <Search
+                size={13}
+                className="absolute left-2.5 top-1/2 -translate-y-1/2 text-on-surface-variant pointer-events-none"
+              />
+              <input
+                type="text"
+                value={localSearch}
+                onChange={e => setLocalSearch(e.target.value)}
+                placeholder="Search in this folder…"
+                className="pl-8 pr-7 py-1.5 text-[12px] w-[200px] bg-surface-container-low border border-border-slate rounded-lg text-on-surface placeholder:text-on-surface-variant focus:outline-none focus:ring-1 focus:ring-primary/20 focus:border-primary transition-all"
+              />
+              {localSearch && (
+                <button
+                  onClick={() => setLocalSearch("")}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-on-surface-variant hover:text-on-surface transition-colors"
+                >
+                  <X size={12} />
+                </button>
+              )}
+            </div>
+
+            {/* View toggle */}
+            <div className="flex items-center bg-surface-container-low border border-border-slate rounded-lg p-0.5 shrink-0">
+              <button
+                onClick={() => setViewMode("grid")}
+                className={`p-1.5 rounded-md transition-colors ${viewMode === "grid" ? "bg-white shadow-sm text-primary" : "text-on-surface-variant hover:text-on-surface"}`}
+                title="Grid view"
+              >
+                <LayoutGrid size={14} />
+              </button>
+              <button
+                onClick={() => setViewMode("list")}
+                className={`p-1.5 rounded-md transition-colors ${viewMode === "list" ? "bg-white shadow-sm text-primary" : "text-on-surface-variant hover:text-on-surface"}`}
+                title="List view"
+              >
+                <List size={14} />
+              </button>
+            </div>
+
+            {/* New Folder */}
+            <button
+              onClick={() => setAddingFolder(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border-slate bg-white hover:bg-surface-container text-[12px] font-medium text-on-surface-variant transition-colors shrink-0"
+            >
+              <FolderPlus size={13} />
+              New Folder
+            </button>
+
+            {/* Upload Here */}
+            {onUpload && (
+              <button
+                onClick={() => onUpload(currentFolderPath)}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary text-white hover:bg-primary-container text-[12px] font-medium shadow-sm transition-all active:scale-[0.98] shrink-0"
+              >
+                <Upload size={13} />
+                Upload Here
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Folder summary line */}
+        <div className="px-5 py-2 border-b border-border-slate bg-surface-container-low">
+          <p className="text-[11px] text-on-surface-variant">
+            {summaryLine}
+            {searchActive && (
+              <span className="ml-2 text-primary font-medium">
+                · Showing results for "{localSearch}"
+              </span>
+            )}
+          </p>
+        </div>
 
         {/* Empty / no-results states */}
         {(actualEmpty || noResults) ? (
