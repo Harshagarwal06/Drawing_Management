@@ -59,6 +59,7 @@ export default function App() {
   const [showTransmittal,  setShowTransmittal]  = useState(false);
   const [toast,            setToast]            = useState(null);
   const [currentUser,      setCurrentUser]      = useState(null);
+  const [sessionLoading,   setSessionLoading]   = useState(true); // true until localStorage checked
   const [mobileNavOpen,    setMobileNavOpen]    = useState(false);
   const [search,           setSearch]           = useState("");
   const [filterDisc,       setFilterDisc]       = useState("All");
@@ -76,18 +77,20 @@ export default function App() {
   useEffect(() => {
     try {
       const saved = localStorage.getItem("dms_user");
-      if (!saved) return;
-      const user = JSON.parse(saved);
-      // Decode JWT payload (base64url) and check exp
-      const payload = JSON.parse(atob(user.token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/")));
-      if (payload.exp * 1000 < Date.now()) {
-        localStorage.removeItem("dms_user");
-        // ProtectedRoute will redirect to /login automatically
-      } else {
-        setCurrentUser(user);
+      if (saved) {
+        const user = JSON.parse(saved);
+        // Decode JWT payload (base64url) and check exp
+        const payload = JSON.parse(atob(user.token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/")));
+        if (payload.exp * 1000 < Date.now()) {
+          localStorage.removeItem("dms_user");
+        } else {
+          setCurrentUser(user);
+        }
       }
     } catch {
       localStorage.removeItem("dms_user");
+    } finally {
+      setSessionLoading(false); // always unblock rendering
     }
   }, []);
 
@@ -271,6 +274,15 @@ export default function App() {
     onProjectChange: setActiveProject,
     onNewProject: () => setShowProjectModal(true),
   };
+
+  /* ── Block render until we know if user is logged in ── */
+  if (sessionLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="w-8 h-8 rounded-full border-4 border-primary/20 border-t-primary animate-spin" />
+      </div>
+    );
+  }
 
   return (
     <>
