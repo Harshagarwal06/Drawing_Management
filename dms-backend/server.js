@@ -49,6 +49,7 @@ const r2 = R2_CONFIGURED ? new S3Client({
 }) : null;
 
 /* ── Middleware ─────────────────────────────────────────────────── */
+app.set('trust proxy', 1); // Railway / Vercel sit behind a reverse proxy
 app.use(cors({ origin: CORS_ORIGIN, credentials: true }));
 app.use(express.json());
 
@@ -184,15 +185,15 @@ ensureUser.run('director',  bcrypt.hashSync('Unique123!', SALT_ROUNDS), 'Harsh A
 ensureUser.run('architect', bcrypt.hashSync('arch123',    SALT_ROUNDS), 'Priya Sharma',  'In House Architect', 'PS', '*');
 ensureUser.run('team',      bcrypt.hashSync('team123',    SALT_ROUNDS), 'Carlos Mendez', 'Project Team',       'CM', '[1]');
 
-// ── One-time migration: update director password if still using old demo password ──
+// ── Ensure director password is always Unique123! (update if it's anything else) ──
 try {
   const dirRow = db.prepare("SELECT password FROM users WHERE username = 'director'").get();
-  if (dirRow && bcrypt.compareSync('director123', dirRow.password)) {
+  if (dirRow && !bcrypt.compareSync('Unique123!', dirRow.password)) {
     db.prepare("UPDATE users SET password = ? WHERE username = 'director'")
       .run(bcrypt.hashSync('Unique123!', SALT_ROUNDS));
-    console.log('✅ Director password migrated to production credentials');
+    console.log('✅ Director password updated to production credentials');
   }
-} catch (e) { console.warn('Director password migration note:', e.message); }
+} catch (e) { console.warn('Director password update note:', e.message); }
 
 /* ── Migrate any remaining plaintext passwords ──────────────────── */
 const plainUsers = db.prepare("SELECT id, password FROM users WHERE password NOT LIKE '$2b$%'").all();
