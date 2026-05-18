@@ -19,17 +19,34 @@ const DB_PATH     = process.env.DB_PATH     || path.join(__dirname, 'dms.db');
 const UPLOAD_DIR  = process.env.UPLOAD_DIR  || path.join(__dirname, 'uploads');
 
 /* ── Cloudflare R2 client ────────────────────────────────────────── */
-const R2_BUCKET     = process.env.R2_BUCKET_NAME;
-const R2_PUBLIC_URL = process.env.R2_PUBLIC_URL; // no trailing slash
+const R2_BUCKET          = process.env.R2_BUCKET_NAME;
+const R2_PUBLIC_URL      = (process.env.R2_PUBLIC_URL || '').replace(/\/+$/, ''); // strip trailing slash
+const CLOUDFLARE_ACCT_ID = process.env.CLOUDFLARE_ACCOUNT_ID;
+const R2_KEY_ID          = process.env.R2_ACCESS_KEY_ID;
+const R2_SECRET          = process.env.R2_SECRET_ACCESS_KEY;
 
-const r2 = new S3Client({
+const R2_CONFIGURED = !!(R2_BUCKET && R2_PUBLIC_URL && CLOUDFLARE_ACCT_ID && R2_KEY_ID && R2_SECRET);
+
+// ── Startup validation ──────────────────────────────────────────────
+console.log('');
+console.log('=== DrawVault Storage Configuration ===');
+console.log(`  R2_BUCKET_NAME        : ${R2_BUCKET        || '❌ NOT SET'}`);
+console.log(`  R2_PUBLIC_URL         : ${R2_PUBLIC_URL     || '❌ NOT SET'}`);
+console.log(`  CLOUDFLARE_ACCOUNT_ID : ${CLOUDFLARE_ACCT_ID || '❌ NOT SET'}`);
+console.log(`  R2_ACCESS_KEY_ID      : ${R2_KEY_ID ? '✅ set (' + R2_KEY_ID.slice(0, 6) + '…)' : '❌ NOT SET'}`);
+console.log(`  R2_SECRET_ACCESS_KEY  : ${R2_SECRET ? '✅ set'          : '❌ NOT SET'}`);
+console.log(`  Storage mode          : ${R2_CONFIGURED ? '☁️  Cloudflare R2' : '⛔ UNCONFIGURED — uploads will be rejected'}`);
+console.log('=======================================');
+console.log('');
+
+const r2 = R2_CONFIGURED ? new S3Client({
   region:   'auto',
-  endpoint: `https://${process.env.CLOUDFLARE_ACCOUNT_ID}.r2.cloudflarestorage.com`,
+  endpoint: `https://${CLOUDFLARE_ACCT_ID}.r2.cloudflarestorage.com`,
   credentials: {
-    accessKeyId:     process.env.R2_ACCESS_KEY_ID     || '',
-    secretAccessKey: process.env.R2_SECRET_ACCESS_KEY || '',
+    accessKeyId:     R2_KEY_ID,
+    secretAccessKey: R2_SECRET,
   },
-});
+}) : null;
 
 /* ── Middleware ─────────────────────────────────────────────────── */
 app.use(cors({ origin: CORS_ORIGIN, credentials: true }));
@@ -334,6 +351,15 @@ app.get('/api/drawings', requireProjectAccess, (req, res) => {
 
 /* ── POST /api/upload ───────────────────────────────────────────── */
 app.post('/api/upload', requireWriteAccess, uploadLimiter, upload.single('drawingFile'), async (req, res) => {
+  /* ── Guard: reject immediately if R2 is not configured ── */
+  if (!R2_CONFIGURED) {
+    console.error('❌ Upload rejected — Cloudflare R2 environment variables are not configured.');
+    return res.status(503).json({
+      error: 'File storage is not configured. Contact the administrator.',
+      detail: 'R2_BUCKET_NAME, R2_PUBLIC_URL, CLOUDFLARE_ACCOUNT_ID, R2_ACCESS_KEY_ID, and R2_SECRET_ACCESS_KEY must all be set.',
+    });
+  }
+
   if (!req.file) return res.status(400).json({ error: 'No file uploaded.' });
 
   const { drawingNumber, title, discipline, originator, revision, status, projectId, folderPath } = req.body;
@@ -341,12 +367,13 @@ app.post('/api/upload', requireWriteAccess, uploadLimiter, upload.single('drawin
   const fPath = folderPath || '';
   const today = new Date().toISOString().split('T')[0];
 
-  /* ── Build a safe, unique filename ── */
-  const ext      = path.extname(req.file.originalname).toLowerCase();
+  /* ── Build a safe, unique R2 object key ── */
   const safeName = req.file.originalname
     .replace(/\s+/g, '-')
     .replace(/[^a-zA-Z0-9.\-_]/g, '');
-  const r2Key    = `${Date.now()}-${safeName}`;
+  const r2Key = `${Date.now()}-${safeName}`;
+
+  console.log(`⬆️  Uploading to R2: bucket=${R2_BUCKET} key=${r2Key} size=${req.file.size} type=${req.file.mimetype}`);
 
   try {
     /* ── Upload buffer to Cloudflare R2 ── */
@@ -358,6 +385,7 @@ app.post('/api/upload', requireWriteAccess, uploadLimiter, upload.single('drawin
     }));
 
     const filePath = `${R2_PUBLIC_URL}/${r2Key}`;
+    console.log(`✅ R2 upload succeeded → ${filePath}`);
 
     /* ── Persist to SQLite ── */
     const existing = db.prepare('SELECT id FROM drawings WHERE number = ? AND project_id = ?').get(drawingNumber, pId);
@@ -378,8 +406,9 @@ app.post('/api/upload', requireWriteAccess, uploadLimiter, upload.single('drawin
 
     res.json({ message: 'Drawing saved successfully.', path: filePath });
   } catch (err) {
-    console.error('❌ POST /api/upload error:', err);
-    res.status(500).json({ error: 'Failed to save drawing.' });
+    console.error('❌ R2 upload failed:', err.message || err);
+    console.error('   Bucket:', R2_BUCKET, '| Key:', r2Key, '| Endpoint:', `https://${CLOUDFLARE_ACCT_ID}.r2.cloudflarestorage.com`);
+    res.status(500).json({ error: 'Failed to upload file to cloud storage. Check server logs.' });
   }
 });
 
