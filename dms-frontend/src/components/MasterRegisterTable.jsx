@@ -79,11 +79,14 @@ export default function MasterRegisterTable({
     URL.revokeObjectURL(url);
   };
 
-  const handleView     = d => { if (d.path) window.open(`${API}${d.path}`, "_blank"); };
+  /* Supports both legacy local paths (/uploads/…) and full R2 URLs */
+  const resolveUrl = p => p?.startsWith('http') ? p : `${API}${p}`;
+
+  const handleView     = d => { if (d.path) window.open(resolveUrl(d.path), "_blank"); };
   const handleDownload = d => {
     if (!d.path) return;
     const ext = d.path.slice(d.path.lastIndexOf("."));
-    const a   = document.createElement("a"); a.href = `${API}${d.path}`; a.download = `${d.number}_Rev${d.rev}${ext}`; a.click();
+    const a   = document.createElement("a"); a.href = resolveUrl(d.path); a.download = `${d.number}_Rev${d.rev}${ext}`; a.click();
   };
   const handleVoidClick = d => {
     if (window.confirm(`Void drawing ${d.number}?\n\nThis marks it as superseded and cannot be undone.`)) onVoid?.(d.id);

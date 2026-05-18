@@ -7,6 +7,8 @@ import {
 } from "lucide-react";
 
 const API         = import.meta.env.VITE_API_URL;
+/* Supports both legacy local paths (/uploads/…) and full R2 URLs */
+const resolveUrl  = p => p?.startsWith('http') ? p : `${API}${p}`;
 const STORAGE_KEY = "uniqueproperties_folder_tree";
 const PALETTE     = ["#3525cd", "#2563eb", "#059669", "#d97706", "#9333ea"];
 const projectDot  = idx => PALETTE[idx % PALETTE.length];
@@ -371,12 +373,12 @@ function FileCard({ d, viewMode }) {
         <span className="font-mono text-[11px] text-on-surface-variant hidden sm:block shrink-0">Rev {d.rev || "—"}</span>
         <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold hidden md:block shrink-0 ${statusPill}`}>{statusLabel}</span>
         <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
-          <a href={`${API}${d.path}`} target="_blank" rel="noreferrer"
+          <a href={resolveUrl(d.path)} target="_blank" rel="noreferrer"
             onClick={e => e.stopPropagation()}
             className="p-1.5 rounded-lg hover:bg-surface-container-low text-on-surface-variant hover:text-primary transition-colors" title="View">
             <Eye size={14} />
           </a>
-          <a href={`${API}${d.path}`} download={filename}
+          <a href={resolveUrl(d.path)} download={filename}
             onClick={e => e.stopPropagation()}
             className="p-1.5 rounded-lg hover:bg-surface-container-low text-on-surface-variant hover:text-primary transition-colors" title="Download">
             <Download size={14} />
@@ -399,11 +401,11 @@ function FileCard({ d, viewMode }) {
         <div className="flex items-center justify-between">
           <span className="font-mono text-[11px] text-on-surface-variant">Rev {d.rev || "—"}</span>
           <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-            <a href={`${API}${d.path}`} target="_blank" rel="noreferrer"
+            <a href={resolveUrl(d.path)} target="_blank" rel="noreferrer"
               className="p-1.5 rounded-lg hover:bg-surface-container text-on-surface-variant hover:text-primary transition-colors" title="View">
               <Eye size={13} />
             </a>
-            <a href={`${API}${d.path}`} download={filename}
+            <a href={resolveUrl(d.path)} download={filename}
               className="p-1.5 rounded-lg hover:bg-surface-container text-on-surface-variant hover:text-primary transition-colors" title="Download">
               <Download size={13} />
             </a>

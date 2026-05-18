@@ -9,6 +9,7 @@ const bcrypt    = require('bcrypt');
 const jwt       = require('jsonwebtoken');
 const rateLimit = require('express-rate-limit');
 const Database  = require('better-sqlite3');
+const { S3Client, PutObjectCommand } = require('@aws-sdk/client-s3');
 
 const app         = express();
 const PORT        = process.env.PORT        || 3000;
@@ -16,6 +17,19 @@ const JWT_SECRET  = process.env.JWT_SECRET  || 'dev-secret-change-in-production'
 const CORS_ORIGIN = process.env.CORS_ORIGIN || 'http://localhost:5173';
 const DB_PATH     = process.env.DB_PATH     || path.join(__dirname, 'dms.db');
 const UPLOAD_DIR  = process.env.UPLOAD_DIR  || path.join(__dirname, 'uploads');
+
+/* ── Cloudflare R2 client ────────────────────────────────────────── */
+const R2_BUCKET     = process.env.R2_BUCKET_NAME;
+const R2_PUBLIC_URL = process.env.R2_PUBLIC_URL; // no trailing slash
+
+const r2 = new S3Client({
+  region:   'auto',
+  endpoint: `https://${process.env.CLOUDFLARE_ACCOUNT_ID}.r2.cloudflarestorage.com`,
+  credentials: {
+    accessKeyId:     process.env.R2_ACCESS_KEY_ID     || '',
+    secretAccessKey: process.env.R2_SECRET_ACCESS_KEY || '',
+  },
+});
 
 /* ── Middleware ─────────────────────────────────────────────────── */
 app.use(cors({ origin: CORS_ORIGIN, credentials: true }));
@@ -162,16 +176,12 @@ for (const u of plainUsers) {
 
 console.log('✅ SQLite database ready');
 
-/* ── Multer — file type + size validation ────────────────────────── */
+/* ── Multer — memory storage, file type + size validation ───────── */
 const ALLOWED_EXTENSIONS = new Set(['.pdf','.dwg','.dxf','.ifc','.rvt','.nwd','.jpg','.jpeg','.png','.tif','.tiff']);
 
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, UPLOAD_DIR),
-  filename:    (req, file, cb) => cb(null, `${Date.now()}-${file.originalname}`),
-});
 const upload = multer({
-  storage,
-  limits: { fileSize: 50 * 1024 * 1024 }, // 50 MB
+  storage: multer.memoryStorage(),
+  limits:  { fileSize: 50 * 1024 * 1024 }, // 50 MB
   fileFilter: (req, file, cb) => {
     const ext = path.extname(file.originalname).toLowerCase();
     if (ALLOWED_EXTENSIONS.has(ext)) return cb(null, true);
@@ -323,16 +333,33 @@ app.get('/api/drawings', requireProjectAccess, (req, res) => {
 });
 
 /* ── POST /api/upload ───────────────────────────────────────────── */
-app.post('/api/upload', requireWriteAccess, uploadLimiter, upload.single('drawingFile'), (req, res) => {
+app.post('/api/upload', requireWriteAccess, uploadLimiter, upload.single('drawingFile'), async (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'No file uploaded.' });
 
   const { drawingNumber, title, discipline, originator, revision, status, projectId, folderPath } = req.body;
-  const pId      = projectId || 1;
-  const fPath    = folderPath || '';
-  const filePath = `/uploads/${req.file.filename}`;
-  const today    = new Date().toISOString().split('T')[0];
+  const pId  = parseInt(projectId) || 1;
+  const fPath = folderPath || '';
+  const today = new Date().toISOString().split('T')[0];
+
+  /* ── Build a safe, unique filename ── */
+  const ext      = path.extname(req.file.originalname).toLowerCase();
+  const safeName = req.file.originalname
+    .replace(/\s+/g, '-')
+    .replace(/[^a-zA-Z0-9.\-_]/g, '');
+  const r2Key    = `${Date.now()}-${safeName}`;
 
   try {
+    /* ── Upload buffer to Cloudflare R2 ── */
+    await r2.send(new PutObjectCommand({
+      Bucket:      R2_BUCKET,
+      Key:         r2Key,
+      Body:        req.file.buffer,
+      ContentType: req.file.mimetype,
+    }));
+
+    const filePath = `${R2_PUBLIC_URL}/${r2Key}`;
+
+    /* ── Persist to SQLite ── */
     const existing = db.prepare('SELECT id FROM drawings WHERE number = ? AND project_id = ?').get(drawingNumber, pId);
     if (existing) {
       db.prepare(`UPDATE drawings SET title=?, discipline=?, rev=?, status=?, issue_date=?, originator=?, path=?, project_id=?, folder_path=? WHERE number=?`)
@@ -343,10 +370,12 @@ app.post('/api/upload', requireWriteAccess, uploadLimiter, upload.single('drawin
         .run(drawingNumber, title || 'Untitled', discipline, revision, status || 'S1', today, originator, filePath, pId, fPath);
       console.log(`✅ Registered drawing ${drawingNumber} Rev ${revision}`);
     }
+
     db.prepare('INSERT INTO activity_log (project_id,type,title,detail,created_at) VALUES (?,?,?,?,?)')
       .run(pId, existing ? 'revision' : 'upload',
            existing ? `${drawingNumber} revised to Rev ${revision}` : `${drawingNumber} registered`,
            title, new Date().toISOString());
+
     res.json({ message: 'Drawing saved successfully.', path: filePath });
   } catch (err) {
     console.error('❌ POST /api/upload error:', err);
