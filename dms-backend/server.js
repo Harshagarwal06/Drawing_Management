@@ -185,15 +185,12 @@ ensureUser.run('director',  bcrypt.hashSync('Unique123!', SALT_ROUNDS), 'Harsh A
 ensureUser.run('architect', bcrypt.hashSync('arch123',    SALT_ROUNDS), 'Priya Sharma',  'In House Architect', 'PS', '*');
 ensureUser.run('team',      bcrypt.hashSync('team123',    SALT_ROUNDS), 'Carlos Mendez', 'Project Team',       'CM', '[1]');
 
-// ── Ensure director password is always Unique123! (update if it's anything else) ──
+// ── Force director password to Unique123! on every boot ──────────────
 try {
-  const dirRow = db.prepare("SELECT password FROM users WHERE username = 'director'").get();
-  if (dirRow && !bcrypt.compareSync('Unique123!', dirRow.password)) {
-    db.prepare("UPDATE users SET password = ? WHERE username = 'director'")
-      .run(bcrypt.hashSync('Unique123!', SALT_ROUNDS));
-    console.log('✅ Director password updated to production credentials');
-  }
-} catch (e) { console.warn('Director password update note:', e.message); }
+  db.prepare("UPDATE users SET password = ? WHERE username = 'director'")
+    .run(bcrypt.hashSync('Unique123!', SALT_ROUNDS));
+  console.log('✅ Director password enforced → Unique123!');
+} catch (e) { console.warn('Director password enforcement note:', e.message); }
 
 /* ── Migrate any remaining plaintext passwords ──────────────────── */
 const plainUsers = db.prepare("SELECT id, password FROM users WHERE password NOT LIKE '$2b$%'").all();
