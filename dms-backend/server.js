@@ -15,15 +15,15 @@ const PORT        = process.env.PORT        || 3000;
 const JWT_SECRET  = process.env.JWT_SECRET  || 'dev-secret-change-in-production';
 const CORS_ORIGIN = process.env.CORS_ORIGIN || 'http://localhost:5173';
 const DB_PATH     = process.env.DB_PATH     || path.join(__dirname, 'dms.db');
+const UPLOAD_DIR  = process.env.UPLOAD_DIR  || path.join(__dirname, 'uploads');
 
 /* ── Middleware ─────────────────────────────────────────────────── */
-app.use(cors({ origin: CORS_ORIGIN }));
+app.use(cors({ origin: CORS_ORIGIN, credentials: true }));
 app.use(express.json());
 
 /* ── Uploads folder ─────────────────────────────────────────────── */
-const uploadDir = path.join(__dirname, 'uploads');
-if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir);
-app.use('/uploads', express.static(uploadDir));
+if (!fs.existsSync(UPLOAD_DIR)) fs.mkdirSync(UPLOAD_DIR, { recursive: true });
+app.use('/uploads', express.static(UPLOAD_DIR));
 
 /* ── SQLite setup ───────────────────────────────────────────────── */
 const db = new Database(DB_PATH);
@@ -166,7 +166,7 @@ console.log('✅ SQLite database ready');
 const ALLOWED_EXTENSIONS = new Set(['.pdf','.dwg','.dxf','.ifc','.rvt','.nwd','.jpg','.jpeg','.png','.tif','.tiff']);
 
 const storage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, uploadDir),
+  destination: (req, file, cb) => cb(null, UPLOAD_DIR),
   filename:    (req, file, cb) => cb(null, `${Date.now()}-${file.originalname}`),
 });
 const upload = multer({
