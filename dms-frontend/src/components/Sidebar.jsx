@@ -1,22 +1,24 @@
+import { NavLink, useNavigate } from "react-router-dom";
+
 const NAV_ITEMS = [
-  { tab: "dashboard",    icon: "dashboard",     label: "Dashboard"        },
-  { tab: "documents",    icon: "description",   label: "Documents"        },
-  { tab: "register",     icon: "architecture",  label: "Drawing Register" },
-  { tab: "transmittals", icon: "move_to_inbox", label: "Transmittals"     },
-  { tab: "analytics",   icon: "analytics",      label: "Analytics"        },
+  { path: "/dashboard",    icon: "dashboard",     label: "Dashboard"        },
+  { path: "/documents",    icon: "description",   label: "Documents"        },
+  { path: "/register",     icon: "architecture",  label: "Drawing Register" },
+  { path: "/transmittals", icon: "move_to_inbox", label: "Transmittals"     },
+  { path: "/analytics",    icon: "analytics",     label: "Analytics"        },
 ];
 
 export default function Sidebar({
   activeProject,
-  currentTab,
-  onTabChange,
   onNewDrawing,
   mobileOpen    = false,
   onMobileClose = () => {},
 }) {
-  const handleNav = tab => {
-    onTabChange(tab);
-    onMobileClose(); // close drawer on mobile after navigation
+  const navigate = useNavigate();
+
+  const handleNav = (path) => {
+    navigate(path);
+    onMobileClose();
   };
 
   return (
@@ -79,40 +81,59 @@ export default function Sidebar({
 
         {/* Nav */}
         <nav className="flex flex-col gap-1 flex-1">
-          {NAV_ITEMS.map(({ tab, icon, label }) => (
-            <button
-              key={tab}
-              onClick={() => handleNav(tab)}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-[14px] transition-all duration-200 text-left ${
-                tab === currentTab
-                  ? "text-primary font-bold bg-primary/10"
-                  : "text-on-surface-variant font-medium hover:bg-surface-container"
-              }`}
+          {NAV_ITEMS.map(({ path, icon, label }) => (
+            <NavLink
+              key={path}
+              to={path}
+              onClick={onMobileClose}
+              className={({ isActive }) =>
+                `w-full flex items-center gap-3 px-4 py-3 rounded-lg text-[14px] transition-all duration-200 text-left no-underline ${
+                  isActive
+                    ? "text-primary font-bold bg-primary/10"
+                    : "text-on-surface-variant font-medium hover:bg-surface-container"
+                }`
+              }
             >
-              <span
-                className="material-symbols-outlined text-[20px]"
-                style={tab === currentTab ? { fontVariationSettings: "'FILL' 1" } : undefined}
-              >
-                {icon}
-              </span>
-              {label}
-            </button>
+              {({ isActive }) => (
+                <>
+                  <span
+                    className="material-symbols-outlined text-[20px]"
+                    style={isActive ? { fontVariationSettings: "'FILL' 1" } : undefined}
+                  >
+                    {icon}
+                  </span>
+                  {label}
+                </>
+              )}
+            </NavLink>
           ))}
         </nav>
 
         {/* Footer */}
         <div className="mt-auto pt-4 border-t border-border-slate space-y-1">
-          <button
-            onClick={() => handleNav("settings")}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-[14px] transition-all ${
-              currentTab === "settings"
-                ? "text-primary font-bold bg-primary/10"
-                : "text-on-surface-variant font-medium hover:bg-surface-container"
-            }`}
+          <NavLink
+            to="/settings"
+            onClick={onMobileClose}
+            className={({ isActive }) =>
+              `w-full flex items-center gap-3 px-4 py-3 rounded-lg text-[14px] transition-all no-underline ${
+                isActive
+                  ? "text-primary font-bold bg-primary/10"
+                  : "text-on-surface-variant font-medium hover:bg-surface-container"
+              }`
+            }
           >
-            <span className="material-symbols-outlined text-[20px]">settings</span>
-            Settings
-          </button>
+            {({ isActive }) => (
+              <>
+                <span
+                  className="material-symbols-outlined text-[20px]"
+                  style={isActive ? { fontVariationSettings: "'FILL' 1" } : undefined}
+                >
+                  settings
+                </span>
+                Settings
+              </>
+            )}
+          </NavLink>
 
           {/* Active project chip */}
           {activeProject && (

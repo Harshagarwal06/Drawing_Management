@@ -1,21 +1,23 @@
 import { useState, useMemo, useEffect } from "react";
-import Sidebar from "./components/Sidebar";
-import Dashboard from "./components/Dashboard";
-import UploadModal from "./components/UploadModal";
-import TransmittalModal from "./components/TransmittalModal";
-import ProjectModal from "./components/ProjectModal";
+import { Routes, Route, Navigate, useNavigate } from "react-router-dom";
+
+import AppShell          from "./components/AppShell";
+import ProtectedRoute    from "./components/ProtectedRoute";
+import LoginPage         from "./components/LoginPage";
+import Dashboard         from "./components/Dashboard";
 import MasterRegisterTable from "./components/MasterRegisterTable";
-import TransmittalsView from "./components/TransmittalsView";
-import ProjectSelector from "./components/ProjectSelector";
-import Toast from "./components/Toast";
-import LoginPage from "./components/LoginPage";
-import DocumentsView from "./components/DocumentsView";
-import AnalyticsView from "./components/AnalyticsView";
-import SettingsView from "./components/SettingsView";
+import TransmittalsView  from "./components/TransmittalsView";
+import DocumentsView     from "./components/DocumentsView";
+import AnalyticsView     from "./components/AnalyticsView";
+import SettingsView      from "./components/SettingsView";
+import UploadModal       from "./components/UploadModal";
+import TransmittalModal  from "./components/TransmittalModal";
+import ProjectModal      from "./components/ProjectModal";
+import Toast             from "./components/Toast";
 
-import { ROLES, OVERDUE_PURPOSES, MS_30_DAYS, MEP_SUBTYPES } from "./constants";
+import { OVERDUE_PURPOSES, MS_30_DAYS, MEP_SUBTYPES } from "./constants";
 
-const API = import.meta.env.VITE_API_URL;
+const API      = import.meta.env.VITE_API_URL;
 const PER_PAGE = 8;
 
 function authHeaders(token) {
@@ -44,7 +46,8 @@ async function fetchTransmittals(projectId, token) {
 }
 
 export default function App() {
-  const [currentTab,       setCurrentTab]       = useState("dashboard");
+  const navigate = useNavigate();
+
   const [projects,         setProjects]         = useState([]);
   const [activeProject,    setActiveProject]    = useState(null);
   const [showProjectModal, setShowProjectModal] = useState(false);
@@ -69,22 +72,46 @@ export default function App() {
   const isDirector    = activeRole === "Director";
   const isProjectTeam = activeRole === "Project Team";
 
-  /* ── Session persistence ── */
+  /* ── Session restore + token expiry check ── */
   useEffect(() => {
     try {
       const saved = localStorage.getItem("dms_user");
-      if (saved) setCurrentUser(JSON.parse(saved));
-    } catch {}
+      if (!saved) return;
+      const user = JSON.parse(saved);
+      // Decode JWT payload (base64url) and check exp
+      const payload = JSON.parse(atob(user.token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/")));
+      if (payload.exp * 1000 < Date.now()) {
+        localStorage.removeItem("dms_user");
+        // ProtectedRoute will redirect to /login automatically
+      } else {
+        setCurrentUser(user);
+      }
+    } catch {
+      localStorage.removeItem("dms_user");
+    }
   }, []);
 
+  /* ── Persist session ── */
   useEffect(() => {
     if (currentUser) localStorage.setItem("dms_user", JSON.stringify(currentUser));
     else localStorage.removeItem("dms_user");
   }, [currentUser]);
 
+  /* ── Auth handlers ── */
+  const handleLogin = (user) => {
+    setCurrentUser(user);
+    navigate("/dashboard", { replace: true });
+  };
+
+  const handleLogout = () => {
+    setCurrentUser(null);
+    navigate("/login", { replace: true });
+  };
+
   const handleUnauthorized = () => {
     setCurrentUser(null);
     setToast({ msg: "Session expired — please log in again.", type: "error" });
+    navigate("/login", { replace: true });
   };
 
   /* ── Bootstrap projects ── */
@@ -144,7 +171,7 @@ export default function App() {
   const totalPages = Math.ceil(filtered.length / PER_PAGE);
   const pageRows   = filtered.slice((page - 1) * PER_PAGE, page * PER_PAGE);
 
-  const handleSort      = key => {
+  const handleSort       = key => {
     if (sortKey === key) setSortDir(d => d === "asc" ? "desc" : "asc");
     else { setSortKey(key); setSortDir("asc"); }
     setPage(1);
@@ -227,157 +254,106 @@ export default function App() {
     }
   };
 
-  if (!currentUser) return <LoginPage onLogin={setCurrentUser} />;
+  /* ── Shared shell props ── */
+  const shellProps = {
+    currentUser,
+    onLogout: handleLogout,
+    activeProject,
+    projects,
+    isDirector,
+    isProjectTeam,
+    isRestricted,
+    search,
+    onSearch: handleSearch,
+    mobileNavOpen,
+    setMobileNavOpen,
+    onNewDrawing: () => { setModalFolder(""); setShowModal(true); },
+    onProjectChange: setActiveProject,
+    onNewProject: () => setShowProjectModal(true),
+  };
 
   return (
-    <div className="bg-background text-on-surface font-outfit min-h-screen flex">
+    <>
+      <Routes>
+        {/* ── Public ── */}
+        <Route path="/login" element={<LoginPage onLogin={handleLogin} />} />
 
-      <Sidebar
-        activeProject={activeProject}
-        onTabChange={setCurrentTab}
-        currentTab={currentTab}
-        currentUser={currentUser}
-        mobileOpen={mobileNavOpen}
-        onMobileClose={() => setMobileNavOpen(false)}
-      />
+        {/* ── Protected ── */}
+        <Route element={<ProtectedRoute currentUser={currentUser} />}>
+          <Route element={<AppShell {...shellProps} />}>
 
-      {/* ── Right column ── */}
-      <div className="flex flex-col flex-1 md:ml-[280px]">
+            <Route index element={<Navigate to="/dashboard" replace />} />
 
-        {/* ── Top App Bar — search only + utility icons ── */}
-        <header className="bg-glass-surface/80 backdrop-blur-md border-b border-border-slate sticky top-0 z-40 h-16 flex items-center justify-between px-4 md:px-10 gap-4 md:gap-6">
+            <Route path="/dashboard" element={
+              <Dashboard
+                totalDrawings={totalDrawings}
+                totalTransmittals={totalTransmittals}
+                latestRevisions={pendingReviews}
+                overdueItems={overdueTransmit}
+                drawings={drawings}
+                activeProjectId={activeProject?.id}
+                token={currentUser?.token}
+              />
+            } />
 
-          {/* Hamburger — mobile only */}
-          <button
-            onClick={() => setMobileNavOpen(true)}
-            className="md:hidden p-2 -ml-1 text-on-surface-variant hover:bg-surface-container rounded-lg transition-colors shrink-0"
-            aria-label="Open navigation"
-          >
-            <span className="material-symbols-outlined text-[24px]">menu</span>
-          </button>
+            <Route path="/documents" element={
+              <DocumentsView
+                drawings={drawings}
+                onUpload={!isRestricted ? (folder) => { setModalFolder(folder); setShowModal(true); } : undefined}
+                projects={projects}
+                activeProject={activeProject}
+                onProjectChange={setActiveProject}
+                transmittals={transmittals}
+                isProjectTeam={isProjectTeam}
+              />
+            } />
 
-          {/* Search — left */}
-          <div className="relative w-full max-w-md">
-            <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant text-[20px]">search</span>
-            <input
-              type="text"
-              value={search}
-              onChange={e => handleSearch(e.target.value)}
-              placeholder="Search drawings, transmittals, or tasks…"
-              className="w-full pl-10 pr-4 py-2 bg-surface-container-low border border-border-slate rounded-lg text-body-sm text-on-surface placeholder:text-on-surface-variant focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/20 transition-all"
-            />
-          </div>
+            <Route path="/register" element={
+              <MasterRegisterTable
+                drawings={pageRows}
+                allDrawings={drawings}
+                total={filtered.length}
+                page={page}
+                totalPages={totalPages}
+                search={search}
+                filterStat={filterStat}
+                filterDisc={filterDisc}
+                sortKey={sortKey}
+                sortDir={sortDir}
+                onPageChange={setPage}
+                onSearch={handleSearch}
+                onFilterStat={handleFilterStat}
+                onFilterDisc={handleFilterDisc}
+                onSort={handleSort}
+                onNewEntry={() => { setModalFolder(""); setShowModal(true); }}
+                onNewTransmittal={!isRestricted ? () => setShowTransmittal(true) : undefined}
+                onVoid={handleVoid}
+                isRestricted={isRestricted}
+                loading={drawingsLoading}
+              />
+            } />
 
-          {/* Utility icons — right */}
-          <div className="flex items-center gap-1 shrink-0">
-            <button className="p-2 text-on-surface-variant hover:bg-surface-container rounded-full transition-colors" title="Notifications">
-              <span className="material-symbols-outlined text-[22px]">notifications</span>
-            </button>
-            <button className="p-2 text-on-surface-variant hover:bg-surface-container rounded-full transition-colors" title="Help">
-              <span className="material-symbols-outlined text-[22px]">help</span>
-            </button>
+            <Route path="/transmittals" element={
+              <TransmittalsView transmittals={transmittals} drawings={drawings} loading={drawingsLoading} />
+            } />
 
-            {/* Project selector — hidden on Documents tab (workspace bar handles it there) */}
-            {currentTab !== "documents" && (
-              isProjectTeam ? (
-                <div className="flex items-center gap-3 bg-surface-container-low border border-outline-variant rounded-xl px-4 py-2.5 min-w-[200px]">
-                  <span className="w-3 h-3 rounded-full shrink-0 bg-primary" />
-                  <div className="flex flex-col items-start min-w-0 text-left flex-1">
-                    <span className="font-mono text-[12px] font-bold text-primary leading-none tracking-wide">{activeProject?.code ?? "—"}</span>
-                    <span className="text-[11px] text-on-surface-variant leading-none mt-1 truncate max-w-[180px]">
-                      {activeProject?.name?.split("—")[1]?.trim() ?? activeProject?.name ?? ""}
-                    </span>
-                  </div>
-                </div>
-              ) : (
-                <ProjectSelector
-                  projects={projects}
-                  activeProject={activeProject}
-                  onChange={setActiveProject}
-                  onNew={() => setShowProjectModal(true)}
-                  isRestricted={!isDirector}
-                />
-              )
-            )}
+            <Route path="/analytics" element={
+              <AnalyticsView drawings={drawings} transmittals={transmittals} />
+            } />
 
-            <div className="h-6 w-px bg-border-slate mx-1" />
+            <Route path="/settings" element={
+              isDirector
+                ? <SettingsView currentUser={currentUser} onUserUpdate={setCurrentUser} token={currentUser?.token} />
+                : <Navigate to="/dashboard" replace />
+            } />
 
-            <button
-              onClick={() => setCurrentUser(null)}
-              className="p-2 text-on-surface-variant hover:bg-status-rose-bg hover:text-status-rose-text rounded-full transition-colors"
-              title="Sign out"
-            >
-              <span className="material-symbols-outlined text-[20px]">logout</span>
-            </button>
+            {/* Catch-all */}
+            <Route path="*" element={<Navigate to="/dashboard" replace />} />
+          </Route>
+        </Route>
+      </Routes>
 
-            <div
-              className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-white text-[13px] font-bold cursor-pointer border border-border-slate ml-1"
-              title={currentUser.name}
-            >
-              {currentUser.name.charAt(0).toUpperCase()}
-            </div>
-          </div>
-        </header>
-
-        {/* ── Main content ── */}
-        <main className="flex-1 p-margin-desktop">
-          {currentTab === "dashboard" ? (
-            <Dashboard
-              totalDrawings={totalDrawings}
-              totalTransmittals={totalTransmittals}
-              latestRevisions={pendingReviews}
-              overdueItems={overdueTransmit}
-              drawings={drawings}
-              activeProjectId={activeProject?.id}
-              token={currentUser?.token}
-              onViewRegister={() => setCurrentTab("register")}
-            />
-          ) : currentTab === "register" ? (
-            <MasterRegisterTable
-              drawings={pageRows}
-              allDrawings={drawings}
-              total={filtered.length}
-              page={page}
-              totalPages={totalPages}
-              search={search}
-              filterStat={filterStat}
-              filterDisc={filterDisc}
-              sortKey={sortKey}
-              sortDir={sortDir}
-              onPageChange={setPage}
-              onSearch={handleSearch}
-              onFilterStat={handleFilterStat}
-              onFilterDisc={handleFilterDisc}
-              onSort={handleSort}
-              onNewEntry={() => { setModalFolder(""); setShowModal(true); }}
-              onNewTransmittal={!isRestricted ? () => setShowTransmittal(true) : undefined}
-              onVoid={handleVoid}
-              isRestricted={isRestricted}
-              loading={drawingsLoading}
-            />
-          ) : currentTab === "transmittals" ? (
-            <TransmittalsView transmittals={transmittals} drawings={drawings} loading={drawingsLoading} />
-          ) : currentTab === "documents" ? (
-            <DocumentsView
-              drawings={drawings}
-              onUpload={!isRestricted ? (folder) => { setModalFolder(folder); setShowModal(true); } : undefined}
-              projects={projects}
-              activeProject={activeProject}
-              onProjectChange={setActiveProject}
-              transmittals={transmittals}
-              isProjectTeam={isProjectTeam}
-            />
-          ) : currentTab === "analytics" ? (
-            <AnalyticsView drawings={drawings} transmittals={transmittals} />
-          ) : currentTab === "settings" ? (
-            <SettingsView currentUser={currentUser} onUserUpdate={setCurrentUser} token={currentUser?.token} />
-          ) : (
-            <PlaceholderView tab={currentTab} />
-          )}
-        </main>
-      </div>
-
-      {/* ── Modals & Toasts ── */}
+      {/* ── Modals & Toasts (outside Routes so they overlay correctly) ── */}
       {showModal && <UploadModal onClose={() => setShowModal(false)} onSubmit={handleUpload} initialFolder={modalFolder} />}
       {showTransmittal && (
         <TransmittalModal
@@ -410,19 +386,6 @@ export default function App() {
           }}
         />
       )}
-    </div>
-  );
-}
-
-function PlaceholderView({ tab }) {
-  const iconMap = { documents: "folder_open", analytics: "analytics", settings: "settings" };
-  return (
-    <div className="flex flex-col items-center justify-center h-[60vh] gap-4">
-      <div className="w-20 h-20 rounded-2xl bg-white border border-border-slate flex items-center justify-center">
-        <span className="material-symbols-outlined text-[40px] text-on-surface-variant">{iconMap[tab] || "construction"}</span>
-      </div>
-      <p className="text-headline-sm font-semibold text-on-surface capitalize">{tab}</p>
-      <p className="text-body-md text-on-surface-variant">This section is coming soon.</p>
-    </div>
+    </>
   );
 }
