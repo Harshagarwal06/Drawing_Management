@@ -1,12 +1,6 @@
 import { useState } from "react";
 import { Loader2, Eye, EyeOff, ShieldCheck, FileStack, Send, ArrowRight, Lock, User, Users } from "lucide-react";
 
-const DEMO_USERS = [
-  { label: "Director",     username: "director",  password: "director123" },
-  { label: "Architect",    username: "architect", password: "arch123"     },
-  { label: "Project Team", username: "team",      password: "team123"     },
-];
-
 const FEATURES = [
   {
     Icon: FileStack,
@@ -26,19 +20,11 @@ const FEATURES = [
 ];
 
 export default function LoginPage({ onLogin }) {
-  const [username,   setUsername]   = useState("director");
-  const [password,   setPassword]   = useState("director123");
-  const [error,      setError]      = useState("");
-  const [loading,    setLoading]    = useState(false);
-  const [activeDemo, setActiveDemo] = useState("Director");
-  const [showPw,     setShowPw]     = useState(false);
-
-  const handleDemoClick = (demo) => {
-    setActiveDemo(demo.label);
-    setUsername(demo.username);
-    setPassword(demo.password);
-    setError("");
-  };
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [error,    setError]    = useState("");
+  const [loading,  setLoading]  = useState(false);
+  const [showPw,   setShowPw]   = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -216,29 +202,6 @@ export default function LoginPage({ onLogin }) {
               <div className="lg:hidden mb-6">
                 <h2 className="text-[20px] font-bold text-on-surface">Sign in</h2>
                 <p className="text-[13px] text-on-surface-variant mt-0.5">Secure Project Workspace</p>
-              </div>
-
-              {/* Quick demo access */}
-              <div className="mb-6">
-                <p className="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest mb-2">
-                  Quick demo access
-                </p>
-                <div className="flex p-1 bg-surface-container rounded-xl gap-1">
-                  {DEMO_USERS.map(demo => (
-                    <button
-                      key={demo.label}
-                      type="button"
-                      onClick={() => handleDemoClick(demo)}
-                      className={`flex-1 py-1.5 rounded-lg text-[11px] font-semibold transition-all duration-150 ${
-                        activeDemo === demo.label
-                          ? "bg-surface shadow-card text-primary border border-outline-variant"
-                          : "text-on-surface-variant hover:text-on-surface"
-                      }`}
-                    >
-                      {demo.label}
-                    </button>
-                  ))}
-                </div>
               </div>
 
               {/* ── Form ── */}

@@ -178,11 +178,21 @@ insertProject.run('Unique Youtopia — Kharadi',        'YOUTOPIA',  now);
 /* ── Seed users (hashed passwords) ─────────────────────────────── */
 const SALT_ROUNDS = 10;
 
-// Always ensure the 3 canonical demo accounts exist (INSERT OR IGNORE = safe to run every boot)
+// Always ensure the 3 canonical accounts exist (INSERT OR IGNORE = safe to run every boot)
 const ensureUser = db.prepare('INSERT OR IGNORE INTO users (username, password, name, role, avatar, allowed_projects) VALUES (?, ?, ?, ?, ?, ?)');
-ensureUser.run('director',  bcrypt.hashSync('director123', SALT_ROUNDS), 'Harsh Agarwal', 'Director',           'HA', '*');
-ensureUser.run('architect', bcrypt.hashSync('arch123',     SALT_ROUNDS), 'Priya Sharma',  'In House Architect', 'PS', '*');
-ensureUser.run('team',      bcrypt.hashSync('team123',     SALT_ROUNDS), 'Carlos Mendez', 'Project Team',       'CM', '[1]');
+ensureUser.run('director',  bcrypt.hashSync('Unique123!', SALT_ROUNDS), 'Harsh Agarwal', 'Director',           'HA', '*');
+ensureUser.run('architect', bcrypt.hashSync('arch123',    SALT_ROUNDS), 'Priya Sharma',  'In House Architect', 'PS', '*');
+ensureUser.run('team',      bcrypt.hashSync('team123',    SALT_ROUNDS), 'Carlos Mendez', 'Project Team',       'CM', '[1]');
+
+// ── One-time migration: update director password if still using old demo password ──
+try {
+  const dirRow = db.prepare("SELECT password FROM users WHERE username = 'director'").get();
+  if (dirRow && bcrypt.compareSync('director123', dirRow.password)) {
+    db.prepare("UPDATE users SET password = ? WHERE username = 'director'")
+      .run(bcrypt.hashSync('Unique123!', SALT_ROUNDS));
+    console.log('✅ Director password migrated to production credentials');
+  }
+} catch (e) { console.warn('Director password migration note:', e.message); }
 
 /* ── Migrate any remaining plaintext passwords ──────────────────── */
 const plainUsers = db.prepare("SELECT id, password FROM users WHERE password NOT LIKE '$2b$%'").all();
