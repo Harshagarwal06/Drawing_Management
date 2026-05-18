@@ -22,6 +22,7 @@ export default function SettingsView({ currentUser, onUserUpdate, token }) {
   const [userMsg,    setUserMsg]    = useState(null);
   const [userLoading,setUserLoading]= useState(false);
   const [addOpen,    setAddOpen]    = useState(false);
+  const [roleFlash,  setRoleFlash]  = useState(null); // { userId, ok }
 
   const [projects,           setProjects]           = useState([]);
   const [editingProjectsFor, setEditingProjectsFor] = useState(null);
@@ -74,9 +75,15 @@ export default function SettingsView({ currentUser, onUserUpdate, token }) {
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({ role, allowedProjects: role === 'Director' ? '*' : allowedProjects }),
       });
-      if (res.ok) setUserMsg({ type: 'success', text: 'Role updated successfully.' });
-      else setUserMsg({ type: 'error', text: 'Failed to update role.' });
-    } catch { setUserMsg({ type: 'error', text: 'Cannot connect to server.' }); }
+      const ok = res.ok;
+      setRoleFlash({ userId, ok });
+      setTimeout(() => setRoleFlash(null), 2000);
+      if (!ok) setUserMsg({ type: 'error', text: 'Failed to update role.' });
+    } catch {
+      setRoleFlash({ userId, ok: false });
+      setTimeout(() => setRoleFlash(null), 2000);
+      setUserMsg({ type: 'error', text: 'Cannot connect to server.' });
+    }
     loadUsers();
   };
 
@@ -243,14 +250,26 @@ export default function SettingsView({ currentUser, onUserUpdate, token }) {
                         </div>
 
                         {/* Role dropdown — sole visual indicator + control */}
-                        <select
-                          value={u.role}
-                          onChange={e => handleRoleChange(u.id, e.target.value, u.allowed_projects)}
-                          disabled={isSelf}
-                          className="bg-white border border-border-slate rounded-lg px-2 py-1.5 text-[12px] text-on-surface focus:outline-none focus:ring-1 focus:ring-primary/20 disabled:opacity-50 shrink-0"
-                        >
-                          {ROLES.map(r => <option key={r} value={r}>{r}</option>)}
-                        </select>
+                        <div className="relative flex items-center gap-1.5 shrink-0">
+                          <select
+                            value={u.role}
+                            onChange={e => handleRoleChange(u.id, e.target.value, u.allowed_projects)}
+                            disabled={isSelf}
+                            className="bg-white border border-border-slate rounded-lg px-2 py-1.5 text-[12px] text-on-surface focus:outline-none focus:ring-1 focus:ring-primary/20 disabled:opacity-50"
+                          >
+                            {ROLES.map(r => <option key={r} value={r}>{r}</option>)}
+                          </select>
+                          {/* Per-row flash: green check or red X for 2s */}
+                          {roleFlash?.userId === u.id && (
+                            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full shrink-0 ${
+                              roleFlash.ok
+                                ? 'bg-status-emerald-bg text-status-emerald-text'
+                                : 'bg-status-rose-bg text-status-rose-text'
+                            }`}>
+                              {roleFlash.ok ? '✓ saved' : '✗ failed'}
+                            </span>
+                          )}
+                        </div>
 
                         {/* Project access pill — non-Director, non-self */}
                         {isNonDirector && !isSelf && (

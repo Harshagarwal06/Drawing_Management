@@ -50,11 +50,13 @@ export default function App() {
   const [showProjectModal, setShowProjectModal] = useState(false);
   const [drawings,         setDrawings]         = useState([]);
   const [transmittals,     setTransmittals]     = useState([]);
+  const [drawingsLoading,  setDrawingsLoading]  = useState(false);
   const [showModal,        setShowModal]        = useState(false);
   const [modalFolder,      setModalFolder]      = useState("");
   const [showTransmittal,  setShowTransmittal]  = useState(false);
   const [toast,            setToast]            = useState(null);
   const [currentUser,      setCurrentUser]      = useState(null);
+  const [mobileNavOpen,    setMobileNavOpen]    = useState(false);
   const [search,           setSearch]           = useState("");
   const [filterDisc,       setFilterDisc]       = useState("All");
   const [filterStat,       setFilterStat]       = useState("All");
@@ -96,12 +98,14 @@ export default function App() {
   /* ── Load drawings + transmittals when project changes ── */
   useEffect(() => {
     if (!activeProject || !currentUser) return;
-    fetchDrawings(activeProject.id, currentUser.token)
-      .then(setDrawings)
-      .catch(err => { if (err.status === 401) handleUnauthorized(); });
-    fetchTransmittals(activeProject.id, currentUser.token)
-      .then(setTransmittals)
-      .catch(err => { if (err.status === 401) handleUnauthorized(); });
+    setDrawingsLoading(true);
+    Promise.all([
+      fetchDrawings(activeProject.id, currentUser.token),
+      fetchTransmittals(activeProject.id, currentUser.token),
+    ])
+      .then(([d, t]) => { setDrawings(d); setTransmittals(t); })
+      .catch(err => { if (err.status === 401) handleUnauthorized(); })
+      .finally(() => setDrawingsLoading(false));
   }, [activeProject]);
 
   /* ── Derived metrics ── */
@@ -233,14 +237,24 @@ export default function App() {
         onTabChange={setCurrentTab}
         currentTab={currentTab}
         currentUser={currentUser}
-        /* New Drawing CTA removed — upload lives in the contextual action bar */
+        mobileOpen={mobileNavOpen}
+        onMobileClose={() => setMobileNavOpen(false)}
       />
 
       {/* ── Right column ── */}
-      <div className="flex flex-col flex-1" style={{ marginLeft: "280px" }}>
+      <div className="flex flex-col flex-1 md:ml-[280px]">
 
         {/* ── Top App Bar — search only + utility icons ── */}
-        <header className="bg-glass-surface/80 backdrop-blur-md border-b border-border-slate sticky top-0 z-40 h-16 flex items-center justify-between px-10 gap-6">
+        <header className="bg-glass-surface/80 backdrop-blur-md border-b border-border-slate sticky top-0 z-40 h-16 flex items-center justify-between px-4 md:px-10 gap-4 md:gap-6">
+
+          {/* Hamburger — mobile only */}
+          <button
+            onClick={() => setMobileNavOpen(true)}
+            className="md:hidden p-2 -ml-1 text-on-surface-variant hover:bg-surface-container rounded-lg transition-colors shrink-0"
+            aria-label="Open navigation"
+          >
+            <span className="material-symbols-outlined text-[24px]">menu</span>
+          </button>
 
           {/* Search — left */}
           <div className="relative w-full max-w-md">
@@ -339,9 +353,10 @@ export default function App() {
               onNewTransmittal={!isRestricted ? () => setShowTransmittal(true) : undefined}
               onVoid={handleVoid}
               isRestricted={isRestricted}
+              loading={drawingsLoading}
             />
           ) : currentTab === "transmittals" ? (
-            <TransmittalsView transmittals={transmittals} drawings={drawings} />
+            <TransmittalsView transmittals={transmittals} drawings={drawings} loading={drawingsLoading} />
           ) : currentTab === "documents" ? (
             <DocumentsView
               drawings={drawings}

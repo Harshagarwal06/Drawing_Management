@@ -61,6 +61,7 @@ export default function MasterRegisterTable({
   onNewTransmittal,
   onVoid,
   isRestricted = false,
+  loading = false,
 }) {
   const [discOpen, setDiscOpen] = useState(false);
 
@@ -251,7 +252,20 @@ export default function MasterRegisterTable({
 
             {/* Rows */}
             <tbody>
-              {drawings.length === 0 ? (
+              {loading ? (
+                Array.from({ length: 5 }).map((_, i) => (
+                  <tr key={i} className="border-b border-border-slate animate-pulse">
+                    <td className="py-3 px-4"><div className="h-4 w-4 rounded bg-surface-container" /></td>
+                    <td className="py-3 px-4"><div className="h-4 w-28 rounded bg-surface-container" /></td>
+                    <td className="py-3 px-4"><div className="h-4 w-48 rounded bg-surface-container" /></td>
+                    <td className="py-3 px-4"><div className="h-4 w-20 rounded bg-surface-container" /></td>
+                    <td className="py-3 px-4"><div className="h-4 w-8  rounded bg-surface-container" /></td>
+                    <td className="py-3 px-4"><div className="h-5 w-24 rounded-full bg-surface-container" /></td>
+                    <td className="py-3 px-4"><div className="h-4 w-16 rounded bg-surface-container" /></td>
+                    <td className="py-3 px-4"><div className="h-6 w-6  rounded bg-surface-container" /></td>
+                  </tr>
+                ))
+              ) : drawings.length === 0 ? (
                 <tr>
                   <td colSpan={8} className="py-16 text-center">
                     <div className="flex flex-col items-center gap-3 text-on-surface-variant">
