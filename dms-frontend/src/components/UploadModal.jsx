@@ -131,7 +131,7 @@ export default function UploadModal({ onClose, onSubmit, initialFolder }) {
                   <p className={`text-sm font-medium transition ${dragging ? "text-blue-600" : "text-slate-500 group-hover:text-blue-600"}`}>
                     {dragging ? "Drop file here" : "Drag & drop PDF / DWG / DXF here"}
                   </p>
-                  <p className="text-xs text-slate-400">or <span className="text-blue-500 underline">browse files</span> — max 100 MB</p>
+                  <p className="text-xs text-slate-400">or <span className="text-blue-500 underline">browse files</span> — max 50 MB</p>
                 </div>
               )}
             </div>

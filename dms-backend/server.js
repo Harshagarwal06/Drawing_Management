@@ -230,6 +230,15 @@ const loginLimiter = rateLimit({
   message: { error: 'Too many login attempts — please try again in 15 minutes.' },
 });
 
+/* ── Upload rate limiter — max 20 uploads per 15 min per IP ─────── */
+const uploadLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many uploads — please wait 15 minutes before uploading again.' },
+});
+
 /* Apply verifyToken to all /api/* routes except POST /api/login and GET /api/health */
 app.use('/api', (req, res, next) => {
   if (req.path === '/login'  && req.method === 'POST') return next();
@@ -314,7 +323,7 @@ app.get('/api/drawings', requireProjectAccess, (req, res) => {
 });
 
 /* ── POST /api/upload ───────────────────────────────────────────── */
-app.post('/api/upload', requireWriteAccess, upload.single('drawingFile'), (req, res) => {
+app.post('/api/upload', requireWriteAccess, uploadLimiter, upload.single('drawingFile'), (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'No file uploaded.' });
 
   const { drawingNumber, title, discipline, originator, revision, status, projectId, folderPath } = req.body;
