@@ -255,6 +255,14 @@ export default function App() {
     }
   };
 
+  /* ── Delete ── */
+  const handleDeleteDrawing = async (id) => {
+    const res = await fetch(`${API}/api/drawings/${id}`, { method: "DELETE", headers: authHeaders(currentUser.token) });
+    if (res.status === 401) { handleUnauthorized(); throw new Error("Unauthorized"); }
+    if (!res.ok) throw new Error("Delete failed");
+    setDrawings(await fetchDrawings(activeProject.id, currentUser.token));
+  };
+
   /* ── Shared shell props ── */
   const shellProps = {
     currentUser,
@@ -310,6 +318,7 @@ export default function App() {
               <DocumentsView
                 drawings={drawings}
                 onUpload={!isRestricted ? (folder) => { setModalFolder(folder); setShowModal(true); } : undefined}
+                onDeleteDrawing={!isRestricted ? handleDeleteDrawing : undefined}
                 projects={projects}
                 activeProject={activeProject}
                 onProjectChange={setActiveProject}

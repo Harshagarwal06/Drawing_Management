@@ -738,6 +738,23 @@ app.patch('/api/drawings/:id/void', requireWriteAccess, (req, res) => {
   }
 });
 
+/* ── DELETE /api/drawings/:id ───────────────────────────────────── */
+app.delete('/api/drawings/:id', requireWriteAccess, (req, res) => {
+  const { id } = req.params;
+  try {
+    const drawing = db.prepare('SELECT number, project_id FROM drawings WHERE id = ?').get(id);
+    if (!drawing) return res.status(404).json({ error: 'Drawing not found.' });
+    db.prepare('DELETE FROM drawings WHERE id = ?').run(id);
+    db.prepare('INSERT INTO activity_log (project_id,type,title,detail,created_at) VALUES (?,?,?,?,?)')
+      .run(drawing.project_id, 'delete', `${drawing.number} deleted`, 'Drawing permanently removed', new Date().toISOString());
+    console.log(`✅ Drawing ${drawing.number} deleted`);
+    res.json({ id, deleted: true });
+  } catch (err) {
+    console.error('❌ DELETE /api/drawings/:id error:', err);
+    res.status(500).json({ error: 'Failed to delete drawing.' });
+  }
+});
+
 /* ── GET /api/users ─────────────────────────────────────────────── */
 app.get('/api/users', requireDirector, (req, res) => {
   try {
