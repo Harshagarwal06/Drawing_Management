@@ -363,9 +363,7 @@ export default function App() {
             } />
 
             <Route path="/settings" element={
-              isDirector
-                ? <SettingsView currentUser={currentUser} onUserUpdate={setCurrentUser} token={currentUser?.token} />
-                : <Navigate to="/dashboard" replace />
+              <SettingsView currentUser={currentUser} onUserUpdate={setCurrentUser} token={currentUser?.token} />
             } />
 
             {/* Catch-all */}
