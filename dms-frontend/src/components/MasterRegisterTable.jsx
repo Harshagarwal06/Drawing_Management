@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from "react";
+import { useLocation } from "react-router-dom";
 import { createPortal } from "react-dom";
 import { MoreVertical, Eye, Download, Ban } from "lucide-react";
 
@@ -64,6 +65,16 @@ export default function MasterRegisterTable({
   loading = false,
 }) {
   const [discOpen, setDiscOpen] = useState(false);
+  const location = useLocation();
+
+  /* Apply status filter passed from Dashboard metric card click */
+  useEffect(() => {
+    if (location.state?.filterStat) {
+      onFilterStat?.(location.state.filterStat);
+      // Clear the state so it doesn't re-apply on subsequent renders
+      window.history.replaceState({}, "");
+    }
+  }, [location.state?.filterStat]);
 
   const extraTypes    = Array.from(new Set(allDrawings.map(d => d.discipline).filter(d => d && !KNOWN_TYPES.has(d))));
   const activeFilters = (filterStat !== "All" ? 1 : 0) + (filterDisc !== "All" ? 1 : 0) + (search ? 1 : 0);

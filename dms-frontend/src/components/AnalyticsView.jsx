@@ -5,6 +5,23 @@ const STATUS_META = {
   VOID: { label: 'Void',             color: '#f87171' },
 };
 
+function exportCSV(drawings) {
+  const headers = ["Number", "Title", "Discipline", "Revision", "Status", "Issue Date", "Originator"];
+  const rows = drawings.map(d => [
+    d.number, d.title, d.discipline, d.rev, d.status, d.issueDate ?? "", d.originator,
+  ]);
+  const csv = [headers, ...rows]
+    .map(r => r.map(v => `"${String(v ?? "").replace(/"/g, '""')}"`).join(","))
+    .join("\n");
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `drawings-export-${new Date().toISOString().slice(0, 10)}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 export default function AnalyticsView({ drawings, transmittals }) {
   /* ── Status breakdown ── */
   const statusCounts = { S3: 0, S2: 0, S1: 0, VOID: 0 };
@@ -37,9 +54,20 @@ export default function AnalyticsView({ drawings, transmittals }) {
   return (
     <div className="max-w-[1400px] mx-auto space-y-8">
       {/* Header */}
-      <div>
-        <h1 className="font-display-lg text-display-lg text-on-surface tracking-tight">Analytics</h1>
-        <p className="font-body-md text-body-md text-on-surface-variant mt-1">Project-level metrics and breakdowns</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="font-display-lg text-display-lg text-on-surface tracking-tight">Analytics</h1>
+          <p className="font-body-md text-body-md text-on-surface-variant mt-1">Project-level metrics and breakdowns</p>
+        </div>
+        {drawings.length > 0 && (
+          <button
+            onClick={() => exportCSV(drawings)}
+            className="flex items-center gap-1.5 px-4 py-2.5 bg-white border border-border-slate rounded-xl text-on-surface font-medium text-[13px] hover:bg-surface-container-low transition-colors shadow-sm"
+          >
+            <span className="material-symbols-outlined text-[18px]">download</span>
+            Export CSV
+          </button>
+        )}
       </div>
 
       {/* KPI row */}

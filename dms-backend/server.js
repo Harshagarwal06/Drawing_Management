@@ -210,6 +210,7 @@ try {
   `);
 } catch (e) { console.warn('Index creation note:', e.message); }
 try { db.exec("ALTER TABLE users ADD COLUMN allowed_projects TEXT DEFAULT '*';");   } catch {}
+try { db.exec("ALTER TABLE users ADD COLUMN active INTEGER DEFAULT 1;");            } catch {}
 
 // ── Migrate legacy role names → 3-role system ──────────────────────────────
 try {
@@ -869,8 +870,8 @@ app.patch('/api/drawings/:id', requireWriteAccess, (req, res) => {
 /* ── GET /api/users ─────────────────────────────────────────────── */
 app.get('/api/users', requireDirector, (req, res) => {
   try {
-    const rows = db.prepare('SELECT id, username, name, role, avatar, allowed_projects FROM users ORDER BY id ASC').all();
-    res.json(rows.map(u => ({ ...u, allowedProjects: u.allowed_projects })));
+    const rows = db.prepare('SELECT id, username, name, role, avatar, allowed_projects, active FROM users ORDER BY id ASC').all();
+    res.json(rows.map(u => ({ ...u, allowedProjects: u.allowed_projects, active: u.active ?? 1 })));
   } catch (err) {
     console.error('❌ GET /api/users error:', err);
     res.status(500).json({ error: 'Failed to fetch users.' });
@@ -930,6 +931,36 @@ app.patch('/api/users/:id/reset-password', requireDirector, async (req, res) => 
   }
 });
 
+/* ── PATCH /api/users/:id/deactivate — toggle active status ────── */
+app.patch('/api/users/:id/deactivate', requireDirector, (req, res) => {
+  try {
+    const user = db.prepare('SELECT id, active FROM users WHERE id = ?').get(req.params.id);
+    if (!user) return res.status(404).json({ error: 'User not found.' });
+    if (user.id === req.user.id) return res.status(400).json({ error: 'You cannot deactivate your own account.' });
+    const newActive = user.active === 0 ? 1 : 0;
+    db.prepare('UPDATE users SET active = ? WHERE id = ?').run(newActive, req.params.id);
+    console.log(`✅ Director ${newActive ? 'reactivated' : 'deactivated'} user id=${req.params.id}`);
+    res.json({ id: user.id, active: newActive });
+  } catch (err) {
+    console.error('❌ PATCH /api/users/:id/deactivate error:', err);
+    res.status(500).json({ error: 'Failed to update user status.' });
+  }
+});
+
+/* ── DELETE /api/users/:id — permanently remove a user ───────────── */
+app.delete('/api/users/:id', requireDirector, (req, res) => {
+  try {
+    if (parseInt(req.params.id) === req.user.id) return res.status(400).json({ error: 'You cannot delete your own account.' });
+    const info = db.prepare('DELETE FROM users WHERE id = ?').run(req.params.id);
+    if (info.changes === 0) return res.status(404).json({ error: 'User not found.' });
+    console.log(`✅ Director deleted user id=${req.params.id}`);
+    res.json({ message: 'User removed successfully.' });
+  } catch (err) {
+    console.error('❌ DELETE /api/users/:id error:', err);
+    res.status(500).json({ error: 'Failed to remove user.' });
+  }
+});
+
 /* ── PATCH /api/users/me/password ───────────────────────────────── */
 app.patch('/api/users/me/password', async (req, res) => {
   const { currentPassword, newPassword } = req.body;
@@ -955,6 +986,7 @@ app.post('/api/login', loginLimiter, async (req, res) => {
   try {
     const user = db.prepare('SELECT * FROM users WHERE username = ?').get(username);
     if (!user) return res.status(401).json({ error: 'Invalid username or password' });
+    if (user.active === 0) return res.status(403).json({ error: 'Account deactivated — contact your administrator.' });
     const match = await bcrypt.compare(password, user.password);
     if (!match) return res.status(401).json({ error: 'Invalid username or password' });
     const allowedProjects = user.allowed_projects ?? '*';

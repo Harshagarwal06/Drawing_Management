@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 
 const API = import.meta.env.VITE_API_URL;
 
@@ -35,8 +36,9 @@ function timeAgo(iso) {
 
 export default function Dashboard({
   totalDrawings, totalTransmittals, latestRevisions, overdueItems,
-  drawings, activeProjectId, token, onViewRegister,
+  drawings, activeProjectId, token,
 }) {
+  const navigate = useNavigate();
   const [activity, setActivity]           = useState([]);
   const [activityError, setActivityError] = useState(false);
 
@@ -87,6 +89,7 @@ export default function Dashboard({
           value={totalDrawings}
           iconBg="bg-primary/5"
           iconColor="text-primary"
+          onClick={() => navigate("/register")}
         />
         <MetricCard
           icon="move_to_inbox"
@@ -95,6 +98,7 @@ export default function Dashboard({
           value={totalTransmittals}
           iconBg="bg-primary/5"
           iconColor="text-primary"
+          onClick={() => navigate("/transmittals")}
         />
         <MetricCard
           icon="update"
@@ -103,6 +107,7 @@ export default function Dashboard({
           value={latestRevisions}
           iconBg="bg-primary/5"
           iconColor="text-primary"
+          onClick={() => navigate("/register", { state: { filterStat: "S2" } })}
         />
         <MetricCard
           icon="warning"
@@ -111,6 +116,7 @@ export default function Dashboard({
           value={overdueItems}
           iconBg={overdueItems > 0 ? "bg-status-rose-bg" : "bg-status-emerald-bg"}
           iconColor={overdueItems > 0 ? "text-status-rose-text" : "text-status-emerald-text"}
+          onClick={() => navigate("/transmittals")}
         />
       </div>
 
@@ -219,7 +225,7 @@ export default function Dashboard({
             <h4 className="font-headline-md text-headline-md text-on-surface">Latest Drawing Revisions</h4>
             <p className="font-body-sm text-on-surface-variant">Recently uploaded and updated drawings.</p>
           </div>
-          <button onClick={onViewRegister} className="text-primary font-label-md hover:underline text-[13px]">
+          <button onClick={() => navigate("/register")} className="text-primary font-label-md hover:underline text-[13px]">
             View Register
           </button>
         </div>
@@ -262,9 +268,15 @@ export default function Dashboard({
   );
 }
 
-function MetricCard({ icon, badge, title, value, iconBg, iconColor }) {
+function MetricCard({ icon, badge, title, value, iconBg, iconColor, onClick }) {
   return (
-    <div className="bg-white border border-border-slate p-6 rounded-xl hover:shadow-md transition-shadow">
+    <div
+      className={`bg-white border border-border-slate p-6 rounded-xl hover:shadow-md transition-shadow ${onClick ? "cursor-pointer" : ""}`}
+      onClick={onClick}
+      role={onClick ? "button" : undefined}
+      tabIndex={onClick ? 0 : undefined}
+      onKeyDown={onClick ? (e) => { if (e.key === "Enter" || e.key === " ") onClick(); } : undefined}
+    >
       <div className="flex justify-between items-start mb-4">
         <div className={`p-2 rounded-lg ${iconBg} ${iconColor}`}>
           <span className="material-symbols-outlined text-[22px]" style={{ fontVariationSettings: "'FILL' 0" }}>{icon}</span>

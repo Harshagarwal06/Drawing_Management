@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { createPortal } from "react-dom";
-import { MoreVertical, KeyRound, UserX, Trash2, X } from "lucide-react";
+import { MoreVertical, KeyRound, UserX, Trash2, X, RotateCcw } from "lucide-react";
 
 const API = import.meta.env.VITE_API_URL;
 
@@ -232,12 +232,39 @@ export default function SettingsView({ currentUser, onUserUpdate, token }) {
     finally { setResetLoading(false); }
   };
 
-  /* ── Placeholder handlers — not yet implemented on the backend ── */
-  const handleDeactivate = (u) => {
-    flashMsg('warning', `Deactivate user "${u.name}" — not yet implemented.`);
+  // Confirmation state for deactivate / remove
+  const [confirmAction, setConfirmAction] = useState(null); // { type: 'deactivate'|'remove', user }
+
+  const handleDeactivate = async (u) => {
+    try {
+      const res = await fetch(`${API}/api/users/${u.id}/deactivate`, {
+        method: 'PATCH',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      if (res.ok) {
+        flashMsg('success', data.active ? `"${u.name}" reactivated.` : `"${u.name}" deactivated.`);
+      } else {
+        flashMsg('error', data.error || 'Failed to update user status.');
+      }
+    } catch { flashMsg('error', 'Cannot connect to server.'); }
+    loadUsers();
   };
-  const handleRemove = (u) => {
-    flashMsg('warning', `Remove user "${u.name}" — not yet implemented.`);
+
+  const handleRemove = async (u) => {
+    try {
+      const res = await fetch(`${API}/api/users/${u.id}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      if (res.ok) {
+        flashMsg('success', `"${u.name}" removed permanently.`);
+      } else {
+        flashMsg('error', data.error || 'Failed to remove user.');
+      }
+    } catch { flashMsg('error', 'Cannot connect to server.'); }
+    loadUsers();
   };
 
   const handleAddUser = async e => {
@@ -374,21 +401,27 @@ export default function SettingsView({ currentUser, onUserUpdate, token }) {
                   const allowedList   = parseAllowed(u.allowed_projects);
                   const isExpanded    = editingProjectsFor === u.id;
                   const isLast        = idx === arr.length - 1;
+                  const isDeactivated = u.active === 0;
 
                   return (
                     <div key={u.id} className={!isLast ? 'border-b border-border-slate' : ''}>
 
                       {/* ── User row ── */}
-                      <div className="flex items-center gap-3 px-4 py-2.5 bg-white hover:bg-surface-container-low transition-colors">
+                      <div className={`flex items-center gap-3 px-4 py-2.5 transition-colors ${isDeactivated ? 'bg-surface-container-low opacity-60' : 'bg-white hover:bg-surface-container-low'}`}>
 
                         {/* Avatar */}
-                        <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-white font-bold text-[12px] shrink-0">
+                        <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white font-bold text-[12px] shrink-0 ${isDeactivated ? 'bg-on-surface-variant' : 'bg-primary'}`}>
                           {u.avatar}
                         </div>
 
                         {/* Name + username */}
                         <div className="flex-1 min-w-0">
-                          <p className="text-[13px] font-medium text-on-surface leading-tight">{u.name}</p>
+                          <p className="text-[13px] font-medium text-on-surface leading-tight flex items-center gap-2">
+                            {u.name}
+                            {isDeactivated && (
+                              <span className="px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-status-rose-bg text-status-rose-text uppercase tracking-wide">Deactivated</span>
+                            )}
+                          </p>
                           <p className="text-[11px] text-on-surface-variant">@{u.username}</p>
                         </div>
 
@@ -463,17 +496,26 @@ export default function SettingsView({ currentUser, onUserUpdate, token }) {
                             }}
                           />
                           <MenuDivider />
-                          <MenuItem
-                            icon={UserX}
-                            label="Deactivate User"
-                            variant="warning"
-                            onClick={() => { closeMenu(); handleDeactivate(u); }}
-                          />
+                          {isDeactivated ? (
+                            <MenuItem
+                              icon={RotateCcw}
+                              label="Reactivate User"
+                              variant="default"
+                              onClick={() => { closeMenu(); handleDeactivate(u); }}
+                            />
+                          ) : (
+                            <MenuItem
+                              icon={UserX}
+                              label="Deactivate User"
+                              variant="warning"
+                              onClick={() => { closeMenu(); setConfirmAction({ type: 'deactivate', user: u }); }}
+                            />
+                          )}
                           <MenuItem
                             icon={Trash2}
                             label="Remove User"
                             variant="danger"
-                            onClick={() => { closeMenu(); handleRemove(u); }}
+                            onClick={() => { closeMenu(); setConfirmAction({ type: 'remove', user: u }); }}
                           />
                         </PortalDropdown>
                       )}
@@ -621,6 +663,58 @@ export default function SettingsView({ currentUser, onUserUpdate, token }) {
             </form>
           )}
         </Section>
+      )}
+
+      {/* ── Confirmation modal for deactivate / remove ── */}
+      {confirmAction && createPortal(
+        <div className="fixed inset-0 z-[10000] flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/40" onClick={() => setConfirmAction(null)} />
+          <div className="relative bg-white rounded-2xl shadow-2xl border border-border-slate p-6 w-full max-w-sm mx-4">
+            <div className="flex items-center gap-3 mb-4">
+              <div className={`w-10 h-10 rounded-full flex items-center justify-center ${confirmAction.type === 'remove' ? 'bg-red-100' : 'bg-amber-100'}`}>
+                {confirmAction.type === 'remove'
+                  ? <Trash2 size={18} className="text-red-600" />
+                  : <UserX size={18} className="text-amber-600" />
+                }
+              </div>
+              <div>
+                <h3 className="text-[16px] font-semibold text-on-surface">
+                  {confirmAction.type === 'remove' ? 'Remove User' : 'Deactivate User'}
+                </h3>
+                <p className="text-[12px] text-on-surface-variant">{confirmAction.user.name} (@{confirmAction.user.username})</p>
+              </div>
+            </div>
+            <p className="text-[13px] text-on-surface-variant mb-5">
+              {confirmAction.type === 'remove'
+                ? 'This will permanently delete this user account. This action cannot be undone.'
+                : 'This user will be unable to log in until reactivated. Their data will be preserved.'
+              }
+            </p>
+            <div className="flex gap-2 justify-end">
+              <button
+                onClick={() => setConfirmAction(null)}
+                className="px-4 py-2 rounded-lg border border-border-slate text-on-surface-variant hover:bg-surface-container font-medium text-[13px] transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  const u = confirmAction.user;
+                  const action = confirmAction.type;
+                  setConfirmAction(null);
+                  if (action === 'remove') handleRemove(u);
+                  else handleDeactivate(u);
+                }}
+                className={`px-4 py-2 rounded-lg text-white font-medium text-[13px] transition-colors ${
+                  confirmAction.type === 'remove' ? 'bg-red-600 hover:bg-red-700' : 'bg-amber-600 hover:bg-amber-700'
+                }`}
+              >
+                {confirmAction.type === 'remove' ? 'Remove Permanently' : 'Deactivate'}
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
       )}
     </div>
   );
