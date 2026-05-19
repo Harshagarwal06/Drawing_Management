@@ -18,6 +18,12 @@ const CORS_ORIGIN = process.env.CORS_ORIGIN || 'http://localhost:5173';
 const DB_PATH     = process.env.DB_PATH     || path.join(__dirname, 'dms.db');
 const UPLOAD_DIR  = process.env.UPLOAD_DIR  || path.join(__dirname, 'uploads');
 
+// ── DB persistence diagnostic ────────────────────────────────────────
+console.log(`📂 DB_PATH          : ${DB_PATH}`);
+console.log(`📂 DB file exists   : ${fs.existsSync(DB_PATH)}`);
+console.log(`📂 DB_PATH env var  : ${process.env.DB_PATH || '(not set — using default)'}`);
+// If "DB file exists: false" on every boot → volume is not persisting or DB_PATH is wrong
+
 /* ── Cloudflare R2 client ────────────────────────────────────────── */
 const R2_BUCKET          = process.env.R2_BUCKET_NAME;
 const R2_PUBLIC_URL      = (process.env.R2_PUBLIC_URL || '').replace(/\/+$/, ''); // strip trailing slash
