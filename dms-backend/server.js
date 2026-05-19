@@ -121,6 +121,10 @@ db.exec(`
 try {
   const schema = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='drawings'").get()?.sql || '';
   if (schema.includes('UNIQUE')) {
+    // Detect which optional columns already exist so the INSERT doesn't fail
+    const existingCols = db.prepare("PRAGMA table_info(drawings)").all().map(c => c.name);
+    const pidSel = existingCols.includes('project_id') ? 'COALESCE(project_id,1)' : '1';
+    const fldSel = existingCols.includes('folder_path') ? 'folder_path'           : "''";
     db.exec(`
       PRAGMA foreign_keys=OFF;
       BEGIN;
@@ -138,7 +142,7 @@ try {
         folder_path  TEXT    DEFAULT '',
         project_id   INTEGER DEFAULT 1
       );
-      INSERT INTO drawings_v2 SELECT id,number,title,discipline,rev,status,issue_date,originator,transmittals,path,folder_path,COALESCE(project_id,1) FROM drawings;
+      INSERT INTO drawings_v2 SELECT id,number,title,discipline,rev,status,issue_date,originator,transmittals,path,${fldSel},${pidSel} FROM drawings;
       DROP TABLE drawings;
       ALTER TABLE drawings_v2 RENAME TO drawings;
       COMMIT;
@@ -146,7 +150,11 @@ try {
     `);
     console.log('✅ Migrated drawings: removed global UNIQUE constraint on number');
   }
-} catch (e) { console.warn('drawings migration note:', e.message); }
+} catch (e) {
+  console.warn('drawings migration note:', e.message);
+  // CRITICAL: roll back any open transaction so subsequent writes are not swallowed
+  try { db.exec('ROLLBACK'); } catch {}
+}
 
 // Add columns if upgrading from an older schema
 try { db.exec('ALTER TABLE drawings ADD COLUMN project_id INTEGER DEFAULT 1;');     } catch {}
@@ -181,6 +189,8 @@ insertProject.run('UNI 89 — KP Annexe',              'UNI-89',    now);
 insertProject.run('Unique Sky Links — Baner Annexe', 'SKY-LINKS', now);
 insertProject.run('QUE-914 — Keshavnagar',           'QUE-914',   now);
 insertProject.run('Unique Youtopia — Kharadi',        'YOUTOPIA',  now);
+
+console.log(`📊 Drawings in DB   : ${db.prepare('SELECT COUNT(*) as n FROM drawings').get().n}`);
 
 /* ── Seed users (hashed passwords) ─────────────────────────────── */
 const SALT_ROUNDS = 10;
