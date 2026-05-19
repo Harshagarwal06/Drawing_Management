@@ -1,5 +1,5 @@
-import { useState, useEffect } from "react";
-import { MoreVertical } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
+import { MoreVertical, KeyRound, FolderKey, X } from "lucide-react";
 
 const API = import.meta.env.VITE_API_URL;
 
@@ -29,6 +29,12 @@ export default function SettingsView({ currentUser, onUserUpdate, token }) {
   const [pendingProjects,    setPendingProjects]    = useState([]);
   const [userSearch,         setUserSearch]         = useState('');
   const [roleFilter,         setRoleFilter]         = useState('All');
+  const [menuOpenId,         setMenuOpenId]         = useState(null); // which user's ⋮ menu is open
+  const [resetUserId,        setResetUserId]        = useState(null); // inline reset-password for this user
+  const [resetPw,            setResetPw]            = useState('');
+  const [resetMsg,           setResetMsg]           = useState(null);
+  const [resetLoading,       setResetLoading]       = useState(false);
+  const menuRef = useRef(null);
 
   /* Returns null for wildcard, or an array of project IDs */
   const parseAllowed = (ap) => {
@@ -107,6 +113,27 @@ export default function SettingsView({ currentUser, onUserUpdate, token }) {
     const parsed = parseAllowed(u.allowed_projects);
     // If wildcard (null), pre-select all projects; otherwise use the stored list
     setPendingProjects(parsed === null ? projects.map(p => p.id) : parsed);
+  };
+
+  const handleResetPassword = async (userId) => {
+    if (!resetPw || resetPw.length < 6) { setResetMsg({ type: 'error', text: 'Password must be at least 6 characters.' }); return; }
+    setResetLoading(true);
+    try {
+      const res = await fetch(`${API}/api/users/${userId}/reset-password`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ newPassword: resetPw }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setResetMsg({ type: 'success', text: 'Password reset successfully.' });
+        setResetPw('');
+        setTimeout(() => { setResetUserId(null); setResetMsg(null); }, 1500);
+      } else {
+        setResetMsg({ type: 'error', text: data.error || 'Failed to reset password.' });
+      }
+    } catch { setResetMsg({ type: 'error', text: 'Cannot connect to server.' }); }
+    finally { setResetLoading(false); }
   };
 
   const handleAddUser = async e => {
@@ -294,15 +321,76 @@ export default function SettingsView({ currentUser, onUserUpdate, token }) {
                         {/* Spacer for Director / self rows so columns stay aligned */}
                         {(!isNonDirector || isSelf) && <div className="w-[80px] shrink-0" />}
 
-                        {/* Row actions */}
-                        <button
-                          disabled={isSelf}
-                          className="p-1 rounded-md text-on-surface-variant hover:bg-surface-container disabled:opacity-30 transition-colors shrink-0"
-                          title="More actions"
-                        >
-                          <MoreVertical size={15} />
-                        </button>
+                        {/* Row actions — ⋮ dropdown */}
+                        <div className="relative shrink-0">
+                          <button
+                            disabled={isSelf}
+                            onClick={() => setMenuOpenId(menuOpenId === u.id ? null : u.id)}
+                            className="p-1 rounded-md text-on-surface-variant hover:bg-surface-container disabled:opacity-30 transition-colors"
+                            title="More actions"
+                          >
+                            <MoreVertical size={15} />
+                          </button>
+
+                          {menuOpenId === u.id && (
+                            <>
+                              {/* backdrop */}
+                              <div className="fixed inset-0 z-10" onClick={() => setMenuOpenId(null)} />
+                              <div className="absolute right-0 top-8 z-20 w-48 bg-white border border-border-slate rounded-xl shadow-lg overflow-hidden">
+                                {isNonDirector && (
+                                  <button
+                                    onClick={() => { setMenuOpenId(null); isExpanded ? setEditingProjectsFor(null) : openProjectEditor(u); }}
+                                    className="w-full flex items-center gap-2.5 px-4 py-2.5 text-[13px] text-on-surface hover:bg-surface-container-low transition-colors text-left"
+                                  >
+                                    <FolderKey size={14} className="text-on-surface-variant shrink-0" />
+                                    Edit Project Access
+                                  </button>
+                                )}
+                                <button
+                                  onClick={() => { setMenuOpenId(null); setResetUserId(u.id); setResetPw(''); setResetMsg(null); }}
+                                  className="w-full flex items-center gap-2.5 px-4 py-2.5 text-[13px] text-on-surface hover:bg-surface-container-low transition-colors text-left border-t border-border-slate"
+                                >
+                                  <KeyRound size={14} className="text-on-surface-variant shrink-0" />
+                                  Reset Password
+                                </button>
+                              </div>
+                            </>
+                          )}
+                        </div>
                       </div>
+
+                      {/* ── Inline reset-password panel ── */}
+                      {resetUserId === u.id && (
+                        <div className="border-t border-border-slate bg-surface-container-low px-4 py-3">
+                          <div className="flex items-center justify-between mb-2">
+                            <p className="text-[11px] font-semibold text-on-surface-variant uppercase tracking-wide">Reset Password — {u.name}</p>
+                            <button onClick={() => { setResetUserId(null); setResetMsg(null); }} className="text-on-surface-variant hover:text-on-surface">
+                              <X size={14} />
+                            </button>
+                          </div>
+                          {resetMsg && (
+                            <div className={`text-[12px] p-2 rounded-lg border mb-2 ${resetMsg.type === 'success' ? 'bg-status-emerald-bg text-status-emerald-text border-status-emerald-text/20' : 'bg-status-rose-bg text-status-rose-text border-status-rose-text/20'}`}>
+                              {resetMsg.text}
+                            </div>
+                          )}
+                          <div className="flex gap-2 items-center">
+                            <input
+                              type="password"
+                              value={resetPw}
+                              onChange={e => setResetPw(e.target.value)}
+                              placeholder="New password (min 6 chars)"
+                              className="flex-1 bg-white border border-border-slate rounded-lg px-3 py-1.5 text-[13px] text-on-surface focus:outline-none focus:ring-1 focus:ring-primary/20 focus:border-primary transition-all"
+                            />
+                            <button
+                              onClick={() => handleResetPassword(u.id)}
+                              disabled={resetLoading}
+                              className="bg-primary text-white rounded-lg hover:bg-primary-container px-3 py-1.5 font-medium text-[12px] transition-colors disabled:opacity-60 shrink-0"
+                            >
+                              {resetLoading ? 'Saving…' : 'Set Password'}
+                            </button>
+                          </div>
+                        </div>
+                      )}
 
                       {/* ── Inline project editor ── */}
                       {isNonDirector && !isSelf && isExpanded && (

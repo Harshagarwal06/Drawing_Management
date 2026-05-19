@@ -784,6 +784,24 @@ app.patch('/api/users/:id/role', requireDirector, (req, res) => {
   }
 });
 
+/* ── PATCH /api/users/:id/reset-password (Director only) ───────── */
+app.patch('/api/users/:id/reset-password', requireDirector, async (req, res) => {
+  const { newPassword } = req.body;
+  if (!newPassword || newPassword.length < 6)
+    return res.status(400).json({ error: 'New password must be at least 6 characters.' });
+  try {
+    const user = db.prepare('SELECT id FROM users WHERE id = ?').get(req.params.id);
+    if (!user) return res.status(404).json({ error: 'User not found.' });
+    const hashed = await bcrypt.hash(newPassword, SALT_ROUNDS);
+    db.prepare('UPDATE users SET password = ? WHERE id = ?').run(hashed, req.params.id);
+    console.log(`✅ Director reset password for user id=${req.params.id}`);
+    res.json({ message: 'Password reset successfully.' });
+  } catch (err) {
+    console.error('❌ PATCH /api/users/:id/reset-password error:', err);
+    res.status(500).json({ error: 'Failed to reset password.' });
+  }
+});
+
 /* ── PATCH /api/users/me/password ───────────────────────────────── */
 app.patch('/api/users/me/password', async (req, res) => {
   const { currentPassword, newPassword } = req.body;
