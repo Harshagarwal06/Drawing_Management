@@ -1,4 +1,5 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { MoreVertical, KeyRound, FolderKey, X } from "lucide-react";
 
 const API = import.meta.env.VITE_API_URL;
@@ -10,6 +11,54 @@ const ROLE_COLOR = {
   'In House Architect':  'bg-status-emerald-bg text-status-emerald-text',
   'Project Team':        'bg-status-amber-bg text-status-amber-text',
 };
+
+/* ── Portal dropdown — escapes overflow:hidden containers ─────────
+   Positions itself with fixed coords from getBoundingClientRect().
+   Flips upward automatically when there isn't enough space below.   */
+const MENU_W = 192;
+const MENU_H = 96; // approximate max height of the menu
+
+function PortalDropdown({ anchorEl, onClose, children }) {
+  const [pos, setPos] = useState(null);
+
+  useEffect(() => {
+    if (!anchorEl) return;
+    const rect = anchorEl.getBoundingClientRect();
+    const spaceBelow = window.innerHeight - rect.bottom;
+    const flipUp     = spaceBelow < MENU_H + 8;
+
+    // Right-align the menu to the button, clamped inside the viewport
+    const rawLeft = rect.right - MENU_W;
+    const left    = Math.max(8, Math.min(window.innerWidth - MENU_W - 8, rawLeft));
+
+    setPos({
+      left,
+      ...(flipUp
+        ? { bottom: window.innerHeight - rect.top + 4 }
+        : { top:    rect.bottom + 4 }),
+    });
+  }, [anchorEl]);
+
+  if (!pos) return null;
+
+  return createPortal(
+    <>
+      {/* Invisible full-screen backdrop to catch outside clicks */}
+      <div
+        style={{ position: 'fixed', inset: 0, zIndex: 9998 }}
+        onClick={onClose}
+      />
+      {/* Menu panel */}
+      <div
+        style={{ position: 'fixed', zIndex: 9999, width: MENU_W, ...pos }}
+        className="bg-white border border-border-slate rounded-xl shadow-xl overflow-hidden"
+      >
+        {children}
+      </div>
+    </>,
+    document.body
+  );
+}
 
 export default function SettingsView({ currentUser, onUserUpdate, token }) {
   const isAdmin = currentUser?.role === 'Director';
@@ -29,12 +78,34 @@ export default function SettingsView({ currentUser, onUserUpdate, token }) {
   const [pendingProjects,    setPendingProjects]    = useState([]);
   const [userSearch,         setUserSearch]         = useState('');
   const [roleFilter,         setRoleFilter]         = useState('All');
-  const [menuOpenId,         setMenuOpenId]         = useState(null); // which user's ⋮ menu is open
-  const [resetUserId,        setResetUserId]        = useState(null); // inline reset-password for this user
-  const [resetPw,            setResetPw]            = useState('');
-  const [resetMsg,           setResetMsg]           = useState(null);
-  const [resetLoading,       setResetLoading]       = useState(false);
-  const menuRef = useRef(null);
+
+  // ⋮ menu state — tracks which user's menu is open + the anchor DOM element
+  const [menuOpenId,  setMenuOpenId]  = useState(null);
+  const [menuAnchor,  setMenuAnchor]  = useState(null); // the button element for PortalDropdown
+
+  // Reset-password inline panel
+  const [resetUserId, setResetUserId] = useState(null);
+  const [resetPw,     setResetPw]     = useState('');
+  const [resetMsg,    setResetMsg]    = useState(null);
+  const [resetLoading,setResetLoading]= useState(false);
+
+  // Map of userId → button DOM element, so we can pass the correct anchor to PortalDropdown
+  const btnRefs = useRef(new Map());
+  const setBtnRef = useCallback((userId, el) => {
+    if (el) btnRefs.current.set(userId, el);
+    else    btnRefs.current.delete(userId);
+  }, []);
+
+  const openMenu = (userId) => {
+    const el = btnRefs.current.get(userId);
+    setMenuOpenId(userId);
+    setMenuAnchor(el || null);
+  };
+
+  const closeMenu = () => {
+    setMenuOpenId(null);
+    setMenuAnchor(null);
+  };
 
   /* Returns null for wildcard, or an array of project IDs */
   const parseAllowed = (ap) => {
@@ -111,7 +182,6 @@ export default function SettingsView({ currentUser, onUserUpdate, token }) {
   const openProjectEditor = (u) => {
     setEditingProjectsFor(u.id);
     const parsed = parseAllowed(u.allowed_projects);
-    // If wildcard (null), pre-select all projects; otherwise use the stored list
     setPendingProjects(parsed === null ? projects.map(p => p.id) : parsed);
   };
 
@@ -246,7 +316,7 @@ export default function SettingsView({ currentUser, onUserUpdate, token }) {
             </div>
           )}
 
-          {/* User list — single container with dividers */}
+          {/* User list */}
           {!addOpen && (
             <div className="rounded-xl border border-border-slate overflow-hidden mb-4">
               {users
@@ -276,7 +346,7 @@ export default function SettingsView({ currentUser, onUserUpdate, token }) {
                           <p className="text-[11px] text-on-surface-variant">@{u.username}</p>
                         </div>
 
-                        {/* Role dropdown — sole visual indicator + control */}
+                        {/* Role dropdown */}
                         <div className="relative flex items-center gap-1.5 shrink-0">
                           <select
                             value={u.role}
@@ -286,7 +356,6 @@ export default function SettingsView({ currentUser, onUserUpdate, token }) {
                           >
                             {ROLES.map(r => <option key={r} value={r}>{r}</option>)}
                           </select>
-                          {/* Per-row flash: green check or red X for 2s */}
                           {roleFlash?.userId === u.id && (
                             <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full shrink-0 ${
                               roleFlash.ok
@@ -318,53 +387,62 @@ export default function SettingsView({ currentUser, onUserUpdate, token }) {
                             </button>
                           )
                         )}
-                        {/* Spacer for Director / self rows so columns stay aligned */}
+                        {/* Spacer for Director / self rows */}
                         {(!isNonDirector || isSelf) && <div className="w-[80px] shrink-0" />}
 
-                        {/* Row actions — ⋮ dropdown */}
-                        <div className="relative shrink-0">
-                          <button
-                            disabled={isSelf}
-                            onClick={() => setMenuOpenId(menuOpenId === u.id ? null : u.id)}
-                            className="p-1 rounded-md text-on-surface-variant hover:bg-surface-container disabled:opacity-30 transition-colors"
-                            title="More actions"
-                          >
-                            <MoreVertical size={15} />
-                          </button>
-
-                          {menuOpenId === u.id && (
-                            <>
-                              {/* backdrop */}
-                              <div className="fixed inset-0 z-10" onClick={() => setMenuOpenId(null)} />
-                              <div className="absolute right-0 top-8 z-20 w-48 bg-white border border-border-slate rounded-xl shadow-lg overflow-hidden">
-                                {isNonDirector && (
-                                  <button
-                                    onClick={() => { setMenuOpenId(null); isExpanded ? setEditingProjectsFor(null) : openProjectEditor(u); }}
-                                    className="w-full flex items-center gap-2.5 px-4 py-2.5 text-[13px] text-on-surface hover:bg-surface-container-low transition-colors text-left"
-                                  >
-                                    <FolderKey size={14} className="text-on-surface-variant shrink-0" />
-                                    Edit Project Access
-                                  </button>
-                                )}
-                                <button
-                                  onClick={() => { setMenuOpenId(null); setResetUserId(u.id); setResetPw(''); setResetMsg(null); }}
-                                  className="w-full flex items-center gap-2.5 px-4 py-2.5 text-[13px] text-on-surface hover:bg-surface-container-low transition-colors text-left border-t border-border-slate"
-                                >
-                                  <KeyRound size={14} className="text-on-surface-variant shrink-0" />
-                                  Reset Password
-                                </button>
-                              </div>
-                            </>
-                          )}
-                        </div>
+                        {/* ⋮ button — ref stored in map for portal positioning */}
+                        <button
+                          ref={el => setBtnRef(u.id, el)}
+                          disabled={isSelf}
+                          onClick={() => menuOpenId === u.id ? closeMenu() : openMenu(u.id)}
+                          className="p-1 rounded-md text-on-surface-variant hover:bg-surface-container disabled:opacity-30 transition-colors shrink-0"
+                          title="More actions"
+                        >
+                          <MoreVertical size={15} />
+                        </button>
                       </div>
+
+                      {/* ── Portal dropdown (escapes overflow:hidden) ── */}
+                      {menuOpenId === u.id && (
+                        <PortalDropdown anchorEl={menuAnchor} onClose={closeMenu}>
+                          {isNonDirector && (
+                            <button
+                              onClick={() => {
+                                closeMenu();
+                                isExpanded ? setEditingProjectsFor(null) : openProjectEditor(u);
+                              }}
+                              className="w-full flex items-center gap-2.5 px-4 py-2.5 text-[13px] text-on-surface hover:bg-surface-container-low transition-colors text-left"
+                            >
+                              <FolderKey size={14} className="text-on-surface-variant shrink-0" />
+                              Edit Project Access
+                            </button>
+                          )}
+                          <button
+                            onClick={() => {
+                              closeMenu();
+                              setResetUserId(u.id);
+                              setResetPw('');
+                              setResetMsg(null);
+                            }}
+                            className={`w-full flex items-center gap-2.5 px-4 py-2.5 text-[13px] text-on-surface hover:bg-surface-container-low transition-colors text-left ${isNonDirector ? 'border-t border-border-slate' : ''}`}
+                          >
+                            <KeyRound size={14} className="text-on-surface-variant shrink-0" />
+                            Reset Password
+                          </button>
+                        </PortalDropdown>
+                      )}
 
                       {/* ── Inline reset-password panel ── */}
                       {resetUserId === u.id && (
                         <div className="border-t border-border-slate bg-surface-container-low px-4 py-3">
                           <div className="flex items-center justify-between mb-2">
-                            <p className="text-[11px] font-semibold text-on-surface-variant uppercase tracking-wide">Reset Password — {u.name}</p>
-                            <button onClick={() => { setResetUserId(null); setResetMsg(null); }} className="text-on-surface-variant hover:text-on-surface">
+                            <p className="text-[11px] font-semibold text-on-surface-variant uppercase tracking-wide">
+                              Reset Password — {u.name}
+                            </p>
+                            <button
+                              onClick={() => { setResetUserId(null); setResetMsg(null); }}
+                              className="text-on-surface-variant hover:text-on-surface"
+                            >
                               <X size={14} />
                             </button>
                           </div>
@@ -378,6 +456,7 @@ export default function SettingsView({ currentUser, onUserUpdate, token }) {
                               type="password"
                               value={resetPw}
                               onChange={e => setResetPw(e.target.value)}
+                              onKeyDown={e => e.key === 'Enter' && handleResetPassword(u.id)}
                               placeholder="New password (min 6 chars)"
                               className="flex-1 bg-white border border-border-slate rounded-lg px-3 py-1.5 text-[13px] text-on-surface focus:outline-none focus:ring-1 focus:ring-primary/20 focus:border-primary transition-all"
                             />
