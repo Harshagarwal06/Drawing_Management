@@ -35,7 +35,9 @@ function SkeletonCard() {
   );
 }
 
-export default function TransmittalsView({ transmittals = [], drawings = [], loading = false }) {
+const API = import.meta.env.VITE_API_URL;
+
+export default function TransmittalsView({ transmittals = [], drawings = [], loading = false, token = "" }) {
   const drawingMap = Object.fromEntries(drawings.map(d => [d.id, d]));
   // Track which transmittal cards are expanded (showing all drawings)
   const [expandedIds, setExpandedIds] = useState(new Set());
@@ -135,19 +137,30 @@ export default function TransmittalsView({ transmittals = [], drawings = [], loa
                     )}
                   </div>
 
-                  {/* Right: recipients */}
-                  <div className="shrink-0 min-w-[180px]">
-                    <p className="font-label-sm text-label-sm text-outline mb-2 uppercase tracking-wider">Recipients</p>
+                  {/* Right: recipients + PDF download */}
+                  <div className="shrink-0 min-w-[180px] flex flex-col gap-2">
+                    <p className="font-label-sm text-label-sm text-outline uppercase tracking-wider">Recipients</p>
                     <div className="flex flex-col gap-1">
-                      {(t.recipients || []).map((r, i) => (
-                        <div key={i} className="flex items-center gap-2">
-                          <div className="w-6 h-6 rounded-full bg-primary flex items-center justify-center text-on-primary text-[10px] font-bold shrink-0">
-                            {r.charAt(0).toUpperCase()}
+                      {(t.recipients || []).map((r, i) => {
+                        const name = typeof r === "string" ? r : (r.name || "");
+                        const initial = name.charAt(0).toUpperCase();
+                        return (
+                          <div key={i} className="flex items-center gap-2">
+                            <div className="w-6 h-6 rounded-full bg-primary flex items-center justify-center text-on-primary text-[10px] font-bold shrink-0">
+                              {initial}
+                            </div>
+                            <span className="font-body-sm text-[12px] text-on-surface-variant truncate">{name}</span>
                           </div>
-                          <span className="font-body-sm text-[12px] text-on-surface-variant truncate">{r}</span>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
+                    <button
+                      onClick={() => window.open(`${API}/api/transmittals/${t.id}/pdf?token=${token}`, "_blank")}
+                      className="mt-1 inline-flex items-center gap-1.5 text-[11px] font-medium text-primary hover:underline w-fit"
+                    >
+                      <span className="material-symbols-outlined text-[14px]">download</span>
+                      Download PDF
+                    </button>
                   </div>
                 </div>
               </div>

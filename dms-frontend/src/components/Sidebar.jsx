@@ -10,7 +10,6 @@ const NAV_ITEMS = [
 
 export default function Sidebar({
   activeProject,
-  onNewDrawing,
   mobileOpen    = false,
   onMobileClose = () => {},
 }) {
@@ -67,17 +66,6 @@ export default function Sidebar({
             <span className="material-symbols-outlined text-[20px]">close</span>
           </button>
         </div>
-
-        {/* New Drawing CTA */}
-        {onNewDrawing && (
-          <button
-            onClick={() => { onNewDrawing(); onMobileClose(); }}
-            className="w-full bg-primary text-white py-3 rounded-xl text-[14px] font-medium flex items-center justify-center gap-2 mb-6 hover:bg-primary-container transition-colors active:scale-[0.98]"
-          >
-            <span className="material-symbols-outlined text-[20px]">add</span>
-            New Drawing
-          </button>
-        )}
 
         {/* Nav */}
         <nav className="flex flex-col gap-1 flex-1">

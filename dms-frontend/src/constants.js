@@ -100,6 +100,7 @@ export const TRANSMITTAL_PURPOSES = [
   "For Approval",
   "For Construction",
   "For Information",
+  "For Tender",
   "As-Built",
 ];
 

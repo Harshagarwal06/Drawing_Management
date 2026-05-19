@@ -147,8 +147,6 @@ export default function App() {
     (Date.now() - new Date(t.issuedAt).getTime()) > MS_30_DAYS
   ).length;
 
-  const nextTrnNumber = `TRN-${String(transmittals.length + 1).padStart(3, "0")}`;
-
   /* ── Filter + sort ── */
   const filtered = useMemo(() => {
     let d = drawings.filter(row => {
@@ -220,7 +218,6 @@ export default function App() {
         method:  "POST",
         headers: { "Content-Type": "application/json", ...authHeaders(currentUser.token) },
         body: JSON.stringify({
-          number:     nextTrnNumber,
           drawingIds: formData.drawingIds,
           recipients: formData.recipients,
           purpose:    formData.purpose,
@@ -231,6 +228,7 @@ export default function App() {
       });
       if (res.status === 401) { handleUnauthorized(); return; }
       if (!res.ok) throw new Error(`Server responded ${res.status}`);
+      const created = await res.json();
       const [freshDrawings, freshTransmittals] = await Promise.all([
         fetchDrawings(activeProject.id, currentUser.token),
         fetchTransmittals(activeProject.id, currentUser.token),
@@ -238,7 +236,7 @@ export default function App() {
       setDrawings(freshDrawings);
       setTransmittals(freshTransmittals);
       setShowTransmittal(false);
-      setToast({ msg: `Transmittal ${nextTrnNumber} issued successfully.`, type: "success" });
+      setToast({ msg: `Transmittal ${created.number} issued successfully.`, type: "success" });
     } catch {
       setShowTransmittal(false);
       setToast({ msg: "Could not save transmittal — is the backend running?", type: "error" });
@@ -346,7 +344,7 @@ export default function App() {
             } />
 
             <Route path="/transmittals" element={
-              <TransmittalsView transmittals={transmittals} drawings={drawings} loading={drawingsLoading} />
+              <TransmittalsView transmittals={transmittals} drawings={drawings} loading={drawingsLoading} token={currentUser?.token} />
             } />
 
             <Route path="/analytics" element={
@@ -372,7 +370,6 @@ export default function App() {
           drawings={drawings}
           onClose={() => setShowTransmittal(false)}
           onSubmit={handleTransmittal}
-          trnNumber={nextTrnNumber}
         />
       )}
       {toast && <Toast msg={toast.msg} type={toast.type} onDone={() => setToast(null)} />}

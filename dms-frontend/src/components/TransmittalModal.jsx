@@ -1,14 +1,7 @@
 import { useState } from "react";
-import { X, Search, Send, Loader2 } from "lucide-react";
+import { X, Search, Send, Loader2, Plus, UserPlus } from "lucide-react";
 import FieldLabel from "./FieldLabel";
-import { MOCK_RECIPIENTS, TRANSMITTAL_PURPOSES, STATUS_META } from "../constants";
-
-const AVATAR_COLORS = [
-  "bg-violet-500","bg-blue-500","bg-teal-500","bg-amber-500","bg-pink-500",
-  "bg-cyan-500","bg-orange-500","bg-emerald-500","bg-rose-500","bg-indigo-500",
-];
-const avatarColor = (id) =>
-  AVATAR_COLORS[MOCK_RECIPIENTS.findIndex(r => r.id === id) % AVATAR_COLORS.length];
+import { TRANSMITTAL_PURPOSES, STATUS_META } from "../constants";
 
 const STATUS_PILL = {
   S3:   { bg: "bg-status-emerald-bg", text: "text-status-emerald-text" },
@@ -17,14 +10,17 @@ const STATUS_PILL = {
   VOID: { bg: "bg-status-rose-bg",    text: "text-status-rose-text"    },
 };
 
-export default function TransmittalModal({ drawings, onClose, onSubmit, trnNumber }) {
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+export default function TransmittalModal({ drawings, onClose, onSubmit }) {
   const [selectedDrawings,   setSelectedDrawings]   = useState([]);
   const [selectedRecipients, setSelectedRecipients] = useState([]);
+  const [recipientName,      setRecipientName]      = useState("");
+  const [recipientEmail,     setRecipientEmail]     = useState("");
+  const [recipientError,     setRecipientError]     = useState("");
   const [purpose,            setPurpose]            = useState("");
   const [remarks,            setRemarks]            = useState("");
   const [drawingSearch,      setDrawingSearch]      = useState("");
-  const [recipientSearch,    setRecipientSearch]    = useState("");
-  const [recipientOpen,      setRecipientOpen]      = useState(false);
   const [errors,             setErrors]             = useState({});
   const [submitting,         setSubmitting]         = useState(false);
 
@@ -33,16 +29,27 @@ export default function TransmittalModal({ drawings, onClose, onSubmit, trnNumbe
     return !q || d.number.toLowerCase().includes(q) || d.title.toLowerCase().includes(q);
   });
 
-  const filteredRecipients = MOCK_RECIPIENTS.filter(r =>
-    !selectedRecipients.find(s => s.id === r.id) &&
-    (recipientSearch === "" ||
-      r.name.toLowerCase().includes(recipientSearch.toLowerCase()) ||
-      r.role.toLowerCase().includes(recipientSearch.toLowerCase()))
-  );
+  const toggleDrawing = id =>
+    setSelectedDrawings(p => p.includes(id) ? p.filter(x => x !== id) : [...p, id]);
 
-  const toggleDrawing   = id => setSelectedDrawings(p => p.includes(id) ? p.filter(x => x !== id) : [...p, id]);
-  const addRecipient    = r  => { setSelectedRecipients(p => [...p, r]); setRecipientSearch(""); setErrors(e => ({ ...e, recipients: "" })); };
-  const removeRecipient = id => setSelectedRecipients(p => p.filter(r => r.id !== id));
+  const addRecipient = () => {
+    const name  = recipientName.trim();
+    const email = recipientEmail.trim();
+    if (!name)                  { setRecipientError("Name is required"); return; }
+    if (!EMAIL_RE.test(email))  { setRecipientError("Enter a valid email address"); return; }
+    setSelectedRecipients(p => [...p, { name, email }]);
+    setRecipientName("");
+    setRecipientEmail("");
+    setRecipientError("");
+    setErrors(e => ({ ...e, recipients: "" }));
+  };
+
+  const removeRecipient = idx =>
+    setSelectedRecipients(p => p.filter((_, i) => i !== idx));
+
+  const handleRecipientKeyDown = e => {
+    if (e.key === "Enter") { e.preventDefault(); addRecipient(); }
+  };
 
   const validate = () => {
     const e = {};
@@ -62,8 +69,6 @@ export default function TransmittalModal({ drawings, onClose, onSubmit, trnNumbe
   };
 
   const errMsg = key => errors[key] && <p className="text-[12px] text-status-rose-text mt-1.5">{errors[key]}</p>;
-
-  /* shared input border */
   const fieldBorder = key => errors[key] ? "border-status-rose-text" : "border-border-slate";
 
   return (
@@ -73,10 +78,7 @@ export default function TransmittalModal({ drawings, onClose, onSubmit, trnNumbe
         {/* Header */}
         <div className="px-6 py-4 flex items-center justify-between shrink-0 bg-surface-container-low border-b border-border-slate">
           <div>
-            <span className="text-xs font-mono font-bold text-primary bg-primary/10 px-2 py-0.5 rounded border border-primary/20">
-              {trnNumber}
-            </span>
-            <h2 className="text-[16px] font-semibold text-on-surface mt-1">Create Transmittal</h2>
+            <h2 className="text-[16px] font-semibold text-on-surface">Create Transmittal</h2>
             <p className="text-[12px] text-on-surface-variant mt-0.5">Issue drawings to project recipients</p>
           </div>
           <button onClick={onClose} className="p-1.5 rounded-lg text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-colors">
@@ -156,51 +158,68 @@ export default function TransmittalModal({ drawings, onClose, onSubmit, trnNumbe
             {/* RIGHT — Recipients + Purpose + Remarks */}
             <div className="flex flex-col gap-5">
 
-              {/* Recipients */}
-              <div className="relative">
+              {/* Recipients — free-type */}
+              <div>
                 <FieldLabel req>Recipients</FieldLabel>
-                <div
-                  className={`min-h-[44px] border rounded-xl px-3 py-2 flex flex-wrap gap-1.5 cursor-text bg-white transition-colors ${fieldBorder("recipients")}`}
-                  onClick={() => setRecipientOpen(true)}
-                >
-                  {selectedRecipients.map(r => (
-                    <span key={r.id} className="inline-flex items-center gap-1 bg-primary/10 text-primary text-[12px] font-medium px-2 py-1 rounded-full">
-                      <span className={`w-4 h-4 rounded-full ${avatarColor(r.id)} text-white flex items-center justify-center text-[8px] font-bold shrink-0`}>
-                        {r.avatar[0]}
-                      </span>
-                      {r.name}
-                      <button type="button" onClick={e => { e.stopPropagation(); removeRecipient(r.id); }}
-                        className="ml-0.5 text-primary/60 hover:text-primary">×</button>
-                    </span>
-                  ))}
-                  <input
-                    placeholder={selectedRecipients.length === 0 ? "Search people or groups…" : ""}
-                    value={recipientSearch}
-                    onChange={e => { setRecipientSearch(e.target.value); setRecipientOpen(true); }}
-                    onFocus={() => setRecipientOpen(true)}
-                    className="text-[13px] flex-1 min-w-[120px] outline-none bg-transparent text-on-surface placeholder:text-on-surface-variant py-0.5"
-                  />
-                </div>
 
-                {recipientOpen && filteredRecipients.length > 0 && (
-                  <div className="absolute z-20 left-0 right-0 top-full mt-1 bg-white border border-border-slate rounded-xl shadow-lg overflow-hidden">
-                    {filteredRecipients.slice(0, 6).map(r => (
-                      <button type="button" key={r.id}
-                        onMouseDown={e => { e.preventDefault(); addRecipient(r); setRecipientOpen(false); }}
-                        className="w-full flex items-center gap-2.5 px-3 py-2.5 text-left hover:bg-surface-container-low transition-colors border-b border-border-slate last:border-0"
-                      >
-                        <span className={`w-7 h-7 rounded-full ${avatarColor(r.id)} text-white text-[12px] font-bold flex items-center justify-center shrink-0`}>
-                          {r.avatar}
+                {/* Added recipients as pills */}
+                {selectedRecipients.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5 mb-2">
+                    {selectedRecipients.map((r, i) => (
+                      <span key={i} className="inline-flex items-center gap-1.5 bg-primary/10 text-primary text-[12px] font-medium px-2.5 py-1 rounded-full border border-primary/20">
+                        <span className="w-4 h-4 rounded-full bg-primary text-white flex items-center justify-center text-[8px] font-bold shrink-0">
+                          {r.name.charAt(0).toUpperCase()}
                         </span>
-                        <div>
-                          <p className="text-[13px] font-semibold text-on-surface">{r.name}</p>
-                          <p className="text-[11px] text-on-surface-variant">{r.role}</p>
-                        </div>
-                      </button>
+                        <span className="max-w-[160px] truncate">{r.name} &lt;{r.email}&gt;</span>
+                        <button
+                          type="button"
+                          onClick={() => removeRecipient(i)}
+                          className="ml-0.5 text-primary/60 hover:text-primary leading-none"
+                          aria-label="Remove recipient"
+                        >×</button>
+                      </span>
                     ))}
                   </div>
                 )}
-                {recipientOpen && <div className="fixed inset-0 z-10" onClick={() => setRecipientOpen(false)} />}
+
+                {/* Input row */}
+                <div className={`border rounded-xl overflow-hidden ${errors.recipients ? "border-status-rose-text" : "border-border-slate"}`}>
+                  <div className="flex items-center gap-0 divide-x divide-border-slate">
+                    <div className="flex items-center gap-2 px-3 py-2 flex-1 min-w-0">
+                      <UserPlus className="w-3.5 h-3.5 text-on-surface-variant shrink-0" />
+                      <input
+                        type="text"
+                        placeholder="Full name"
+                        value={recipientName}
+                        onChange={e => { setRecipientName(e.target.value); setRecipientError(""); }}
+                        onKeyDown={handleRecipientKeyDown}
+                        className="text-[13px] flex-1 outline-none bg-transparent text-on-surface placeholder:text-on-surface-variant min-w-0"
+                      />
+                    </div>
+                    <div className="flex items-center gap-2 px-3 py-2 flex-1 min-w-0">
+                      <input
+                        type="email"
+                        placeholder="email@company.com"
+                        value={recipientEmail}
+                        onChange={e => { setRecipientEmail(e.target.value); setRecipientError(""); }}
+                        onKeyDown={handleRecipientKeyDown}
+                        className="text-[13px] flex-1 outline-none bg-transparent text-on-surface placeholder:text-on-surface-variant min-w-0"
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={addRecipient}
+                      className="px-3 py-2 bg-primary/10 hover:bg-primary/20 text-primary transition-colors shrink-0 flex items-center gap-1.5"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      <span className="text-[12px] font-semibold hidden sm:inline">Add</span>
+                    </button>
+                  </div>
+                </div>
+
+                {recipientError && (
+                  <p className="text-[12px] text-status-rose-text mt-1.5">{recipientError}</p>
+                )}
                 {errMsg("recipients")}
               </div>
 
@@ -244,7 +263,7 @@ export default function TransmittalModal({ drawings, onClose, onSubmit, trnNumbe
 
           {/* Footer */}
           <div className="px-6 py-4 border-t border-border-slate bg-surface-container-low flex items-center justify-between gap-3 shrink-0">
-            <p className="text-[12px] text-on-surface-variant hidden sm:block">A PDF cover sheet will be auto-generated.</p>
+            <p className="text-[12px] text-on-surface-variant hidden sm:block">A PDF cover sheet will be generated &amp; emailed to recipients.</p>
             <div className="flex items-center gap-2 ml-auto">
               <button type="button" onClick={onClose}
                 className="bg-white border border-border-slate text-on-surface-variant hover:bg-surface-container px-4 py-2 rounded-lg text-[14px] font-medium transition-colors">

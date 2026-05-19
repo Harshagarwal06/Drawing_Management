@@ -1,14 +1,16 @@
 require('dotenv').config();
 
-const express   = require('express');
-const multer    = require('multer');
-const cors      = require('cors');
-const fs        = require('fs');
-const path      = require('path');
-const bcrypt    = require('bcrypt');
-const jwt       = require('jsonwebtoken');
-const rateLimit = require('express-rate-limit');
-const Database  = require('better-sqlite3');
+const express      = require('express');
+const multer       = require('multer');
+const cors         = require('cors');
+const fs           = require('fs');
+const path         = require('path');
+const bcrypt       = require('bcrypt');
+const jwt          = require('jsonwebtoken');
+const rateLimit    = require('express-rate-limit');
+const Database     = require('better-sqlite3');
+const PDFDocument  = require('pdfkit');
+const nodemailer   = require('nodemailer');
 const { S3Client, PutObjectCommand } = require('@aws-sdk/client-s3');
 
 const app         = express();
@@ -53,6 +55,24 @@ const r2 = R2_CONFIGURED ? new S3Client({
     secretAccessKey: R2_SECRET,
   },
 }) : null;
+
+/* ── Nodemailer transporter ─────────────────────────────────────── */
+const SMTP_CONFIGURED = !!(process.env.SMTP_HOST);
+const mailer = SMTP_CONFIGURED ? nodemailer.createTransport({
+  host:   process.env.SMTP_HOST,
+  port:   parseInt(process.env.SMTP_PORT || '587', 10),
+  secure: process.env.SMTP_PORT === '465',
+  auth: {
+    user: process.env.SMTP_USER,
+    pass: process.env.SMTP_PASS,
+  },
+}) : null;
+
+if (SMTP_CONFIGURED) {
+  console.log(`📧 SMTP configured → ${process.env.SMTP_HOST}:${process.env.SMTP_PORT || 587}`);
+} else {
+  console.log('📧 SMTP not configured — email delivery disabled (set SMTP_HOST to enable)');
+}
 
 /* ── Middleware ─────────────────────────────────────────────────── */
 app.set('trust proxy', 1); // Railway / Vercel sit behind a reverse proxy
@@ -236,6 +256,19 @@ function verifyToken(req, res, next) {
   if (!auth?.startsWith('Bearer ')) return res.status(401).json({ error: 'Unauthorized — no token provided' });
   try {
     req.user = jwt.verify(auth.slice(7), JWT_SECRET);
+    next();
+  } catch {
+    res.status(401).json({ error: 'Invalid or expired token — please log in again' });
+  }
+}
+
+/* ── JWT auth for PDF download (accepts ?token= query param) ─────── */
+function verifyTokenForDownload(req, res, next) {
+  const auth = req.headers.authorization;
+  const tokenStr = auth?.startsWith('Bearer ') ? auth.slice(7) : req.query.token;
+  if (!tokenStr) return res.status(401).json({ error: 'Unauthorized — no token provided' });
+  try {
+    req.user = jwt.verify(tokenStr, JWT_SECRET);
     next();
   } catch {
     res.status(401).json({ error: 'Invalid or expired token — please log in again' });
@@ -455,13 +488,18 @@ app.get('/api/transmittals', requireProjectAccess, (req, res) => {
 
 /* ── POST /api/transmittals ─────────────────────────────────────── */
 app.post('/api/transmittals', requireWriteAccess, (req, res) => {
-  const { number, drawingIds, recipients, purpose, remarks, issuedAt, projectId } = req.body;
-  const pId = projectId || 1;
+  const { drawingIds, recipients, purpose, remarks, issuedAt, projectId } = req.body;
+  const pId = parseInt(projectId, 10) || 1;
   if (!drawingIds?.length || !recipients?.length || !purpose)
     return res.status(400).json({ error: 'drawingIds, recipients, and purpose are required.' });
   try {
+    // Auto-generate TRN number (per-project sequential)
+    const count = db.prepare('SELECT COUNT(*) as n FROM transmittals WHERE project_id = ?').get(pId).n;
+    const number = `TRN-${String(count + 1).padStart(3, '0')}`;
+
+    const today = issuedAt || new Date().toISOString().split('T')[0];
     const result = db.prepare(`INSERT INTO transmittals (number,drawing_ids,recipients,purpose,remarks,issued_at,project_id) VALUES (?,?,?,?,?,?,?)`)
-      .run(number, JSON.stringify(drawingIds), JSON.stringify(recipients), purpose, remarks || '', issuedAt || new Date().toISOString().split('T')[0], pId);
+      .run(number, JSON.stringify(drawingIds), JSON.stringify(recipients), purpose, remarks || '', today, pId);
     // Single bulk UPDATE instead of N+1 loop
     if (drawingIds.length > 0) {
       const placeholders = drawingIds.map(() => '?').join(',');
@@ -470,10 +508,216 @@ app.post('/api/transmittals', requireWriteAccess, (req, res) => {
     db.prepare('INSERT INTO activity_log (project_id,type,title,detail,created_at) VALUES (?,?,?,?,?)')
       .run(pId, 'transmittal', `${number} issued`, `${drawingIds.length} drawing(s) — ${purpose}`, new Date().toISOString());
     console.log(`✅ Transmittal ${number} saved`);
-    res.status(201).json({ id: result.lastInsertRowid, number });
+
+    const trnId = result.lastInsertRowid;
+    res.status(201).json({ id: trnId, number });
+
+    // ── Async: generate PDF and send emails (don't block response) ──
+    if (SMTP_CONFIGURED && recipients.length > 0) {
+      setImmediate(async () => {
+        try {
+          const project = db.prepare('SELECT * FROM projects WHERE id = ?').get(pId);
+          const drws = drawingIds.length > 0
+            ? db.prepare(`SELECT * FROM drawings WHERE id IN (${drawingIds.map(() => '?').join(',')})`).all(drawingIds)
+            : [];
+
+          // Build PDF buffer
+          const pdfBuffer = await new Promise((resolve, reject) => {
+            const doc = new PDFDocument({ size: 'A4', margin: 50 });
+            const chunks = [];
+            doc.on('data', c => chunks.push(c));
+            doc.on('end',  () => resolve(Buffer.concat(chunks)));
+            doc.on('error', reject);
+            buildTransmittalPdf(doc, { number, purpose, today, project, recipients, drws, remarks });
+            doc.end();
+          });
+
+          // Send to each recipient
+          for (const r of recipients) {
+            const name  = typeof r === 'string' ? r : (r.name  || '');
+            const email = typeof r === 'string' ? '' : (r.email || '');
+            if (!email) { console.log(`⚠️  No email for recipient "${name}" — skipping`); continue; }
+            await mailer.sendMail({
+              from:    process.env.SMTP_FROM || process.env.SMTP_USER,
+              to:      `${name} <${email}>`,
+              subject: `Transmittal ${number} — ${purpose} | ${project?.code || 'Project'}`,
+              html: buildEmailHtml({ number, purpose, today, project, recipients, drws, remarks }),
+              attachments: [{ filename: `${number}.pdf`, content: pdfBuffer, contentType: 'application/pdf' }],
+            });
+            console.log(`✅ Email sent to ${email}`);
+          }
+        } catch (mailErr) {
+          console.error('❌ Email delivery failed:', mailErr.message);
+        }
+      });
+    } else if (!SMTP_CONFIGURED) {
+      console.log('⚠️  SMTP not configured — email not sent');
+    }
   } catch (err) {
     console.error('❌ POST /api/transmittals error:', err);
     res.status(500).json({ error: 'Failed to save transmittal.' });
+  }
+});
+
+/* ── PDF / Email helpers ────────────────────────────────────────── */
+function buildTransmittalPdf(doc, { number, purpose, today, project, recipients, drws, remarks }) {
+  const BLUE   = '#1B3A6B';
+  const GOLD   = '#F4A223';
+  const GRAY   = '#64748B';
+  const LIGHT  = '#F8FAFC';
+  const LINE   = '#E2E8F0';
+  const W      = 495; // usable width (A4 595 - 50*2 margins)
+
+  // ── Header band ──
+  doc.rect(50, 40, W, 60).fill(BLUE);
+  doc.fontSize(18).font('Helvetica-Bold').fillColor('#FFFFFF')
+    .text('TRANSMITTAL COVER SHEET', 60, 52, { width: W - 20 });
+  doc.fontSize(10).font('Helvetica').fillColor(GOLD)
+    .text('Unique Properties — Enterprise Drawing Management', 60, 76, { width: W - 20 });
+
+  // ── Meta grid ──
+  doc.rect(50, 110, W, 70).fill(LIGHT).stroke(LINE);
+  const metaY = 120;
+  const col2  = 310;
+  doc.fontSize(8).font('Helvetica-Bold').fillColor(GRAY);
+  doc.text('TRANSMITTAL NO.',   60,  metaY);
+  doc.text('DATE',              col2, metaY);
+  doc.text('PURPOSE',           60,  metaY + 22);
+  doc.text('PROJECT',           col2, metaY + 22);
+
+  doc.fontSize(11).font('Helvetica-Bold').fillColor('#0F172A');
+  doc.text(number,              60,  metaY + 10);
+  doc.text(today,               col2, metaY + 10);
+  doc.fontSize(10).font('Helvetica').fillColor('#0F172A');
+  doc.text(purpose,             60,  metaY + 32);
+  doc.text(project ? `${project.code} — ${project.name}` : '—', col2, metaY + 32, { width: W - col2 + 50 - 10 });
+
+  // ── Recipients ──
+  let y = 198;
+  doc.fontSize(9).font('Helvetica-Bold').fillColor(BLUE).text('TO:', 50, y);
+  doc.moveTo(50, y + 11).lineTo(545, y + 11).stroke(LINE);
+  y += 16;
+  for (const r of recipients) {
+    const name  = typeof r === 'string' ? r : (r.name  || '');
+    const email = typeof r === 'string' ? '' : (r.email || '');
+    doc.fontSize(10).font('Helvetica').fillColor('#0F172A')
+      .text(`${name}${email ? `  <${email}>` : ''}`, 60, y);
+    y += 15;
+  }
+
+  // ── Drawings table ──
+  y += 8;
+  doc.fontSize(9).font('Helvetica-Bold').fillColor(BLUE).text('DRAWINGS ISSUED:', 50, y);
+  y += 12;
+  doc.rect(50, y, W, 16).fill(BLUE);
+  doc.fontSize(8).font('Helvetica-Bold').fillColor('#FFFFFF');
+  doc.text('Drawing No.',  56, y + 4, { width: 120 });
+  doc.text('Title',       182, y + 4, { width: 180 });
+  doc.text('Rev',         368, y + 4, { width: 30 });
+  doc.text('Status',      404, y + 4, { width: 50 });
+  doc.text('Discipline',  460, y + 4, { width: 80 });
+  y += 16;
+
+  drws.forEach((d, i) => {
+    doc.rect(50, y, W, 15).fill(i % 2 === 0 ? '#FFFFFF' : LIGHT);
+    doc.fontSize(8).font('Helvetica').fillColor('#0F172A');
+    doc.text(d.number      || '—',  56, y + 3, { width: 120 });
+    doc.text(d.title       || '—', 182, y + 3, { width: 180 });
+    doc.text(d.rev         || '—', 368, y + 3, { width: 30 });
+    doc.text(d.status      || '—', 404, y + 3, { width: 50 });
+    doc.text(d.discipline  || '—', 460, y + 3, { width: 80 });
+    y += 15;
+    if (y > 750) { doc.addPage(); y = 50; }
+  });
+
+  // ── Remarks ──
+  if (remarks) {
+    y += 10;
+    doc.fontSize(9).font('Helvetica-Bold').fillColor(BLUE).text('REMARKS:', 50, y);
+    y += 12;
+    doc.fontSize(10).font('Helvetica').fillColor('#334155')
+      .text(remarks, 60, y, { width: W - 10 });
+    y += doc.heightOfString(remarks, { width: W - 10 }) + 4;
+  }
+
+  // ── Footer ──
+  doc.fontSize(7).font('Helvetica').fillColor(GRAY)
+    .text('This document is computer-generated by Unique Properties DMS. Unauthorised reproduction is prohibited.',
+      50, 810, { width: W, align: 'center' });
+}
+
+function buildEmailHtml({ number, purpose, today, project, recipients, drws, remarks }) {
+  const rows = drws.map(d =>
+    `<tr><td style="padding:4px 8px;border-bottom:1px solid #e2e8f0">${d.number}</td>
+         <td style="padding:4px 8px;border-bottom:1px solid #e2e8f0">${d.title}</td>
+         <td style="padding:4px 8px;border-bottom:1px solid #e2e8f0">Rev ${d.rev}</td>
+         <td style="padding:4px 8px;border-bottom:1px solid #e2e8f0">${d.status}</td></tr>`
+  ).join('');
+  return `
+<html><body style="font-family:Arial,sans-serif;color:#0f172a;max-width:600px;margin:auto">
+  <div style="background:#1B3A6B;padding:20px;border-radius:8px 8px 0 0">
+    <h2 style="color:#fff;margin:0">Transmittal ${number}</h2>
+    <p style="color:#F4A223;margin:4px 0 0">Unique Properties — Enterprise Drawing Management</p>
+  </div>
+  <div style="background:#f8fafc;padding:20px;border:1px solid #e2e8f0">
+    <table style="width:100%;margin-bottom:16px">
+      <tr><td style="color:#64748b;font-size:12px">PROJECT</td><td><strong>${project ? project.code + ' — ' + project.name : '—'}</strong></td></tr>
+      <tr><td style="color:#64748b;font-size:12px">DATE</td><td>${today}</td></tr>
+      <tr><td style="color:#64748b;font-size:12px">PURPOSE</td><td>${purpose}</td></tr>
+      <tr><td style="color:#64748b;font-size:12px">RECIPIENTS</td><td>${recipients.map(r => typeof r === 'string' ? r : r.name).join(', ')}</td></tr>
+    </table>
+    <h3 style="color:#1B3A6B;border-bottom:2px solid #1B3A6B;padding-bottom:4px">Drawings Issued (${drws.length})</h3>
+    <table style="width:100%;border-collapse:collapse;font-size:13px">
+      <thead><tr style="background:#1B3A6B;color:#fff">
+        <th style="padding:6px 8px;text-align:left">Drawing No.</th>
+        <th style="padding:6px 8px;text-align:left">Title</th>
+        <th style="padding:6px 8px;text-align:left">Rev</th>
+        <th style="padding:6px 8px;text-align:left">Status</th>
+      </tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+    ${remarks ? `<div style="margin-top:16px;padding:12px;background:#fff;border-left:4px solid #F4A223"><strong>Remarks:</strong><br>${remarks}</div>` : ''}
+    <p style="color:#94a3b8;font-size:11px;margin-top:24px">
+      The PDF cover sheet is attached to this email.<br>
+      This message was generated automatically by Unique Properties DMS.
+    </p>
+  </div>
+</body></html>`;
+}
+
+/* ── GET /api/transmittals/:id/pdf ───────────────────────────────── */
+app.get('/api/transmittals/:id/pdf', verifyTokenForDownload, (req, res) => {
+  try {
+    const t = db.prepare('SELECT * FROM transmittals WHERE id = ?').get(req.params.id);
+    if (!t) return res.status(404).json({ error: 'Transmittal not found.' });
+
+    let drawingIds = [], recipients = [];
+    try { drawingIds = JSON.parse(t.drawing_ids); } catch {}
+    try { recipients = JSON.parse(t.recipients);  } catch {}
+
+    const project = db.prepare('SELECT * FROM projects WHERE id = ?').get(t.project_id) || null;
+    const drws = drawingIds.length > 0
+      ? db.prepare(`SELECT * FROM drawings WHERE id IN (${drawingIds.map(() => '?').join(',')})`).all(drawingIds)
+      : [];
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${t.number}.pdf"`);
+
+    const doc = new PDFDocument({ size: 'A4', margin: 50 });
+    doc.pipe(res);
+    buildTransmittalPdf(doc, {
+      number:     t.number,
+      purpose:    t.purpose,
+      today:      t.issued_at,
+      project,
+      recipients,
+      drws,
+      remarks:    t.remarks,
+    });
+    doc.end();
+  } catch (err) {
+    console.error('❌ GET /api/transmittals/:id/pdf error:', err);
+    if (!res.headersSent) res.status(500).json({ error: 'Failed to generate PDF.' });
   }
 });
 

@@ -28,7 +28,6 @@ export default function AppShell({
         activeProject={activeProject}
         mobileOpen={mobileNavOpen}
         onMobileClose={() => setMobileNavOpen(false)}
-        onNewDrawing={!isRestricted ? onNewDrawing : undefined}
       />
 
       {/* ── Right column ── */}
@@ -60,12 +59,6 @@ export default function AppShell({
 
           {/* Utility icons */}
           <div className="flex items-center gap-1 shrink-0">
-            <button className="p-2 text-on-surface-variant hover:bg-surface-container rounded-full transition-colors" title="Notifications">
-              <span className="material-symbols-outlined text-[22px]">notifications</span>
-            </button>
-            <button className="p-2 text-on-surface-variant hover:bg-surface-container rounded-full transition-colors" title="Help">
-              <span className="material-symbols-outlined text-[22px]">help</span>
-            </button>
 
             {/* Project selector — hidden on /documents (workspace bar handles it there) */}
             {!isDocuments && (
