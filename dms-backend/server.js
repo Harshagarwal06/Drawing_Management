@@ -181,13 +181,32 @@ try { db.exec('ALTER TABLE drawings ADD COLUMN project_id INTEGER DEFAULT 1;'); 
 try { db.exec("ALTER TABLE drawings ADD COLUMN folder_path TEXT DEFAULT '';");       } catch {}
 try { db.exec('ALTER TABLE transmittals ADD COLUMN project_id INTEGER DEFAULT 1;'); } catch {}
 
+// ── Drawing Revisions table ──────────────────────────────────────────
+// Each row is a snapshot of a drawing at the moment it was superseded.
+// The `drawings` table always holds the CURRENT (latest) revision.
+db.exec(`
+  CREATE TABLE IF NOT EXISTS drawing_revisions (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    drawing_id  INTEGER NOT NULL,
+    rev         TEXT,
+    status      TEXT,
+    title       TEXT,
+    discipline  TEXT,
+    originator  TEXT,
+    path        TEXT,
+    uploaded_by TEXT,
+    created_at  TEXT NOT NULL
+  );
+`);
+
 // Performance indexes (safe to run every boot — IF NOT EXISTS)
 try {
   db.exec(`
-    CREATE INDEX IF NOT EXISTS idx_drawings_project_id      ON drawings(project_id);
-    CREATE INDEX IF NOT EXISTS idx_drawings_status          ON drawings(status);
-    CREATE INDEX IF NOT EXISTS idx_transmittals_project_id  ON transmittals(project_id);
-    CREATE INDEX IF NOT EXISTS idx_activity_project_id      ON activity_log(project_id);
+    CREATE INDEX IF NOT EXISTS idx_drawings_project_id          ON drawings(project_id);
+    CREATE INDEX IF NOT EXISTS idx_drawings_status              ON drawings(status);
+    CREATE INDEX IF NOT EXISTS idx_transmittals_project_id      ON transmittals(project_id);
+    CREATE INDEX IF NOT EXISTS idx_activity_project_id          ON activity_log(project_id);
+    CREATE INDEX IF NOT EXISTS idx_drawing_revisions_drawing_id ON drawing_revisions(drawing_id);
   `);
 } catch (e) { console.warn('Index creation note:', e.message); }
 try { db.exec("ALTER TABLE users ADD COLUMN allowed_projects TEXT DEFAULT '*';");   } catch {}
@@ -445,11 +464,21 @@ app.post('/api/upload', requireWriteAccess, uploadLimiter, upload.single('drawin
     console.log(`✅ R2 upload succeeded → ${filePath}`);
 
     /* ── Persist to SQLite ── */
-    const existing = db.prepare('SELECT id FROM drawings WHERE number = ? AND project_id = ?').get(drawingNumber, pId);
+    const existing = db.prepare('SELECT * FROM drawings WHERE number = ? AND project_id = ?').get(drawingNumber, pId);
     if (existing) {
+      /* Archive the current revision before overwriting */
+      db.prepare(
+        `INSERT INTO drawing_revisions (drawing_id, rev, status, title, discipline, originator, path, uploaded_by, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      ).run(
+        existing.id, existing.rev, existing.status, existing.title,
+        existing.discipline, existing.originator, existing.path,
+        req.user?.name || 'Unknown',
+        existing.issue_date || new Date().toISOString()
+      );
       db.prepare(`UPDATE drawings SET title=?, discipline=?, rev=?, status=?, issue_date=?, originator=?, path=?, project_id=?, folder_path=? WHERE number=?`)
         .run(title, discipline, revision, status, today, originator, filePath, pId, fPath, drawingNumber);
-      console.log(`✅ Updated drawing ${drawingNumber} → Rev ${revision}`);
+      console.log(`✅ Updated drawing ${drawingNumber} → Rev ${revision} (previous Rev ${existing.rev} archived)`);
     } else {
       db.prepare(`INSERT INTO drawings (number,title,discipline,rev,status,issue_date,originator,transmittals,path,project_id,folder_path) VALUES (?,?,?,?,?,?,?,0,?,?,?)`)
         .run(drawingNumber, title || 'Untitled', discipline, revision, status || 'S1', today, originator, filePath, pId, fPath);
@@ -466,6 +495,40 @@ app.post('/api/upload', requireWriteAccess, uploadLimiter, upload.single('drawin
     console.error('❌ R2 upload failed:', err.message || err);
     console.error('   Bucket:', R2_BUCKET, '| Key:', r2Key, '| Endpoint:', `https://${CLOUDFLARE_ACCT_ID}.r2.cloudflarestorage.com`);
     res.status(500).json({ error: 'Failed to upload file to cloud storage. Check server logs.' });
+  }
+});
+
+/* ── GET /api/drawings/:id/revisions ───────────────────────────── */
+app.get('/api/drawings/:id/revisions', (req, res) => {
+  const { id } = req.params;
+  try {
+    const drawing = db.prepare('SELECT * FROM drawings WHERE id = ?').get(id);
+    if (!drawing) return res.status(404).json({ error: 'Drawing not found.' });
+
+    // Archived past revisions (oldest first)
+    const past = db.prepare(
+      'SELECT id, rev, status, title, discipline, originator, path, uploaded_by, created_at FROM drawing_revisions WHERE drawing_id = ? ORDER BY id ASC'
+    ).all(id);
+
+    // Current revision = what's in the drawings table now
+    const current = {
+      id:         null,
+      rev:        drawing.rev,
+      status:     drawing.status,
+      title:      drawing.title,
+      discipline: drawing.discipline,
+      originator: drawing.originator,
+      path:       drawing.path,
+      uploaded_by: null,
+      created_at: drawing.issue_date,
+      current:    true,
+    };
+
+    // Return chronological list: past revisions + current at end
+    res.json([...past, current]);
+  } catch (err) {
+    console.error('❌ GET /api/drawings/:id/revisions error:', err);
+    res.status(500).json({ error: 'Failed to fetch revisions.' });
   }
 });
 
