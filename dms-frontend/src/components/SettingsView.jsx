@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { createPortal } from "react-dom";
-import { MoreVertical, KeyRound, FolderKey, X } from "lucide-react";
+import { MoreVertical, KeyRound, UserX, Trash2, X } from "lucide-react";
 
 const API = import.meta.env.VITE_API_URL;
 
@@ -12,22 +12,21 @@ const ROLE_COLOR = {
   'Project Team':        'bg-status-amber-bg text-status-amber-text',
 };
 
-/* ── Portal dropdown — escapes overflow:hidden containers ─────────
+/* ── Portal dropdown — escapes overflow:hidden containers ────────────
    Positions itself with fixed coords from getBoundingClientRect().
-   Flips upward automatically when there isn't enough space below.   */
-const MENU_W = 192;
-const MENU_H = 96; // approximate max height of the menu
+   Flips upward automatically when there isn't enough space below.    */
+const MENU_W = 200;
+const MENU_H = 132; // approximate max height (3 items)
 
 function PortalDropdown({ anchorEl, onClose, children }) {
   const [pos, setPos] = useState(null);
 
   useEffect(() => {
     if (!anchorEl) return;
-    const rect = anchorEl.getBoundingClientRect();
+    const rect      = anchorEl.getBoundingClientRect();
     const spaceBelow = window.innerHeight - rect.bottom;
     const flipUp     = spaceBelow < MENU_H + 8;
 
-    // Right-align the menu to the button, clamped inside the viewport
     const rawLeft = rect.right - MENU_W;
     const left    = Math.max(8, Math.min(window.innerWidth - MENU_W - 8, rawLeft));
 
@@ -43,15 +42,13 @@ function PortalDropdown({ anchorEl, onClose, children }) {
 
   return createPortal(
     <>
-      {/* Invisible full-screen backdrop to catch outside clicks */}
       <div
         style={{ position: 'fixed', inset: 0, zIndex: 9998 }}
         onClick={onClose}
       />
-      {/* Menu panel */}
       <div
         style={{ position: 'fixed', zIndex: 9999, width: MENU_W, ...pos }}
-        className="bg-white border border-border-slate rounded-xl shadow-xl overflow-hidden"
+        className="bg-white border border-border-slate rounded-xl shadow-xl overflow-hidden py-1"
       >
         {children}
       </div>
@@ -60,18 +57,46 @@ function PortalDropdown({ anchorEl, onClose, children }) {
   );
 }
 
+/* ── Dropdown menu item variants ──────────────────────────────────── */
+function MenuItem({ icon: Icon, label, onClick, variant = 'default' }) {
+  const styles = {
+    default: 'text-on-surface hover:bg-surface-container-low',
+    warning: 'text-amber-600 hover:bg-amber-50',
+    danger:  'text-red-600 hover:bg-red-50',
+  };
+  const iconStyles = {
+    default: 'text-on-surface-variant',
+    warning: 'text-amber-500',
+    danger:  'text-red-500',
+  };
+  return (
+    <button
+      onClick={onClick}
+      className={`w-full flex items-center gap-2.5 px-4 py-2.5 text-[13px] font-medium transition-colors text-left ${styles[variant]}`}
+    >
+      <Icon size={14} className={`shrink-0 ${iconStyles[variant]}`} />
+      {label}
+    </button>
+  );
+}
+
+/* ── Thin divider inside the dropdown ────────────────────────────── */
+function MenuDivider() {
+  return <div className="my-1 border-t border-border-slate" />;
+}
+
 export default function SettingsView({ currentUser, onUserUpdate, token }) {
   const isAdmin = currentUser?.role === 'Director';
 
-  const [pwForm,     setPwForm]     = useState({ currentPassword: '', newPassword: '', confirm: '' });
-  const [pwMsg,      setPwMsg]      = useState(null);
-  const [pwLoading,  setPwLoading]  = useState(false);
-  const [users,      setUsers]      = useState([]);
-  const [newUser,    setNewUser]    = useState({ username: '', password: '', name: '', role: 'In House Architect', selectedProjects: [] });
-  const [userMsg,    setUserMsg]    = useState(null);
-  const [userLoading,setUserLoading]= useState(false);
-  const [addOpen,    setAddOpen]    = useState(false);
-  const [roleFlash,  setRoleFlash]  = useState(null); // { userId, ok }
+  const [pwForm,      setPwForm]      = useState({ currentPassword: '', newPassword: '', confirm: '' });
+  const [pwMsg,       setPwMsg]       = useState(null);
+  const [pwLoading,   setPwLoading]   = useState(false);
+  const [users,       setUsers]       = useState([]);
+  const [newUser,     setNewUser]     = useState({ username: '', password: '', name: '', role: 'In House Architect', selectedProjects: [] });
+  const [userMsg,     setUserMsg]     = useState(null);
+  const [userLoading, setUserLoading] = useState(false);
+  const [addOpen,     setAddOpen]     = useState(false);
+  const [roleFlash,   setRoleFlash]   = useState(null); // { userId, ok }
 
   const [projects,           setProjects]           = useState([]);
   const [editingProjectsFor, setEditingProjectsFor] = useState(null);
@@ -79,17 +104,17 @@ export default function SettingsView({ currentUser, onUserUpdate, token }) {
   const [userSearch,         setUserSearch]         = useState('');
   const [roleFilter,         setRoleFilter]         = useState('All');
 
-  // ⋮ menu state — tracks which user's menu is open + the anchor DOM element
-  const [menuOpenId,  setMenuOpenId]  = useState(null);
-  const [menuAnchor,  setMenuAnchor]  = useState(null); // the button element for PortalDropdown
+  // ⋮ menu
+  const [menuOpenId, setMenuOpenId] = useState(null);
+  const [menuAnchor, setMenuAnchor] = useState(null);
 
   // Reset-password inline panel
-  const [resetUserId, setResetUserId] = useState(null);
-  const [resetPw,     setResetPw]     = useState('');
-  const [resetMsg,    setResetMsg]    = useState(null);
-  const [resetLoading,setResetLoading]= useState(false);
+  const [resetUserId,  setResetUserId]  = useState(null);
+  const [resetPw,      setResetPw]      = useState('');
+  const [resetMsg,     setResetMsg]     = useState(null);
+  const [resetLoading, setResetLoading] = useState(false);
 
-  // Map of userId → button DOM element, so we can pass the correct anchor to PortalDropdown
+  // Map of userId → ⋮ button DOM element
   const btnRefs = useRef(new Map());
   const setBtnRef = useCallback((userId, el) => {
     if (el) btnRefs.current.set(userId, el);
@@ -97,15 +122,10 @@ export default function SettingsView({ currentUser, onUserUpdate, token }) {
   }, []);
 
   const openMenu = (userId) => {
-    const el = btnRefs.current.get(userId);
     setMenuOpenId(userId);
-    setMenuAnchor(el || null);
+    setMenuAnchor(btnRefs.current.get(userId) || null);
   };
-
-  const closeMenu = () => {
-    setMenuOpenId(null);
-    setMenuAnchor(null);
-  };
+  const closeMenu = () => { setMenuOpenId(null); setMenuAnchor(null); };
 
   /* Returns null for wildcard, or an array of project IDs */
   const parseAllowed = (ap) => {
@@ -113,22 +133,28 @@ export default function SettingsView({ currentUser, onUserUpdate, token }) {
     try { return JSON.parse(ap); } catch { return []; }
   };
 
+  /* ── Show a timed notice in the userMsg banner ── */
+  const flashMsg = (type, text, ms = 3500) => {
+    setUserMsg({ type, text });
+    setTimeout(() => setUserMsg(null), ms);
+  };
+
   const handlePwChange = async e => {
     e.preventDefault();
     if (pwForm.newPassword !== pwForm.confirm) { setPwMsg({ type: 'error', text: 'New passwords do not match.' }); return; }
-    if (pwForm.newPassword.length < 6) { setPwMsg({ type: 'error', text: 'New password must be at least 6 characters.' }); return; }
+    if (pwForm.newPassword.length < 6)         { setPwMsg({ type: 'error', text: 'New password must be at least 6 characters.' }); return; }
     setPwLoading(true);
     try {
-      const res = await fetch(`${API}/api/users/me/password`, {
-        method: 'PATCH',
+      const res  = await fetch(`${API}/api/users/me/password`, {
+        method:  'PATCH',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ currentPassword: pwForm.currentPassword, newPassword: pwForm.newPassword }),
+        body:    JSON.stringify({ currentPassword: pwForm.currentPassword, newPassword: pwForm.newPassword }),
       });
       const data = await res.json();
       if (res.ok) { setPwMsg({ type: 'success', text: 'Password updated successfully.' }); setPwForm({ currentPassword: '', newPassword: '', confirm: '' }); }
-      else setPwMsg({ type: 'error', text: data.error || 'Failed to update password.' });
-    } catch { setPwMsg({ type: 'error', text: 'Cannot connect to server.' }); }
-    finally { setPwLoading(false); }
+      else          setPwMsg({ type: 'error',   text: data.error || 'Failed to update password.' });
+    } catch    { setPwMsg({ type: 'error', text: 'Cannot connect to server.' }); }
+    finally    { setPwLoading(false); }
   };
 
   const loadUsers = () => {
@@ -148,18 +174,18 @@ export default function SettingsView({ currentUser, onUserUpdate, token }) {
   const handleRoleChange = async (userId, role, allowedProjects) => {
     try {
       const res = await fetch(`${API}/api/users/${userId}/role`, {
-        method: 'PATCH',
+        method:  'PATCH',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ role, allowedProjects: role === 'Director' ? '*' : allowedProjects }),
+        body:    JSON.stringify({ role, allowedProjects: role === 'Director' ? '*' : allowedProjects }),
       });
       const ok = res.ok;
       setRoleFlash({ userId, ok });
       setTimeout(() => setRoleFlash(null), 2000);
-      if (!ok) setUserMsg({ type: 'error', text: 'Failed to update role.' });
+      if (!ok) flashMsg('error', 'Failed to update role.');
     } catch {
       setRoleFlash({ userId, ok: false });
       setTimeout(() => setRoleFlash(null), 2000);
-      setUserMsg({ type: 'error', text: 'Cannot connect to server.' });
+      flashMsg('error', 'Cannot connect to server.');
     }
     loadUsers();
   };
@@ -169,13 +195,13 @@ export default function SettingsView({ currentUser, onUserUpdate, token }) {
     if (!user) return;
     try {
       const res = await fetch(`${API}/api/users/${userId}/role`, {
-        method: 'PATCH',
+        method:  'PATCH',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ role: user.role, allowedProjects: JSON.stringify(pendingProjects) }),
+        body:    JSON.stringify({ role: user.role, allowedProjects: JSON.stringify(pendingProjects) }),
       });
-      if (res.ok) { setUserMsg({ type: 'success', text: 'Project access updated.' }); setEditingProjectsFor(null); }
-      else setUserMsg({ type: 'error', text: 'Failed to update project access.' });
-    } catch { setUserMsg({ type: 'error', text: 'Cannot connect to server.' }); }
+      if (res.ok) { flashMsg('success', 'Project access updated.'); setEditingProjectsFor(null); }
+      else          flashMsg('error',   'Failed to update project access.');
+    } catch     { flashMsg('error', 'Cannot connect to server.'); }
     loadUsers();
   };
 
@@ -189,10 +215,10 @@ export default function SettingsView({ currentUser, onUserUpdate, token }) {
     if (!resetPw || resetPw.length < 6) { setResetMsg({ type: 'error', text: 'Password must be at least 6 characters.' }); return; }
     setResetLoading(true);
     try {
-      const res = await fetch(`${API}/api/users/${userId}/reset-password`, {
-        method: 'PATCH',
+      const res  = await fetch(`${API}/api/users/${userId}/reset-password`, {
+        method:  'PATCH',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ newPassword: resetPw }),
+        body:    JSON.stringify({ newPassword: resetPw }),
       });
       const data = await res.json();
       if (res.ok) {
@@ -206,26 +232,41 @@ export default function SettingsView({ currentUser, onUserUpdate, token }) {
     finally { setResetLoading(false); }
   };
 
+  /* ── Placeholder handlers — not yet implemented on the backend ── */
+  const handleDeactivate = (u) => {
+    flashMsg('warning', `Deactivate user "${u.name}" — not yet implemented.`);
+  };
+  const handleRemove = (u) => {
+    flashMsg('warning', `Remove user "${u.name}" — not yet implemented.`);
+  };
+
   const handleAddUser = async e => {
     e.preventDefault();
     setUserLoading(true);
     try {
-      const res = await fetch(`${API}/api/users`, {
-        method: 'POST',
+      const res  = await fetch(`${API}/api/users`, {
+        method:  'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({
+        body:    JSON.stringify({
           ...newUser,
           allowedProjects: newUser.role === 'Director' ? '*' : JSON.stringify(newUser.selectedProjects),
         }),
       });
       const data = await res.json();
       if (res.ok) {
-        setUserMsg({ type: 'success', text: `User "${newUser.username}" created.` });
+        flashMsg('success', `User "${newUser.username}" created.`);
         setNewUser({ username: '', password: '', name: '', role: 'In House Architect', selectedProjects: [] });
         setAddOpen(false); loadUsers();
-      } else setUserMsg({ type: 'error', text: data.error || 'Failed to create user.' });
-    } catch { setUserMsg({ type: 'error', text: 'Cannot connect to server.' }); }
+      } else flashMsg('error', data.error || 'Failed to create user.');
+    } catch { flashMsg('error', 'Cannot connect to server.'); }
     finally { setUserLoading(false); }
+  };
+
+  /* ── Banner colours (handles 'warning' type too) ── */
+  const bannerClass = (type) => {
+    if (type === 'success') return 'bg-status-emerald-bg text-status-emerald-text border-status-emerald-text/20';
+    if (type === 'warning') return 'bg-amber-50 text-amber-700 border-amber-200';
+    return 'bg-status-rose-bg text-status-rose-text border-status-rose-text/20';
   };
 
   return (
@@ -235,7 +276,7 @@ export default function SettingsView({ currentUser, onUserUpdate, token }) {
         <p className="text-body-md text-on-surface-variant mt-1">Account &amp; administration</p>
       </div>
 
-      {/* Profile */}
+      {/* ── Profile ─────────────────────────────────────────────────── */}
       <Section title="Profile" icon="person">
         <div className="flex items-center gap-4">
           <div className="w-14 h-14 rounded-full bg-primary flex items-center justify-center text-white font-bold text-xl shrink-0">
@@ -251,11 +292,11 @@ export default function SettingsView({ currentUser, onUserUpdate, token }) {
         </div>
       </Section>
 
-      {/* Change Password */}
+      {/* ── Change Password ──────────────────────────────────────────── */}
       <Section title="Change Password" icon="lock">
         <form onSubmit={handlePwChange} className="space-y-4 max-w-sm">
           {pwMsg && (
-            <div className={`text-[13px] p-3 rounded-lg border ${pwMsg.type === 'success' ? 'bg-status-emerald-bg text-status-emerald-text border-status-emerald-text/20' : 'bg-status-rose-bg text-status-rose-text border-status-rose-text/20'}`}>
+            <div className={`text-[13px] p-3 rounded-lg border ${bannerClass(pwMsg.type)}`}>
               {pwMsg.text}
             </div>
           )}
@@ -269,7 +310,7 @@ export default function SettingsView({ currentUser, onUserUpdate, token }) {
         </form>
       </Section>
 
-      {/* User Management */}
+      {/* ── User Management ──────────────────────────────────────────── */}
       {isAdmin && (
         <Section
           title="User Management"
@@ -286,8 +327,9 @@ export default function SettingsView({ currentUser, onUserUpdate, token }) {
             )
           }
         >
+          {/* Status banner */}
           {userMsg && (
-            <div className={`text-[13px] p-3 rounded-lg border mb-4 ${userMsg.type === 'success' ? 'bg-status-emerald-bg text-status-emerald-text border-status-emerald-text/20' : 'bg-status-rose-bg text-status-rose-text border-status-rose-text/20'}`}>
+            <div className={`text-[13px] p-3 rounded-lg border mb-4 ${bannerClass(userMsg.type)}`}>
               {userMsg.text}
             </div>
           )}
@@ -321,7 +363,7 @@ export default function SettingsView({ currentUser, onUserUpdate, token }) {
             <div className="rounded-xl border border-border-slate overflow-hidden mb-4">
               {users
                 .filter(u => {
-                  const q = userSearch.toLowerCase();
+                  const q      = userSearch.toLowerCase();
                   const matchQ = !q || u.name.toLowerCase().includes(q) || u.username.toLowerCase().includes(q);
                   const matchR = roleFilter === 'All' || u.role === roleFilter;
                   return matchQ && matchR;
@@ -338,9 +380,13 @@ export default function SettingsView({ currentUser, onUserUpdate, token }) {
 
                       {/* ── User row ── */}
                       <div className="flex items-center gap-3 px-4 py-2.5 bg-white hover:bg-surface-container-low transition-colors">
+
+                        {/* Avatar */}
                         <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-white font-bold text-[12px] shrink-0">
                           {u.avatar}
                         </div>
+
+                        {/* Name + username */}
                         <div className="flex-1 min-w-0">
                           <p className="text-[13px] font-medium text-on-surface leading-tight">{u.name}</p>
                           <p className="text-[11px] text-on-surface-variant">@{u.username}</p>
@@ -367,7 +413,7 @@ export default function SettingsView({ currentUser, onUserUpdate, token }) {
                           )}
                         </div>
 
-                        {/* Project access pill — non-Director, non-self */}
+                        {/* Project access pill — non-Director, non-self (primary way to edit access) */}
                         {isNonDirector && !isSelf && (
                           allowedList === null ? (
                             <button
@@ -387,10 +433,10 @@ export default function SettingsView({ currentUser, onUserUpdate, token }) {
                             </button>
                           )
                         )}
-                        {/* Spacer for Director / self rows */}
+                        {/* Spacer keeps columns aligned for Director / self rows */}
                         {(!isNonDirector || isSelf) && <div className="w-[80px] shrink-0" />}
 
-                        {/* ⋮ button — ref stored in map for portal positioning */}
+                        {/* ⋮ button */}
                         <button
                           ref={el => setBtnRef(u.id, el)}
                           disabled={isSelf}
@@ -402,33 +448,33 @@ export default function SettingsView({ currentUser, onUserUpdate, token }) {
                         </button>
                       </div>
 
-                      {/* ── Portal dropdown (escapes overflow:hidden) ── */}
+                      {/* ── Portal dropdown ── */}
                       {menuOpenId === u.id && (
                         <PortalDropdown anchorEl={menuAnchor} onClose={closeMenu}>
-                          {isNonDirector && (
-                            <button
-                              onClick={() => {
-                                closeMenu();
-                                isExpanded ? setEditingProjectsFor(null) : openProjectEditor(u);
-                              }}
-                              className="w-full flex items-center gap-2.5 px-4 py-2.5 text-[13px] text-on-surface hover:bg-surface-container-low transition-colors text-left"
-                            >
-                              <FolderKey size={14} className="text-on-surface-variant shrink-0" />
-                              Edit Project Access
-                            </button>
-                          )}
-                          <button
+                          <MenuItem
+                            icon={KeyRound}
+                            label="Reset Password"
+                            variant="default"
                             onClick={() => {
                               closeMenu();
                               setResetUserId(u.id);
                               setResetPw('');
                               setResetMsg(null);
                             }}
-                            className={`w-full flex items-center gap-2.5 px-4 py-2.5 text-[13px] text-on-surface hover:bg-surface-container-low transition-colors text-left ${isNonDirector ? 'border-t border-border-slate' : ''}`}
-                          >
-                            <KeyRound size={14} className="text-on-surface-variant shrink-0" />
-                            Reset Password
-                          </button>
+                          />
+                          <MenuDivider />
+                          <MenuItem
+                            icon={UserX}
+                            label="Deactivate User"
+                            variant="warning"
+                            onClick={() => { closeMenu(); handleDeactivate(u); }}
+                          />
+                          <MenuItem
+                            icon={Trash2}
+                            label="Remove User"
+                            variant="danger"
+                            onClick={() => { closeMenu(); handleRemove(u); }}
+                          />
                         </PortalDropdown>
                       )}
 
@@ -447,7 +493,7 @@ export default function SettingsView({ currentUser, onUserUpdate, token }) {
                             </button>
                           </div>
                           {resetMsg && (
-                            <div className={`text-[12px] p-2 rounded-lg border mb-2 ${resetMsg.type === 'success' ? 'bg-status-emerald-bg text-status-emerald-text border-status-emerald-text/20' : 'bg-status-rose-bg text-status-rose-text border-status-rose-text/20'}`}>
+                            <div className={`text-[12px] p-2 rounded-lg border mb-2 ${bannerClass(resetMsg.type)}`}>
                               {resetMsg.text}
                             </div>
                           )}
@@ -579,6 +625,8 @@ export default function SettingsView({ currentUser, onUserUpdate, token }) {
     </div>
   );
 }
+
+/* ── Layout helpers ───────────────────────────────────────────────── */
 
 function Section({ title, icon, children, headerAction }) {
   return (
