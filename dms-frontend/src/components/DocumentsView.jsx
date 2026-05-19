@@ -7,6 +7,8 @@ import {
   FileEdit, FolderInput, RefreshCcw, Loader2,
 } from "lucide-react";
 
+import { DISCIPLINES, STATUSES } from "../constants";
+
 const API         = import.meta.env.VITE_API_URL;
 /* Supports both legacy local paths (/uploads/…) and full R2 URLs */
 const resolveUrl  = p => p?.startsWith('http') ? p : `${API}${p}`;
@@ -90,6 +92,14 @@ const EXT_STYLE = {
   IFC: "bg-purple-50 text-purple-600",
   RVT: "bg-orange-50 text-orange-600",
 };
+
+/* ────────────────────────── nextRev helper ─────────────────────────── */
+function nextRev(rev) {
+  if (!rev) return "A";
+  const c = rev.trim().toUpperCase();
+  if (/^[A-Z]$/.test(c)) return String.fromCharCode(c.charCodeAt(0) + 1);
+  return c;
+}
 
 /* ─────────────────────── SwitchProjectDropdown ─────────────────────── */
 function SwitchProjectDropdown({ projects, activeProject, onProjectChange }) {
@@ -293,6 +303,490 @@ function FolderMenu({ onAdd, onRename, onDelete }) {
   );
 }
 
+/* ──────────────────────── EditMetadataModal ────────────────────────── */
+function EditMetadataModal({ drawing, token, onSuccess, onClose }) {
+  const [number,     setNumber]     = useState(drawing.number     ?? "");
+  const [title,      setTitle]      = useState(drawing.title      ?? "");
+  const [discipline, setDiscipline] = useState(drawing.discipline ?? "");
+  const [revision,   setRevision]   = useState(drawing.rev        ?? "");
+  const [originator, setOriginator] = useState(drawing.originator ?? "");
+  const [status,     setStatus]     = useState(drawing.status     ?? "S1");
+  const [loading,    setLoading]    = useState(false);
+  const [error,      setError]      = useState("");
+
+  const handleSave = async () => {
+    setLoading(true);
+    setError("");
+    try {
+      const res = await fetch(`${API}/api/drawings/${drawing.id}`, {
+        method:  "PATCH",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body:    JSON.stringify({ number, title, discipline, revision, originator, status }),
+      });
+      const data = await res.json();
+      if (!res.ok) { setError(data.error || "Failed to save changes."); setLoading(false); return; }
+      await onSuccess(`"${data.number}" updated successfully.`);
+      onClose();
+    } catch {
+      setError("Network error — please try again.");
+      setLoading(false);
+    }
+  };
+
+  return createPortal(
+    <div
+      className="fixed inset-0 z-[9990] flex items-center justify-center p-4"
+      style={{ background: "rgba(0,0,0,0.45)" }}
+    >
+      <div className="bg-white rounded-2xl shadow-xl border border-border-slate w-full max-w-lg overflow-hidden">
+        <div className="h-1 bg-primary" />
+        <div className="px-6 py-4 border-b border-border-slate">
+          <h2 className="text-[15px] font-semibold text-on-surface">Edit Metadata</h2>
+          <p className="text-[12px] text-on-surface-variant mt-0.5 font-mono">{drawing.number}</p>
+        </div>
+        <div className="px-6 py-5 space-y-4">
+          {error && (
+            <div className="px-4 py-2.5 rounded-lg bg-status-rose-bg text-status-rose-text text-[12px] font-medium border border-status-rose-text/20">
+              {error}
+            </div>
+          )}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-[11px] font-semibold text-on-surface-variant uppercase tracking-wider mb-1.5">Drawing No.</label>
+              <input
+                value={number}
+                onChange={e => setNumber(e.target.value)}
+                className="w-full px-3 py-2 text-[13px] border border-border-slate rounded-lg text-on-surface font-mono focus:outline-none focus:ring-1 focus:ring-primary/30 focus:border-primary"
+              />
+            </div>
+            <div>
+              <label className="block text-[11px] font-semibold text-on-surface-variant uppercase tracking-wider mb-1.5">Revision</label>
+              <input
+                value={revision}
+                onChange={e => setRevision(e.target.value)}
+                className="w-full px-3 py-2 text-[13px] border border-border-slate rounded-lg text-on-surface font-mono focus:outline-none focus:ring-1 focus:ring-primary/30 focus:border-primary"
+              />
+            </div>
+          </div>
+          <div>
+            <label className="block text-[11px] font-semibold text-on-surface-variant uppercase tracking-wider mb-1.5">Title</label>
+            <input
+              value={title}
+              onChange={e => setTitle(e.target.value)}
+              className="w-full px-3 py-2 text-[13px] border border-border-slate rounded-lg text-on-surface focus:outline-none focus:ring-1 focus:ring-primary/30 focus:border-primary"
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-[11px] font-semibold text-on-surface-variant uppercase tracking-wider mb-1.5">Discipline</label>
+              <select
+                value={discipline}
+                onChange={e => setDiscipline(e.target.value)}
+                className="w-full px-3 py-2 text-[13px] border border-border-slate rounded-lg text-on-surface bg-white focus:outline-none focus:ring-1 focus:ring-primary/30 focus:border-primary"
+              >
+                <option value="">— Select —</option>
+                {DISCIPLINES.map(d => <option key={d} value={d}>{d}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-[11px] font-semibold text-on-surface-variant uppercase tracking-wider mb-1.5">Status</label>
+              <select
+                value={status}
+                onChange={e => setStatus(e.target.value)}
+                className="w-full px-3 py-2 text-[13px] border border-border-slate rounded-lg text-on-surface bg-white focus:outline-none focus:ring-1 focus:ring-primary/30 focus:border-primary"
+              >
+                {STATUSES.map(s => <option key={s} value={s}>{STATUS_LABEL[s] ?? s}</option>)}
+              </select>
+            </div>
+          </div>
+          <div>
+            <label className="block text-[11px] font-semibold text-on-surface-variant uppercase tracking-wider mb-1.5">Originator</label>
+            <input
+              value={originator}
+              onChange={e => setOriginator(e.target.value)}
+              className="w-full px-3 py-2 text-[13px] border border-border-slate rounded-lg text-on-surface focus:outline-none focus:ring-1 focus:ring-primary/30 focus:border-primary"
+            />
+          </div>
+        </div>
+        <div className="px-6 py-4 border-t border-border-slate flex justify-end gap-2">
+          <button
+            onClick={onClose}
+            disabled={loading}
+            className="px-4 py-2 rounded-lg border border-border-slate bg-white text-on-surface-variant hover:bg-surface-container text-[13px] font-medium transition-colors disabled:opacity-50"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleSave}
+            disabled={loading}
+            className="px-4 py-2 rounded-lg bg-primary text-white hover:bg-primary-container text-[13px] font-medium transition-colors disabled:opacity-60 flex items-center gap-1.5"
+          >
+            {loading ? <><Loader2 size={13} className="animate-spin" />Saving…</> : "Save Changes"}
+          </button>
+        </div>
+      </div>
+    </div>,
+    document.body
+  );
+}
+
+/* ────────────────────────── RenameModal ────────────────────────────── */
+function RenameModal({ drawing, token, onSuccess, onClose }) {
+  const [title,   setTitle]   = useState(drawing.title ?? "");
+  const [loading, setLoading] = useState(false);
+  const [error,   setError]   = useState("");
+  const inputRef = useRef(null);
+
+  useEffect(() => { inputRef.current?.select(); }, []);
+
+  const handleRename = async () => {
+    if (!title.trim()) return;
+    setLoading(true);
+    setError("");
+    try {
+      const res = await fetch(`${API}/api/drawings/${drawing.id}`, {
+        method:  "PATCH",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body:    JSON.stringify({ title }),
+      });
+      const data = await res.json();
+      if (!res.ok) { setError(data.error || "Rename failed."); setLoading(false); return; }
+      await onSuccess(`"${drawing.number}" renamed successfully.`);
+      onClose();
+    } catch {
+      setError("Network error — please try again.");
+      setLoading(false);
+    }
+  };
+
+  return createPortal(
+    <div
+      className="fixed inset-0 z-[9990] flex items-center justify-center p-4"
+      style={{ background: "rgba(0,0,0,0.45)" }}
+    >
+      <div className="bg-white rounded-2xl shadow-xl border border-border-slate w-full max-w-sm overflow-hidden">
+        <div className="h-1 bg-primary" />
+        <div className="px-6 py-5">
+          <h2 className="text-[15px] font-semibold text-on-surface mb-0.5">Rename Drawing</h2>
+          <p className="text-[11px] text-on-surface-variant font-mono mb-4">{drawing.number}</p>
+          {error && (
+            <div className="mb-3 px-4 py-2.5 rounded-lg bg-status-rose-bg text-status-rose-text text-[12px] font-medium border border-status-rose-text/20">
+              {error}
+            </div>
+          )}
+          <label className="block text-[11px] font-semibold text-on-surface-variant uppercase tracking-wider mb-1.5">Title</label>
+          <input
+            ref={inputRef}
+            value={title}
+            onChange={e => setTitle(e.target.value)}
+            onKeyDown={e => { if (e.key === "Enter") handleRename(); if (e.key === "Escape") onClose(); }}
+            className="w-full px-3 py-2 text-[13px] border border-border-slate rounded-lg text-on-surface focus:outline-none focus:ring-1 focus:ring-primary/30 focus:border-primary"
+          />
+        </div>
+        <div className="px-6 pb-5 flex justify-end gap-2">
+          <button
+            onClick={onClose}
+            disabled={loading}
+            className="px-4 py-2 rounded-lg border border-border-slate bg-white text-on-surface-variant hover:bg-surface-container text-[13px] font-medium transition-colors disabled:opacity-50"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleRename}
+            disabled={loading || !title.trim()}
+            className="px-4 py-2 rounded-lg bg-primary text-white hover:bg-primary-container text-[13px] font-medium transition-colors disabled:opacity-60 flex items-center gap-1.5"
+          >
+            {loading ? <><Loader2 size={13} className="animate-spin" />Renaming…</> : "Rename"}
+          </button>
+        </div>
+      </div>
+    </div>,
+    document.body
+  );
+}
+
+/* ─────────────────────────── FolderPicker ──────────────────────────── */
+function FolderPicker({ node, path, selected, onSelect, depth = 0 }) {
+  const [expanded, setExpanded] = useState(depth < 2);
+  const hasChildren = node.children && node.children.length > 0;
+
+  return (
+    <div>
+      <button
+        onClick={() => onSelect(path)}
+        className={`w-full flex items-center gap-2 py-1.5 rounded-lg transition-colors text-left text-[13px] ${
+          selected === path
+            ? "bg-primary/10 text-primary font-semibold"
+            : "text-on-surface hover:bg-surface-container-low"
+        }`}
+        style={{ paddingLeft: 12 + depth * 16, paddingRight: 12 }}
+      >
+        {hasChildren ? (
+          <span
+            onClick={e => { e.stopPropagation(); setExpanded(x => !x); }}
+            className="p-0.5 rounded hover:bg-black/8 shrink-0"
+          >
+            {expanded
+              ? <ChevronDown size={13} className="text-on-surface-variant" />
+              : <ChevronRight size={13} className="text-on-surface-variant" />}
+          </span>
+        ) : (
+          <span className="w-[21px] shrink-0" />
+        )}
+        <Folder size={14} className={selected === path ? "text-primary shrink-0" : "text-on-surface-variant shrink-0"} />
+        <span className="truncate">{node.name}</span>
+      </button>
+      {expanded && hasChildren && (
+        <div>
+          {node.children.map((child, i) => (
+            <FolderPicker
+              key={i}
+              node={child}
+              path={`${path}/${child.name}`}
+              selected={selected}
+              onSelect={onSelect}
+              depth={depth + 1}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ────────────────────────── MoveFolderModal ────────────────────────── */
+function MoveFolderModal({ drawing, token, onSuccess, onClose }) {
+  const tree = loadTree();
+  const [selectedPath, setSelectedPath] = useState(drawing.folderPath ?? "");
+  const [loading, setLoading] = useState(false);
+  const [error,   setError]   = useState("");
+
+  const handleMove = async () => {
+    setLoading(true);
+    setError("");
+    try {
+      const res = await fetch(`${API}/api/drawings/${drawing.id}`, {
+        method:  "PATCH",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body:    JSON.stringify({ folderPath: selectedPath }),
+      });
+      const data = await res.json();
+      if (!res.ok) { setError(data.error || "Move failed."); setLoading(false); return; }
+      await onSuccess(`"${drawing.number}" moved successfully.`);
+      onClose();
+    } catch {
+      setError("Network error — please try again.");
+      setLoading(false);
+    }
+  };
+
+  const confirmDisabled = !selectedPath || selectedPath === drawing.folderPath;
+
+  return createPortal(
+    <div
+      className="fixed inset-0 z-[9990] flex items-center justify-center p-4"
+      style={{ background: "rgba(0,0,0,0.45)" }}
+    >
+      <div className="bg-white rounded-2xl shadow-xl border border-border-slate w-full max-w-sm overflow-hidden flex flex-col max-h-[80vh]">
+        <div className="h-1 bg-primary shrink-0" />
+        <div className="px-6 py-4 border-b border-border-slate shrink-0">
+          <h2 className="text-[15px] font-semibold text-on-surface">Move to Folder</h2>
+          <p className="text-[11px] text-on-surface-variant font-mono mt-0.5">{drawing.number}</p>
+        </div>
+        <div className="flex-1 overflow-y-auto px-3 py-3 custom-scrollbar">
+          {error && (
+            <div className="mb-2 px-4 py-2.5 rounded-lg bg-status-rose-bg text-status-rose-text text-[12px] font-medium border border-status-rose-text/20">
+              {error}
+            </div>
+          )}
+          <FolderPicker
+            node={tree}
+            path={tree.name}
+            selected={selectedPath}
+            onSelect={setSelectedPath}
+            depth={0}
+          />
+          {tree.children?.map((child, i) => (
+            <FolderPicker
+              key={i}
+              node={child}
+              path={`${tree.name}/${child.name}`}
+              selected={selectedPath}
+              onSelect={setSelectedPath}
+              depth={1}
+            />
+          ))}
+        </div>
+        {selectedPath && (
+          <div className="px-6 py-2 bg-surface-container-low border-t border-border-slate shrink-0">
+            <p className="text-[11px] text-on-surface-variant font-mono truncate">→ {selectedPath}</p>
+          </div>
+        )}
+        <div className="px-6 py-4 border-t border-border-slate flex justify-end gap-2 shrink-0">
+          <button
+            onClick={onClose}
+            disabled={loading}
+            className="px-4 py-2 rounded-lg border border-border-slate bg-white text-on-surface-variant hover:bg-surface-container text-[13px] font-medium transition-colors disabled:opacity-50"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleMove}
+            disabled={loading || confirmDisabled}
+            className="px-4 py-2 rounded-lg bg-primary text-white hover:bg-primary-container text-[13px] font-medium transition-colors disabled:opacity-60 flex items-center gap-1.5"
+          >
+            {loading ? <><Loader2 size={13} className="animate-spin" />Moving…</> : "Move Here"}
+          </button>
+        </div>
+      </div>
+    </div>,
+    document.body
+  );
+}
+
+/* ────────────────────────── NewRevisionModal ───────────────────────── */
+function NewRevisionModal({ drawing, token, projectId, onSuccess, onClose }) {
+  const [title,      setTitle]      = useState(drawing.title      ?? "");
+  const [revision,   setRevision]   = useState(nextRev(drawing.rev));
+  const [status,     setStatus]     = useState(drawing.status     ?? "S1");
+  const [file,       setFile]       = useState(null);
+  const [dragging,   setDragging]   = useState(false);
+  const [loading,    setLoading]    = useState(false);
+  const [error,      setError]      = useState("");
+  const fileInputRef = useRef(null);
+
+  const handleFile = f => { if (f) setFile(f); };
+
+  const handleSubmit = async () => {
+    if (!file) { setError("Please select a file."); return; }
+    setLoading(true);
+    setError("");
+    try {
+      const fd = new FormData();
+      fd.append("drawingFile",   file);
+      fd.append("drawingNumber", drawing.number);
+      fd.append("title",         title);
+      fd.append("discipline",    drawing.discipline ?? "");
+      fd.append("revision",      revision);
+      fd.append("originator",    drawing.originator ?? "");
+      fd.append("status",        status);
+      fd.append("notes",         "");
+      fd.append("projectId",     projectId ?? "");
+      fd.append("folderPath",    drawing.folderPath ?? "");
+      const res = await fetch(`${API}/api/upload`, {
+        method:  "POST",
+        headers: { Authorization: `Bearer ${token}` },
+        body:    fd,
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) { setError(data.error || `Server responded ${res.status}`); setLoading(false); return; }
+      await onSuccess(`New revision ${revision} of "${drawing.number}" uploaded.`);
+      onClose();
+    } catch {
+      setError("Network error — please try again.");
+      setLoading(false);
+    }
+  };
+
+  return createPortal(
+    <div
+      className="fixed inset-0 z-[9990] flex items-center justify-center p-4"
+      style={{ background: "rgba(0,0,0,0.45)" }}
+    >
+      <div className="bg-white rounded-2xl shadow-xl border border-border-slate w-full max-w-md overflow-hidden">
+        <div className="h-1 bg-primary" />
+        <div className="px-6 py-4 border-b border-border-slate">
+          <h2 className="text-[15px] font-semibold text-on-surface">Upload New Revision</h2>
+          <p className="text-[11px] text-on-surface-variant font-mono mt-0.5">{drawing.number} — locked</p>
+        </div>
+        <div className="px-6 py-5 space-y-4">
+          {error && (
+            <div className="px-4 py-2.5 rounded-lg bg-status-rose-bg text-status-rose-text text-[12px] font-medium border border-status-rose-text/20">
+              {error}
+            </div>
+          )}
+
+          {/* File drop zone */}
+          <div
+            onClick={() => fileInputRef.current?.click()}
+            onDragOver={e => { e.preventDefault(); setDragging(true); }}
+            onDragLeave={() => setDragging(false)}
+            onDrop={e => { e.preventDefault(); setDragging(false); handleFile(e.dataTransfer.files[0]); }}
+            className={`border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition-colors ${
+              file
+                ? "border-status-emerald-text bg-status-emerald-bg"
+                : dragging
+                ? "border-primary bg-primary/5"
+                : "border-border-slate hover:border-primary/50 hover:bg-surface-container-low"
+            }`}
+          >
+            <input
+              ref={fileInputRef}
+              type="file"
+              className="hidden"
+              onChange={e => handleFile(e.target.files[0])}
+            />
+            <Upload size={20} className={`mx-auto mb-2 ${file ? "text-status-emerald-text" : "text-on-surface-variant"}`} />
+            {file
+              ? <p className="text-[13px] font-semibold text-status-emerald-text">{file.name}</p>
+              : <>
+                  <p className="text-[13px] font-medium text-on-surface">Drop file here or click to browse</p>
+                  <p className="text-[11px] text-on-surface-variant mt-1">PDF, DWG, DXF, IFC, RVT</p>
+                </>
+            }
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-[11px] font-semibold text-on-surface-variant uppercase tracking-wider mb-1.5">Revision</label>
+              <input
+                value={revision}
+                onChange={e => setRevision(e.target.value)}
+                className="w-full px-3 py-2 text-[13px] border border-border-slate rounded-lg text-on-surface font-mono focus:outline-none focus:ring-1 focus:ring-primary/30 focus:border-primary"
+              />
+            </div>
+            <div>
+              <label className="block text-[11px] font-semibold text-on-surface-variant uppercase tracking-wider mb-1.5">Status</label>
+              <select
+                value={status}
+                onChange={e => setStatus(e.target.value)}
+                className="w-full px-3 py-2 text-[13px] border border-border-slate rounded-lg text-on-surface bg-white focus:outline-none focus:ring-1 focus:ring-primary/30 focus:border-primary"
+              >
+                {STATUSES.map(s => <option key={s} value={s}>{STATUS_LABEL[s] ?? s}</option>)}
+              </select>
+            </div>
+          </div>
+          <div>
+            <label className="block text-[11px] font-semibold text-on-surface-variant uppercase tracking-wider mb-1.5">Title</label>
+            <input
+              value={title}
+              onChange={e => setTitle(e.target.value)}
+              className="w-full px-3 py-2 text-[13px] border border-border-slate rounded-lg text-on-surface focus:outline-none focus:ring-1 focus:ring-primary/30 focus:border-primary"
+            />
+          </div>
+        </div>
+        <div className="px-6 py-4 border-t border-border-slate flex justify-end gap-2">
+          <button
+            onClick={onClose}
+            disabled={loading}
+            className="px-4 py-2 rounded-lg border border-border-slate bg-white text-on-surface-variant hover:bg-surface-container text-[13px] font-medium transition-colors disabled:opacity-50"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleSubmit}
+            disabled={loading || !file}
+            className="px-4 py-2 rounded-lg bg-primary text-white hover:bg-primary-container text-[13px] font-medium transition-colors disabled:opacity-60 flex items-center gap-1.5"
+          >
+            {loading ? <><Loader2 size={13} className="animate-spin" />Uploading…</> : <><Upload size={13} />Upload Revision</>}
+          </button>
+        </div>
+      </div>
+    </div>,
+    document.body
+  );
+}
+
 /* ─────────────────────────── FileMenu ──────────────────────────────── */
 /*  Portal dropdown for file card actions — escapes overflow:hidden     */
 const FILE_MENU_W = 204;
@@ -447,7 +941,7 @@ function ConfirmDeleteModal({ drawing, onConfirm, onCancel, loading }) {
 }
 
 /* ─────────────────────────── FileCard ──────────────────────────────── */
-function FileCard({ d, viewMode, onDelete, onSupersede, onPlaceholder }) {
+function FileCard({ d, viewMode, onDelete, onEditMetadata, onRename, onMove, onNewRevision }) {
   const filename    = d.path?.split("/").pop() ?? "";
   const ext         = filename.split(".").pop().toUpperCase();
   const extStyle    = EXT_STYLE[ext] ?? "bg-surface-container text-on-surface-variant";
@@ -457,10 +951,10 @@ function FileCard({ d, viewMode, onDelete, onSupersede, onPlaceholder }) {
 
   /* Shared action callbacks */
   const actions = onDelete ? {
-    onEditMetadata: () => onPlaceholder("Edit Metadata"),
-    onRename:       () => onPlaceholder("Rename"),
-    onMove:         () => onPlaceholder("Move to Folder"),
-    onSupersede:    onSupersede,
+    onEditMetadata: () => onEditMetadata(d),
+    onRename:       () => onRename(d),
+    onMove:         () => onMove(d),
+    onSupersede:    onNewRevision ? () => onNewRevision(d) : undefined,
     onDelete:       () => onDelete(d),
   } : null;
 
@@ -601,6 +1095,8 @@ export default function DocumentsView({
   onProjectChange,
   transmittals  = [],
   isProjectTeam = false,
+  token         = "",
+  onDrawingUpdate,
 }) {
   const [tree,          setTree]          = useState(loadTree);
   const [segments,      setSegments]      = useState([]);
@@ -618,7 +1114,13 @@ export default function DocumentsView({
   const [confirmDeleteDrawing, setConfirmDeleteDrawing] = useState(null); // drawing object
   const [deleteLoading,        setDeleteLoading]        = useState(false);
 
-  /* Local toast for placeholder actions */
+  /* Drawing action modal state */
+  const [editDrawing,     setEditDrawing]     = useState(null);
+  const [renameDrawing,   setRenameDrawing]   = useState(null);
+  const [moveDrawing,     setMoveDrawing]     = useState(null);
+  const [revisionDrawing, setRevisionDrawing] = useState(null);
+
+  /* Local toast for actions + delete feedback */
   const [localToast, setLocalToast] = useState(null);
 
   const addInputRef    = useRef(null);
@@ -632,6 +1134,11 @@ export default function DocumentsView({
   const showToast = (msg, type = "info") => {
     setLocalToast({ msg, type });
     setTimeout(() => setLocalToast(null), 3000);
+  };
+
+  const handleDrawingUpdated = async (msg) => {
+    await onDrawingUpdate?.();
+    showToast(msg, "success");
   };
 
   const updateTree = updater => {
@@ -1066,8 +1573,10 @@ export default function DocumentsView({
                         d={d}
                         viewMode="grid"
                         onDelete={onDeleteDrawing ? setConfirmDeleteDrawing : undefined}
-                        onSupersede={onUpload ? () => onUpload(currentFolderPath) : undefined}
-                        onPlaceholder={name => showToast(`${name} — coming soon.`, "info")}
+                        onEditMetadata={onDeleteDrawing ? setEditDrawing   : undefined}
+                        onRename=      {onDeleteDrawing ? setRenameDrawing  : undefined}
+                        onMove=        {onDeleteDrawing ? setMoveDrawing    : undefined}
+                        onNewRevision= {onUpload && onDeleteDrawing ? setRevisionDrawing : undefined}
                       />
                     ))}
                   </div>
@@ -1079,8 +1588,10 @@ export default function DocumentsView({
                         d={d}
                         viewMode="list"
                         onDelete={onDeleteDrawing ? setConfirmDeleteDrawing : undefined}
-                        onSupersede={onUpload ? () => onUpload(currentFolderPath) : undefined}
-                        onPlaceholder={name => showToast(`${name} — coming soon.`, "info")}
+                        onEditMetadata={onDeleteDrawing ? setEditDrawing   : undefined}
+                        onRename=      {onDeleteDrawing ? setRenameDrawing  : undefined}
+                        onMove=        {onDeleteDrawing ? setMoveDrawing    : undefined}
+                        onNewRevision= {onUpload && onDeleteDrawing ? setRevisionDrawing : undefined}
                       />
                     ))}
                   </div>
@@ -1121,7 +1632,48 @@ export default function DocumentsView({
         />
       )}
 
-      {/* ── Local toast (placeholder actions + delete feedback) ── */}
+      {/* ── Edit Metadata modal ── */}
+      {editDrawing && (
+        <EditMetadataModal
+          drawing={editDrawing}
+          token={token}
+          onSuccess={handleDrawingUpdated}
+          onClose={() => setEditDrawing(null)}
+        />
+      )}
+
+      {/* ── Rename modal ── */}
+      {renameDrawing && (
+        <RenameModal
+          drawing={renameDrawing}
+          token={token}
+          onSuccess={handleDrawingUpdated}
+          onClose={() => setRenameDrawing(null)}
+        />
+      )}
+
+      {/* ── Move to Folder modal ── */}
+      {moveDrawing && (
+        <MoveFolderModal
+          drawing={moveDrawing}
+          token={token}
+          onSuccess={handleDrawingUpdated}
+          onClose={() => setMoveDrawing(null)}
+        />
+      )}
+
+      {/* ── New Revision modal ── */}
+      {revisionDrawing && (
+        <NewRevisionModal
+          drawing={revisionDrawing}
+          token={token}
+          projectId={activeProject?.id}
+          onSuccess={handleDrawingUpdated}
+          onClose={() => setRevisionDrawing(null)}
+        />
+      )}
+
+      {/* ── Local toast (actions + delete feedback) ── */}
       {localToast && createPortal(
         <div className={`fixed bottom-6 left-1/2 -translate-x-1/2 z-[9999] px-5 py-3 rounded-xl shadow-xl text-[13px] font-medium flex items-center gap-2 border whitespace-nowrap ${
           localToast.type === "success"

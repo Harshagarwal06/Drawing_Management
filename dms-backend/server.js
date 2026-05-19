@@ -755,6 +755,54 @@ app.delete('/api/drawings/:id', requireWriteAccess, (req, res) => {
   }
 });
 
+/* ── PATCH /api/drawings/:id ─────────────────────────────────────── */
+app.patch('/api/drawings/:id', requireWriteAccess, (req, res) => {
+  const { id } = req.params;
+  try {
+    const drawing = db.prepare('SELECT * FROM drawings WHERE id = ?').get(id);
+    if (!drawing) return res.status(404).json({ error: 'Drawing not found.' });
+
+    const {
+      number     = drawing.number,
+      title      = drawing.title,
+      discipline = drawing.discipline,
+      revision   = drawing.rev,
+      originator = drawing.originator,
+      status     = drawing.status,
+      folderPath = drawing.folder_path,
+    } = req.body;
+
+    // Conflict check if number is changing
+    if (number !== drawing.number) {
+      const conflict = db.prepare(
+        'SELECT id FROM drawings WHERE number=? AND project_id=? AND id!=?'
+      ).get(number, drawing.project_id, id);
+      if (conflict) return res.status(409).json({ error: `Drawing number "${number}" already exists in this project.` });
+    }
+
+    db.prepare(
+      `UPDATE drawings SET number=?, title=?, discipline=?, rev=?, originator=?, status=?, folder_path=? WHERE id=?`
+    ).run(number, title, discipline, revision, originator, status, folderPath, id);
+
+    const updated = db.prepare(
+      `SELECT id, number, title, discipline, rev, status,
+              issue_date as issueDate, originator, transmittals, path,
+              folder_path as folderPath, project_id as projectId
+       FROM drawings WHERE id=?`
+    ).get(id);
+
+    try {
+      db.prepare('INSERT INTO activity_log (project_id,type,title,detail,created_at) VALUES (?,?,?,?,?)')
+        .run(drawing.project_id, 'update', `${updated.number} updated`, 'Drawing metadata updated', new Date().toISOString());
+    } catch {}
+
+    res.json(updated);
+  } catch (err) {
+    console.error('❌ PATCH /api/drawings/:id error:', err);
+    res.status(500).json({ error: 'Failed to update drawing.' });
+  }
+});
+
 /* ── GET /api/users ─────────────────────────────────────────────── */
 app.get('/api/users', requireDirector, (req, res) => {
   try {

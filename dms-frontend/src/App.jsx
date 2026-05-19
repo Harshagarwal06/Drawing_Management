@@ -324,6 +324,8 @@ export default function App() {
                 onProjectChange={setActiveProject}
                 transmittals={transmittals}
                 isProjectTeam={isProjectTeam}
+                token={currentUser?.token}
+                onDrawingUpdate={async () => { setDrawings(await fetchDrawings(activeProject.id, currentUser.token)); }}
               />
             } />
 
