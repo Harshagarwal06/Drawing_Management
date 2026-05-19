@@ -317,7 +317,7 @@ export default function App() {
             <Route path="/documents" element={
               <DocumentsView
                 drawings={drawings}
-                onUpload={!isRestricted ? (folder) => { setModalFolder(folder); setShowModal(true); } : undefined}
+                onUpload={(folder) => { setModalFolder(folder); setShowModal(true); }}
                 onDeleteDrawing={!isRestricted ? handleDeleteDrawing : undefined}
                 projects={projects}
                 activeProject={activeProject}

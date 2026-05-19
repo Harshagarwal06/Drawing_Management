@@ -407,7 +407,7 @@ app.get('/api/drawings', requireProjectAccess, (req, res) => {
 });
 
 /* ── POST /api/upload ───────────────────────────────────────────── */
-app.post('/api/upload', requireWriteAccess, uploadLimiter, upload.single('drawingFile'), async (req, res) => {
+app.post('/api/upload', verifyToken, uploadLimiter, upload.single('drawingFile'), async (req, res) => {
   /* ── Guard: reject immediately if R2 is not configured ── */
   if (!R2_CONFIGURED) {
     console.error('❌ Upload rejected — Cloudflare R2 environment variables are not configured.');
