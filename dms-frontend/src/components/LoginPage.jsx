@@ -298,7 +298,7 @@ export default function LoginPage({ onLogin }) {
 
           {/* Bottom note */}
           <p className="text-center text-[11px] text-on-surface-variant mt-4">
-            Enterprise instance · Unique Properties v2.0
+            Enterprise instance · Unique Properties v2.1
           </p>
         </div>
       </div>
