@@ -169,7 +169,6 @@ export default function SettingsView({ currentUser, onUserUpdate, token }) {
       .then(r => r.ok ? r.json() : [])
       .then(ps => {
         setProjects(ps);
-        setNewUser(prev => ({ ...prev, selectedProjects: ps.map(p => p.id) }));
       })
       .catch(() => {});
   };
@@ -274,6 +273,10 @@ export default function SettingsView({ currentUser, onUserUpdate, token }) {
 
   const handleAddUser = async e => {
     e.preventDefault();
+    if (newUser.role !== 'Director' && newUser.selectedProjects.length === 0) {
+      flashMsg('error', 'Please select at least one project for this user.');
+      return;
+    }
     setUserLoading(true);
     try {
       const res  = await fetch(`${API}/api/users`, {
@@ -287,7 +290,7 @@ export default function SettingsView({ currentUser, onUserUpdate, token }) {
       const data = await res.json();
       if (res.ok) {
         flashMsg('success', `User "${newUser.username}" created.`);
-        setNewUser({ username: '', password: '', name: '', role: 'In House Architect', selectedProjects: projects.map(p => p.id) });
+        setNewUser({ username: '', password: '', name: '', role: 'In House Architect', selectedProjects: [] });
         setAddOpen(false); loadUsers();
       } else flashMsg('error', data.error || 'Failed to create user.');
     } catch { flashMsg('error', 'Cannot connect to server.'); }
