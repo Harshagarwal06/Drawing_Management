@@ -1,7 +1,6 @@
 import { useState, useRef } from "react";
 import { X, Upload, CheckCircle2, Loader2, FolderOpen } from "lucide-react";
 import Field from "./Field";
-import { ORIGINATORS } from "../constants";
 
 export default function UploadModal({ onClose, onSubmit, initialFolder }) {
   const [form, setForm] = useState({
@@ -39,12 +38,10 @@ export default function UploadModal({ onClose, onSubmit, initialFolder }) {
 
   const validate = () => {
     const e = {};
-    if (!file)                      e.file         = "A file is required";
-    if (!form.drawingNumber.trim()) e.drawingNumber = "Required";
-    if (!form.title.trim())         e.title         = "Required";
-    if (!form.discipline)           e.discipline    = "Required";
-    if (!form.revision.trim())      e.revision      = "Required";
-    if (!form.originator)           e.originator    = "Required";
+    if (!file)                  e.file      = "A file is required";
+    if (!form.title.trim())     e.title     = "Required";
+    if (!form.discipline)       e.discipline = "Required";
+    if (!form.revision.trim())  e.revision  = "Required";
     return e;
   };
 
@@ -53,8 +50,10 @@ export default function UploadModal({ onClose, onSubmit, initialFolder }) {
     const e = validate();
     if (Object.keys(e).length) { setErrors(e); return; }
     setSubmitting(true);
+    // Auto-generate drawing number from filename (strip extension)
+    const autoNumber = file.name.replace(/\.[^/.]+$/, "");
     try {
-      await onSubmit(form, file);
+      await onSubmit({ ...form, drawingNumber: autoNumber, originator: "" }, file);
     } finally {
       setSubmitting(false);
     }
@@ -75,7 +74,7 @@ export default function UploadModal({ onClose, onSubmit, initialFolder }) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(15,23,42,0.4)" }}>
-      <div className="modal-enter bg-surface rounded-2xl shadow-card-lg border border-outline-variant w-full max-w-2xl overflow-hidden">
+      <div className="modal-enter bg-surface rounded-2xl shadow-card-lg border border-outline-variant w-full max-w-xl overflow-hidden">
 
         {/* Header */}
         <div className="px-6 py-4 border-b border-outline-variant flex items-center justify-between bg-surface-container-low">
@@ -138,28 +137,6 @@ export default function UploadModal({ onClose, onSubmit, initialFolder }) {
             {errors.file && <p className="text-xs text-red-500 mt-1.5">{errors.file}</p>}
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <Field errors={errors} label="Drawing Number" id="drawingNumber" req>
-              <input
-                id="drawingNumber"
-                placeholder="e.g. ARC-GF-004"
-                className={inputCls("drawingNumber")}
-                value={form.drawingNumber}
-                onChange={e => set("drawingNumber", e.target.value)}
-              />
-            </Field>
-            <Field errors={errors} label="Revision" id="revision" req>
-              <input
-                id="revision"
-                placeholder="e.g. A"
-                maxLength={4}
-                className={inputCls("revision")}
-                value={form.revision}
-                onChange={e => set("revision", e.target.value.toUpperCase())}
-              />
-            </Field>
-          </div>
-
           <Field errors={errors} label="Drawing Title" id="title" req>
             <input
               id="title"
@@ -185,11 +162,15 @@ export default function UploadModal({ onClose, onSubmit, initialFolder }) {
                 <option>Interior</option>
               </select>
             </Field>
-            <Field errors={errors} label="Originator" id="originator" req>
-              <select id="originator" className={inputCls("originator")} value={form.originator} onChange={e => set("originator", e.target.value)}>
-                <option value="">Select originator</option>
-                {ORIGINATORS.map(o => <option key={o}>{o}</option>)}
-              </select>
+            <Field errors={errors} label="Revision" id="revision" req>
+              <input
+                id="revision"
+                placeholder="e.g. A"
+                maxLength={4}
+                className={inputCls("revision")}
+                value={form.revision}
+                onChange={e => set("revision", e.target.value.toUpperCase())}
+              />
             </Field>
           </div>
 
@@ -197,7 +178,7 @@ export default function UploadModal({ onClose, onSubmit, initialFolder }) {
             <textarea
               id="notes"
               rows={2}
-              placeholder="Optional transmittal notes…"
+              placeholder="Optional notes…"
               className={`${inputCls("notes")} resize-none`}
               value={form.notes}
               onChange={e => set("notes", e.target.value)}
