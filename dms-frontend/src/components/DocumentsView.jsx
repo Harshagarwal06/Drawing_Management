@@ -1162,6 +1162,7 @@ function FileCard({ d, viewMode, onDelete, onEditMetadata, onRename, onMove, onN
           <p className="text-[11px] text-on-surface-variant truncate">{d.title}</p>
         </div>
         <span className="font-mono text-[11px] text-on-surface-variant hidden sm:block shrink-0">Rev {d.rev || "—"}</span>
+        {d.issueDate && <span className="text-[11px] text-on-surface-variant hidden lg:block shrink-0">{d.issueDate}</span>}
         <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold hidden md:block shrink-0 ${statusPill}`}>{statusLabel}</span>
 
         {/* Actions — always visible */}
@@ -1208,9 +1209,12 @@ function FileCard({ d, viewMode, onDelete, onEditMetadata, onRename, onMove, onN
         <p className="font-mono text-[13px] font-bold text-primary leading-tight mb-0.5">{d.number}</p>
         <p className="text-[11px] text-on-surface-variant leading-snug line-clamp-2 flex-1 mb-3">{d.title}</p>
 
-        {/* Bottom row: Rev · View · Download */}
+        {/* Bottom row: Rev · Date · View · Download */}
         <div className="flex items-center justify-between mt-auto">
-          <span className="font-mono text-[11px] text-on-surface-variant">Rev {d.rev || "—"}</span>
+          <div className="flex flex-col gap-0.5">
+            <span className="font-mono text-[11px] text-on-surface-variant">Rev {d.rev || "—"}</span>
+            {d.issueDate && <span className="text-[10px] text-on-surface-variant">{d.issueDate}</span>}
+          </div>
           <div className="flex items-center gap-0.5">
             <a
               href={resolveUrl(d.path)} target="_blank" rel="noreferrer"
