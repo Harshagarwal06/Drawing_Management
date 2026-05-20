@@ -63,7 +63,7 @@ export default function AppShell({
 
             {/* Project selector — hidden on /documents (workspace bar handles it there) */}
             {!isDocuments && (
-              isProjectTeam ? (
+              (isProjectTeam || projects.length <= 1) ? (
                 <div className="flex items-center gap-3 bg-surface-container-low border border-outline-variant rounded-xl px-4 py-2.5 min-w-[200px]">
                   <span className="w-3 h-3 rounded-full shrink-0 bg-primary" />
                   <div className="flex flex-col items-start min-w-0 text-left flex-1">

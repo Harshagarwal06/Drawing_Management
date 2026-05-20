@@ -225,8 +225,8 @@ function ProjectWorkspaceBar({
           <StatChip label="Pending"      value={pendingApprovals}  Icon={Clock}     colorCls={pendingApprovals > 0 ? "bg-status-amber-bg text-status-amber-text" : "bg-surface-container text-on-surface-variant"} />
         </div>
 
-        {/* Switch project — hidden for Project Team */}
-        {!isProjectTeam && (
+        {/* Switch project — only shown when user has access to more than 1 project */}
+        {projects.length > 1 && (
           <SwitchProjectDropdown
             projects={projects}
             activeProject={activeProject}
