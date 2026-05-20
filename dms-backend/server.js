@@ -211,6 +211,15 @@ try {
 } catch (e) { console.warn('Index creation note:', e.message); }
 try { db.exec("ALTER TABLE users ADD COLUMN allowed_projects TEXT DEFAULT '*';");   } catch {}
 try { db.exec("ALTER TABLE users ADD COLUMN active INTEGER DEFAULT 1;");            } catch {}
+try {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS project_folder_trees (
+      project_id INTEGER PRIMARY KEY,
+      tree_json  TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+  `);
+} catch (e) { console.warn('folder_trees table note:', e.message); }
 
 // ── Migrate legacy role names → 3-role system ──────────────────────────────
 try {
@@ -399,6 +408,35 @@ app.post('/api/projects', requireDirector, (req, res) => {
   } catch (err) {
     console.error('❌ POST /api/projects error:', err);
     res.status(500).json({ error: 'Failed to create project.' });
+  }
+});
+
+/* ── GET /api/projects/:id/folders ─────────────────────────────── */
+app.get('/api/projects/:id/folders', requireProjectAccess, (req, res) => {
+  try {
+    const row = db.prepare('SELECT tree_json FROM project_folder_trees WHERE project_id = ?').get(req.params.id);
+    if (!row) return res.status(404).json({ tree: null });
+    res.json({ tree: JSON.parse(row.tree_json) });
+  } catch (err) {
+    console.error('❌ GET /api/projects/:id/folders error:', err);
+    res.status(500).json({ error: 'Failed to fetch folder tree.' });
+  }
+});
+
+/* ── PUT /api/projects/:id/folders ─────────────────────────────── */
+app.put('/api/projects/:id/folders', requireProjectAccess, (req, res) => {
+  const { tree } = req.body;
+  if (!tree) return res.status(400).json({ error: 'tree is required.' });
+  try {
+    db.prepare(`
+      INSERT INTO project_folder_trees (project_id, tree_json, updated_at)
+      VALUES (?, ?, ?)
+      ON CONFLICT(project_id) DO UPDATE SET tree_json = excluded.tree_json, updated_at = excluded.updated_at
+    `).run(req.params.id, JSON.stringify(tree), new Date().toISOString());
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('❌ PUT /api/projects/:id/folders error:', err);
+    res.status(500).json({ error: 'Failed to save folder tree.' });
   }
 });
 

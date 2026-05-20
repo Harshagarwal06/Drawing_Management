@@ -12,7 +12,6 @@ import { DISCIPLINES } from "../constants";
 const API         = import.meta.env.VITE_API_URL;
 /* Supports both legacy local paths (/uploads/…) and full R2 URLs */
 const resolveUrl  = p => p?.startsWith('http') ? p : `${API}${p}`;
-const STORAGE_KEY = "uniqueproperties_folder_tree";
 const PALETTE     = ["#3525cd", "#2563eb", "#059669", "#d97706", "#9333ea"];
 const projectDot  = idx => PALETTE[idx % PALETTE.length];
 
@@ -44,15 +43,22 @@ const DEFAULT_TREE = () => ({
   ],
 });
 
-function loadTree() {
-  try {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    if (saved) return JSON.parse(saved);
-  } catch {}
-  return DEFAULT_TREE();
+async function fetchTree(projectId, token) {
+  const res = await fetch(`${API}/api/projects/${projectId}/folders`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (res.status === 404) return null; // no tree saved yet
+  if (!res.ok) throw new Error('Failed to fetch folder tree');
+  const data = await res.json();
+  return data.tree;
 }
-function saveTree(tree) {
-  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(tree)); } catch {}
+
+async function persistTree(projectId, token, tree) {
+  await fetch(`${API}/api/projects/${projectId}/folders`, {
+    method:  'PUT',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body:    JSON.stringify({ tree }),
+  });
 }
 function getNode(tree, segments) {
   let node = tree;
@@ -1286,7 +1292,8 @@ export default function DocumentsView({
   token         = "",
   onDrawingUpdate,
 }) {
-  const [tree,          setTree]          = useState(loadTree);
+  const [tree,          setTree]          = useState(DEFAULT_TREE);
+  const [treeLoading,   setTreeLoading]   = useState(true);
   const [segments,      setSegments]      = useState([]);
   const [viewMode,      setViewMode]      = useState("grid");
   const [renamingIdx,   setRenamingIdx]   = useState(null);
@@ -1316,6 +1323,17 @@ export default function DocumentsView({
   const renameInputRef = useRef(null);
   const subInputRef    = useRef(null);
 
+  /* Load folder tree from server whenever the active project changes */
+  useEffect(() => {
+    if (!activeProject?.id || !token) return;
+    setTreeLoading(true);
+    setSegments([]);
+    fetchTree(activeProject.id, token)
+      .then(saved => { setTree(saved ?? DEFAULT_TREE()); })
+      .catch(() => { setTree(DEFAULT_TREE()); })
+      .finally(() => setTreeLoading(false));
+  }, [activeProject?.id]);
+
   useEffect(() => { if (addingFolder)         addInputRef.current?.focus();    }, [addingFolder]);
   useEffect(() => { if (renamingIdx !== null)  renameInputRef.current?.focus(); }, [renamingIdx]);
   useEffect(() => { if (addingSubIdx !== null) subInputRef.current?.focus();    }, [addingSubIdx]);
@@ -1333,7 +1351,9 @@ export default function DocumentsView({
   const updateTree = updater => {
     setTree(prev => {
       const next = updater(structuredClone(prev));
-      saveTree(next);
+      if (activeProject?.id && token) {
+        persistTree(activeProject.id, token, next).catch(() => {});
+      }
       return next;
     });
   };
@@ -1452,6 +1472,17 @@ export default function DocumentsView({
   const folderWord  = subfolders.length === 1 ? "folder"  : "folders";
   const drawingWord = currentFiles.length === 1 ? "drawing" : "drawings";
   const summaryLine = `${subfolders.length} ${folderWord} · ${currentFiles.length} ${drawingWord} in this location`;
+
+  if (treeLoading) {
+    return (
+      <div className="max-w-[1400px] mx-auto space-y-4">
+        <div className="bg-white border border-border-slate rounded-xl p-10 flex items-center justify-center gap-3 text-on-surface-variant">
+          <Loader2 size={20} className="animate-spin text-primary" />
+          <span className="text-[14px]">Loading folders…</span>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-[1400px] mx-auto space-y-4">
