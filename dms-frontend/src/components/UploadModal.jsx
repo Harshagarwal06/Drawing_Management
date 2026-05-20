@@ -1,7 +1,7 @@
 import { useState, useRef } from "react";
 import { X, Upload, CheckCircle2, Loader2, FolderOpen } from "lucide-react";
 import Field from "./Field";
-import { STATUSES, ORIGINATORS, STATUS_META } from "../constants";
+import { ORIGINATORS } from "../constants";
 
 export default function UploadModal({ onClose, onSubmit, initialFolder }) {
   const [form, setForm] = useState({
@@ -10,7 +10,7 @@ export default function UploadModal({ onClose, onSubmit, initialFolder }) {
     discipline: "",
     revision: "",
     originator: "",
-    status: "S1",
+    status: "S3",
     notes: "",
     folderPath: initialFolder || "",
   });
@@ -192,27 +192,6 @@ export default function UploadModal({ onClose, onSubmit, initialFolder }) {
               </select>
             </Field>
           </div>
-
-          <Field errors={errors} label="Issue Status" id="status">
-            <div className="grid grid-cols-4 gap-2">
-              {STATUSES.map(s => {
-                const m = STATUS_META[s];
-                const active = form.status === s;
-                return (
-                  <button
-                    type="button"
-                    key={s}
-                    onClick={() => set("status", s)}
-                    className={`border rounded-lg py-2 px-2 text-xs font-semibold transition ${
-                      active ? `${m.bg} ${m.text} border-current` : "border-slate-200 text-slate-500 hover:border-slate-300"
-                    }`}
-                  >
-                    {s}
-                  </button>
-                );
-              })}
-            </div>
-          </Field>
 
           <Field errors={errors} label="Notes / Comments" id="notes">
             <textarea

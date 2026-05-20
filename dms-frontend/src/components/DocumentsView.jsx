@@ -7,7 +7,7 @@ import {
   FileEdit, FolderInput, RefreshCcw, Loader2, History,
 } from "lucide-react";
 
-import { DISCIPLINES, STATUSES } from "../constants";
+import { DISCIPLINES } from "../constants";
 
 const API         = import.meta.env.VITE_API_URL;
 /* Supports both legacy local paths (/uploads/…) and full R2 URLs */
@@ -310,7 +310,6 @@ function EditMetadataModal({ drawing, token, onSuccess, onClose }) {
   const [discipline, setDiscipline] = useState(drawing.discipline ?? "");
   const [revision,   setRevision]   = useState(drawing.rev        ?? "");
   const [originator, setOriginator] = useState(drawing.originator ?? "");
-  const [status,     setStatus]     = useState(drawing.status     ?? "S1");
   const [loading,    setLoading]    = useState(false);
   const [error,      setError]      = useState("");
 
@@ -321,7 +320,7 @@ function EditMetadataModal({ drawing, token, onSuccess, onClose }) {
       const res = await fetch(`${API}/api/drawings/${drawing.id}`, {
         method:  "PATCH",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body:    JSON.stringify({ number, title, discipline, revision, originator, status }),
+        body:    JSON.stringify({ number, title, discipline, revision, originator, status: drawing.status }),
       });
       const data = await res.json();
       if (!res.ok) { setError(data.error || "Failed to save changes."); setLoading(false); return; }
@@ -376,28 +375,16 @@ function EditMetadataModal({ drawing, token, onSuccess, onClose }) {
               className="w-full px-3 py-2 text-[13px] border border-border-slate rounded-lg text-on-surface focus:outline-none focus:ring-1 focus:ring-primary/30 focus:border-primary"
             />
           </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-[11px] font-semibold text-on-surface-variant uppercase tracking-wider mb-1.5">Discipline</label>
-              <select
-                value={discipline}
-                onChange={e => setDiscipline(e.target.value)}
-                className="w-full px-3 py-2 text-[13px] border border-border-slate rounded-lg text-on-surface bg-white focus:outline-none focus:ring-1 focus:ring-primary/30 focus:border-primary"
-              >
-                <option value="">— Select —</option>
-                {DISCIPLINES.map(d => <option key={d} value={d}>{d}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className="block text-[11px] font-semibold text-on-surface-variant uppercase tracking-wider mb-1.5">Status</label>
-              <select
-                value={status}
-                onChange={e => setStatus(e.target.value)}
-                className="w-full px-3 py-2 text-[13px] border border-border-slate rounded-lg text-on-surface bg-white focus:outline-none focus:ring-1 focus:ring-primary/30 focus:border-primary"
-              >
-                {STATUSES.map(s => <option key={s} value={s}>{STATUS_LABEL[s] ?? s}</option>)}
-              </select>
-            </div>
+          <div>
+            <label className="block text-[11px] font-semibold text-on-surface-variant uppercase tracking-wider mb-1.5">Discipline</label>
+            <select
+              value={discipline}
+              onChange={e => setDiscipline(e.target.value)}
+              className="w-full px-3 py-2 text-[13px] border border-border-slate rounded-lg text-on-surface bg-white focus:outline-none focus:ring-1 focus:ring-primary/30 focus:border-primary"
+            >
+              <option value="">— Select —</option>
+              {DISCIPLINES.map(d => <option key={d} value={d}>{d}</option>)}
+            </select>
           </div>
           <div>
             <label className="block text-[11px] font-semibold text-on-surface-variant uppercase tracking-wider mb-1.5">Originator</label>
@@ -648,7 +635,6 @@ function MoveFolderModal({ drawing, token, onSuccess, onClose }) {
 function NewRevisionModal({ drawing, token, projectId, onSuccess, onClose }) {
   const [title,      setTitle]      = useState(drawing.title      ?? "");
   const [revision,   setRevision]   = useState(nextRev(drawing.rev));
-  const [status,     setStatus]     = useState(drawing.status     ?? "S1");
   const [file,       setFile]       = useState(null);
   const [dragging,   setDragging]   = useState(false);
   const [loading,    setLoading]    = useState(false);
@@ -669,7 +655,7 @@ function NewRevisionModal({ drawing, token, projectId, onSuccess, onClose }) {
       fd.append("discipline",    drawing.discipline ?? "");
       fd.append("revision",      revision);
       fd.append("originator",    drawing.originator ?? "");
-      fd.append("status",        status);
+      fd.append("status",        drawing.status ?? "S3");
       fd.append("notes",         "");
       fd.append("projectId",     projectId ?? "");
       fd.append("folderPath",    drawing.folderPath ?? "");
@@ -736,25 +722,13 @@ function NewRevisionModal({ drawing, token, projectId, onSuccess, onClose }) {
             }
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-[11px] font-semibold text-on-surface-variant uppercase tracking-wider mb-1.5">Revision</label>
-              <input
-                value={revision}
-                onChange={e => setRevision(e.target.value)}
-                className="w-full px-3 py-2 text-[13px] border border-border-slate rounded-lg text-on-surface font-mono focus:outline-none focus:ring-1 focus:ring-primary/30 focus:border-primary"
-              />
-            </div>
-            <div>
-              <label className="block text-[11px] font-semibold text-on-surface-variant uppercase tracking-wider mb-1.5">Status</label>
-              <select
-                value={status}
-                onChange={e => setStatus(e.target.value)}
-                className="w-full px-3 py-2 text-[13px] border border-border-slate rounded-lg text-on-surface bg-white focus:outline-none focus:ring-1 focus:ring-primary/30 focus:border-primary"
-              >
-                {STATUSES.map(s => <option key={s} value={s}>{STATUS_LABEL[s] ?? s}</option>)}
-              </select>
-            </div>
+          <div>
+            <label className="block text-[11px] font-semibold text-on-surface-variant uppercase tracking-wider mb-1.5">Revision</label>
+            <input
+              value={revision}
+              onChange={e => setRevision(e.target.value)}
+              className="w-full px-3 py-2 text-[13px] border border-border-slate rounded-lg text-on-surface font-mono focus:outline-none focus:ring-1 focus:ring-primary/30 focus:border-primary"
+            />
           </div>
           <div>
             <label className="block text-[11px] font-semibold text-on-surface-variant uppercase tracking-wider mb-1.5">Title</label>
