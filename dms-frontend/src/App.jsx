@@ -362,7 +362,7 @@ export default function App() {
               <DocumentsView
                 drawings={drawings}
                 onUpload={!isRestricted ? (folder) => { setModalFolder(folder); setShowModal(true); } : undefined}
-                onDeleteDrawing={isDirector ? handleDeleteDrawing : undefined}
+                onDeleteDrawing={!isRestricted ? handleDeleteDrawing : undefined}
                 projects={projects}
                 activeProject={activeProject}
                 onProjectChange={setActiveProject}
