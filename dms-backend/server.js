@@ -324,7 +324,7 @@ function requireDirector(req, res, next) {
 function requireProjectAccess(req, res, next) {
   const allowed   = req.user?.allowedProjects;
   if (allowed === '*') return next();
-  const projectId = parseInt(req.query.projectId || req.body?.projectId || 1, 10);
+  const projectId = parseInt(req.params.id || req.query.projectId || req.body?.projectId || 1, 10);
   try {
     const ids = JSON.parse(allowed || '[]');
     if (ids.includes(projectId)) return next();
