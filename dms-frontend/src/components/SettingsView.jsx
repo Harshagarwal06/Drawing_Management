@@ -166,7 +166,12 @@ export default function SettingsView({ currentUser, onUserUpdate, token }) {
   const loadProjects = () => {
     if (!isAdmin) return;
     fetch(`${API}/api/projects`, { headers: { Authorization: `Bearer ${token}` } })
-      .then(r => r.ok ? r.json() : []).then(setProjects).catch(() => {});
+      .then(r => r.ok ? r.json() : [])
+      .then(ps => {
+        setProjects(ps);
+        setNewUser(prev => ({ ...prev, selectedProjects: ps.map(p => p.id) }));
+      })
+      .catch(() => {});
   };
 
   useEffect(() => { loadUsers(); loadProjects(); }, []);
@@ -282,7 +287,7 @@ export default function SettingsView({ currentUser, onUserUpdate, token }) {
       const data = await res.json();
       if (res.ok) {
         flashMsg('success', `User "${newUser.username}" created.`);
-        setNewUser({ username: '', password: '', name: '', role: 'In House Architect', selectedProjects: [] });
+        setNewUser({ username: '', password: '', name: '', role: 'In House Architect', selectedProjects: projects.map(p => p.id) });
         setAddOpen(false); loadUsers();
       } else flashMsg('error', data.error || 'Failed to create user.');
     } catch { flashMsg('error', 'Cannot connect to server.'); }
