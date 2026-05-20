@@ -1,6 +1,6 @@
 import { NavLink, useNavigate } from "react-router-dom";
 
-const NAV_ITEMS = [
+const DIRECTOR_NAV = [
   { path: "/dashboard",    icon: "dashboard",     label: "Dashboard"        },
   { path: "/documents",    icon: "description",   label: "Documents"        },
   { path: "/register",     icon: "architecture",  label: "Drawing Register" },
@@ -8,17 +8,18 @@ const NAV_ITEMS = [
   { path: "/analytics",    icon: "analytics",     label: "Analytics"        },
 ];
 
+const RESTRICTED_NAV = [
+  { path: "/documents", icon: "description", label: "Documents" },
+];
+
 export default function Sidebar({
   activeProject,
+  isDirector    = false,
   mobileOpen    = false,
   onMobileClose = () => {},
 }) {
   const navigate = useNavigate();
-
-  const handleNav = (path) => {
-    navigate(path);
-    onMobileClose();
-  };
+  const navItems = isDirector ? DIRECTOR_NAV : RESTRICTED_NAV;
 
   return (
     <>
@@ -69,7 +70,7 @@ export default function Sidebar({
 
         {/* Nav */}
         <nav className="flex flex-col gap-1 flex-1">
-          {NAV_ITEMS.map(({ path, icon, label }) => (
+          {navItems.map(({ path, icon, label }) => (
             <NavLink
               key={path}
               to={path}

@@ -26,6 +26,7 @@ export default function AppShell({
 
       <Sidebar
         activeProject={activeProject}
+        isDirector={isDirector}
         mobileOpen={mobileNavOpen}
         onMobileClose={() => setMobileNavOpen(false)}
       />

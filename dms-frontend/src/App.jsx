@@ -300,25 +300,69 @@ export default function App() {
         <Route element={<ProtectedRoute currentUser={currentUser} />}>
           <Route element={<AppShell {...shellProps} />}>
 
-            <Route index element={<Navigate to="/dashboard" replace />} />
+            {/* Root redirect — directors go to dashboard, others to documents */}
+            <Route index element={<Navigate to={isDirector ? "/dashboard" : "/documents"} replace />} />
 
+            {/* ── Director-only routes — redirect others to /documents ── */}
             <Route path="/dashboard" element={
-              <Dashboard
-                totalDrawings={totalDrawings}
-                totalTransmittals={totalTransmittals}
-                latestRevisions={pendingReviews}
-                overdueItems={overdueTransmit}
-                drawings={drawings}
-                activeProjectId={activeProject?.id}
-                token={currentUser?.token}
-              />
+              isDirector ? (
+                <Dashboard
+                  totalDrawings={totalDrawings}
+                  totalTransmittals={totalTransmittals}
+                  latestRevisions={pendingReviews}
+                  overdueItems={overdueTransmit}
+                  drawings={drawings}
+                  activeProjectId={activeProject?.id}
+                  token={currentUser?.token}
+                />
+              ) : <Navigate to="/documents" replace />
             } />
 
+            <Route path="/register" element={
+              isDirector ? (
+                <MasterRegisterTable
+                  drawings={pageRows}
+                  allDrawings={drawings}
+                  total={filtered.length}
+                  page={page}
+                  totalPages={totalPages}
+                  search={search}
+                  filterStat={filterStat}
+                  filterDisc={filterDisc}
+                  sortKey={sortKey}
+                  sortDir={sortDir}
+                  onPageChange={setPage}
+                  onSearch={handleSearch}
+                  onFilterStat={handleFilterStat}
+                  onFilterDisc={handleFilterDisc}
+                  onSort={handleSort}
+                  onNewEntry={() => { setModalFolder(""); setShowModal(true); }}
+                  onNewTransmittal={() => setShowTransmittal(true)}
+                  onVoid={handleVoid}
+                  isRestricted={false}
+                  loading={drawingsLoading}
+                />
+              ) : <Navigate to="/documents" replace />
+            } />
+
+            <Route path="/transmittals" element={
+              isDirector
+                ? <TransmittalsView transmittals={transmittals} drawings={drawings} loading={drawingsLoading} token={currentUser?.token} />
+                : <Navigate to="/documents" replace />
+            } />
+
+            <Route path="/analytics" element={
+              isDirector
+                ? <AnalyticsView drawings={drawings} transmittals={transmittals} />
+                : <Navigate to="/documents" replace />
+            } />
+
+            {/* ── Documents — all roles ── */}
             <Route path="/documents" element={
               <DocumentsView
                 drawings={drawings}
-                onUpload={!isRestricted ? (folder) => { setModalFolder(folder); setShowModal(true); } : undefined}
-                onDeleteDrawing={!isRestricted ? handleDeleteDrawing : undefined}
+                onUpload={isDirector ? (folder) => { setModalFolder(folder); setShowModal(true); } : undefined}
+                onDeleteDrawing={isDirector ? handleDeleteDrawing : undefined}
                 projects={projects}
                 activeProject={activeProject}
                 onProjectChange={setActiveProject}
@@ -329,45 +373,13 @@ export default function App() {
               />
             } />
 
-            <Route path="/register" element={
-              <MasterRegisterTable
-                drawings={pageRows}
-                allDrawings={drawings}
-                total={filtered.length}
-                page={page}
-                totalPages={totalPages}
-                search={search}
-                filterStat={filterStat}
-                filterDisc={filterDisc}
-                sortKey={sortKey}
-                sortDir={sortDir}
-                onPageChange={setPage}
-                onSearch={handleSearch}
-                onFilterStat={handleFilterStat}
-                onFilterDisc={handleFilterDisc}
-                onSort={handleSort}
-                onNewEntry={() => { setModalFolder(""); setShowModal(true); }}
-                onNewTransmittal={!isRestricted ? () => setShowTransmittal(true) : undefined}
-                onVoid={handleVoid}
-                isRestricted={isRestricted}
-                loading={drawingsLoading}
-              />
-            } />
-
-            <Route path="/transmittals" element={
-              <TransmittalsView transmittals={transmittals} drawings={drawings} loading={drawingsLoading} token={currentUser?.token} />
-            } />
-
-            <Route path="/analytics" element={
-              <AnalyticsView drawings={drawings} transmittals={transmittals} />
-            } />
-
+            {/* ── Settings — all roles (password change for everyone, user mgmt for director) ── */}
             <Route path="/settings" element={
               <SettingsView currentUser={currentUser} onUserUpdate={setCurrentUser} token={currentUser?.token} />
             } />
 
             {/* Catch-all */}
-            <Route path="*" element={<Navigate to="/dashboard" replace />} />
+            <Route path="*" element={<Navigate to={isDirector ? "/dashboard" : "/documents"} replace />} />
           </Route>
         </Route>
       </Routes>
