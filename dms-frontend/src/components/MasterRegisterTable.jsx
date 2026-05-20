@@ -199,7 +199,7 @@ export default function MasterRegisterTable({
         </div>
 
         {/* Status pills */}
-        <div className="flex items-center gap-1.5 flex-wrap">
+        <div className="flex overflow-x-auto items-center gap-1.5 pb-1">
           {STATUS_FILTERS.map(pill => (
             <button
               key={pill.value}

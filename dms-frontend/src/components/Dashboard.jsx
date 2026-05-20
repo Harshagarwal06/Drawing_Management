@@ -76,7 +76,7 @@ export default function Dashboard({
     <div className="space-y-8">
       {/* Page Header */}
       <div>
-        <h2 className="font-headline-lg text-headline-lg text-on-surface">Project Dashboard</h2>
+        <h2 className="font-semibold text-[22px] md:text-headline-lg text-on-surface">Project Dashboard</h2>
         <p className="font-body-md text-on-surface-variant mt-1">Real-time status overview of project documentation and delivery.</p>
       </div>
 
@@ -130,7 +130,7 @@ export default function Dashboard({
               <h4 className="font-headline-md text-headline-md text-on-surface">Drawings by Discipline</h4>
               <p className="font-body-sm text-on-surface-variant">Status breakdown per drawing type.</p>
             </div>
-            <div className="flex gap-4">
+            <div className="flex gap-2 flex-wrap justify-end">
               {Object.entries(STATUS_META).map(([code, { label, color }]) => (
                 <div key={code} className="flex items-center gap-2">
                   <div className="w-3 h-3 rounded-full" style={{ backgroundColor: color }} />
@@ -178,7 +178,7 @@ export default function Dashboard({
             <h4 className="font-headline-md text-headline-md text-on-surface">Activity Feed</h4>
             <p className="font-body-sm text-on-surface-variant">Recent project events and updates.</p>
           </div>
-          <div className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar">
+          <div className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar max-h-[400px] lg:max-h-none">
             {activityError ? (
               <div className="flex flex-col items-center justify-center h-40 gap-3 text-on-surface-variant">
                 <span className="material-symbols-outlined text-[36px] opacity-30">wifi_off</span>

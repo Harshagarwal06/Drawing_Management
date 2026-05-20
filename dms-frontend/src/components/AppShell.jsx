@@ -53,7 +53,7 @@ export default function AppShell({
               type="text"
               value={search}
               onChange={e => onSearch(e.target.value)}
-              placeholder="Search drawings, transmittals, or tasks…"
+              placeholder="Search drawings…"
               className="w-full pl-10 pr-4 py-2 bg-surface-container-low border border-border-slate rounded-lg text-body-sm text-on-surface placeholder:text-on-surface-variant focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/20 transition-all"
             />
           </div>
@@ -63,7 +63,8 @@ export default function AppShell({
 
             {/* Project selector — hidden on /documents (workspace bar handles it there) */}
             {!isDocuments && (
-              (isProjectTeam || projects.length <= 1) ? (
+              <div className="hidden md:flex">
+              {(isProjectTeam || projects.length <= 1) ? (
                 <div className="flex items-center gap-3 bg-surface-container-low border border-outline-variant rounded-xl px-4 py-2.5 min-w-[200px]">
                   <span className="w-3 h-3 rounded-full shrink-0 bg-primary" />
                   <div className="flex flex-col items-start min-w-0 text-left flex-1">
@@ -81,7 +82,8 @@ export default function AppShell({
                   onNew={onNewProject}
                   isRestricted={!isDirector}
                 />
-              )
+              )}
+              </div>
             )}
 
             <div className="h-6 w-px bg-border-slate mx-1" />
@@ -104,7 +106,7 @@ export default function AppShell({
         </header>
 
         {/* ── Page content rendered by child route ── */}
-        <main className="flex-1 p-margin-desktop">
+        <main className="flex-1 p-4 md:p-[40px]">
           <Outlet />
         </main>
       </div>

@@ -407,7 +407,7 @@ export default function SettingsView({ currentUser, onUserUpdate, token }) {
                     <div key={u.id} className={!isLast ? 'border-b border-border-slate' : ''}>
 
                       {/* ── User row ── */}
-                      <div className={`flex items-center gap-3 px-4 py-2.5 transition-colors ${isDeactivated ? 'bg-surface-container-low opacity-60' : 'bg-white hover:bg-surface-container-low'}`}>
+                      <div className={`flex items-center gap-2 px-4 py-2.5 transition-colors ${isDeactivated ? 'bg-surface-container-low opacity-60' : 'bg-white hover:bg-surface-container-low'}`}>
 
                         {/* Avatar */}
                         <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white font-bold text-[12px] shrink-0 ${isDeactivated ? 'bg-on-surface-variant' : 'bg-primary'}`}>
@@ -431,7 +431,7 @@ export default function SettingsView({ currentUser, onUserUpdate, token }) {
                             value={u.role}
                             onChange={e => handleRoleChange(u.id, e.target.value, u.allowed_projects)}
                             disabled={isSelf}
-                            className="bg-white border border-border-slate rounded-lg px-2 py-1.5 text-[12px] text-on-surface focus:outline-none focus:ring-1 focus:ring-primary/20 disabled:opacity-50"
+                            className="bg-white border border-border-slate rounded-lg px-2 py-1.5 text-[12px] text-on-surface focus:outline-none focus:ring-1 focus:ring-primary/20 disabled:opacity-50 max-w-[120px] sm:max-w-none"
                           >
                             {ROLES.map(r => <option key={r} value={r}>{r}</option>)}
                           </select>
@@ -451,7 +451,7 @@ export default function SettingsView({ currentUser, onUserUpdate, token }) {
                           allowedList === null ? (
                             <button
                               onClick={() => isExpanded ? setEditingProjectsFor(null) : openProjectEditor(u)}
-                              className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-surface-container text-on-surface-variant border border-border-slate hover:bg-surface-container-high transition-colors shrink-0 flex items-center gap-1"
+                              className="hidden sm:flex px-2 py-0.5 rounded-full text-[10px] font-medium bg-surface-container text-on-surface-variant border border-border-slate hover:bg-surface-container-high transition-colors shrink-0 items-center gap-1"
                             >
                               All projects
                               <span className="material-symbols-outlined text-[11px]">edit</span>
@@ -459,7 +459,7 @@ export default function SettingsView({ currentUser, onUserUpdate, token }) {
                           ) : (
                             <button
                               onClick={() => isExpanded ? setEditingProjectsFor(null) : openProjectEditor(u)}
-                              className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-primary/10 text-primary border border-primary/20 hover:bg-primary/20 transition-colors shrink-0"
+                              className="hidden sm:flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-primary/10 text-primary border border-primary/20 hover:bg-primary/20 transition-colors shrink-0"
                             >
                               <span>{allowedList.length} project{allowedList.length !== 1 ? 's' : ''}</span>
                               <span className="material-symbols-outlined text-[12px]">edit</span>

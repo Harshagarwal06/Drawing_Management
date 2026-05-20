@@ -218,7 +218,7 @@ function ProjectWorkspaceBar({
         </div>
 
         {/* Stats */}
-        <div className="flex items-center gap-2 flex-wrap">
+        <div className="flex items-center gap-2 flex-nowrap overflow-x-auto">
           <StatChip label="Folders"      value={totalFolders}      Icon={Layers}    colorCls="bg-primary/10 text-primary" />
           <StatChip label="Drawings"     value={totalDrawings}     Icon={FileText}  colorCls="bg-blue-50 text-blue-600" />
           <StatChip label="Transmittals" value={totalTransmittals} Icon={Send}      colorCls="bg-status-emerald-bg text-status-emerald-text" />
@@ -1470,7 +1470,7 @@ export default function DocumentsView({
 
       {/* ── Page title ── */}
       <div>
-        <h1 className="text-headline-lg font-semibold text-on-surface">Documents</h1>
+        <h1 className="text-[22px] md:text-headline-lg font-semibold text-on-surface">Documents</h1>
         <p className="text-body-md text-on-surface-variant mt-0.5">
           Organize drawings, folders, revisions, and files.
         </p>
@@ -1480,7 +1480,7 @@ export default function DocumentsView({
       <div className="bg-white border border-border-slate rounded-xl overflow-hidden">
 
         {/* Card header: breadcrumb + toolbar */}
-        <div className="flex items-center gap-3 px-5 py-3 border-b border-border-slate flex-wrap gap-y-2">
+        <div className="flex items-center gap-x-3 gap-y-2 px-5 py-3 border-b border-border-slate flex-wrap">
 
           {/* Breadcrumb */}
           <nav className="flex items-center gap-1 flex-1 min-w-0 flex-wrap">
@@ -1523,7 +1523,7 @@ export default function DocumentsView({
           </nav>
 
           {/* Toolbar */}
-          <div className="flex items-center gap-2 shrink-0 flex-wrap">
+          <div className="flex items-center gap-2 flex-wrap">
             {/* Local search */}
             <div className="relative">
               <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-on-surface-variant pointer-events-none" />
@@ -1532,7 +1532,7 @@ export default function DocumentsView({
                 value={localSearch}
                 onChange={e => setLocalSearch(e.target.value)}
                 placeholder="Search in this folder…"
-                className="pl-8 pr-7 py-1.5 text-[12px] w-[200px] bg-surface-container-low border border-border-slate rounded-lg text-on-surface placeholder:text-on-surface-variant focus:outline-none focus:ring-1 focus:ring-primary/20 focus:border-primary transition-all"
+                className="pl-8 pr-7 py-1.5 text-[12px] w-full sm:w-[200px] bg-surface-container-low border border-border-slate rounded-lg text-on-surface placeholder:text-on-surface-variant focus:outline-none focus:ring-1 focus:ring-primary/20 focus:border-primary transition-all"
               />
               {localSearch && (
                 <button
