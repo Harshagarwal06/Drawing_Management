@@ -1255,7 +1255,7 @@ function FolderCard({ node, fileCount, onClick, onAdd, onRename, onDelete, viewM
         {subCount > 0 && (
           <span className="text-[11px] text-on-surface-variant">{subCount} folder{subCount !== 1 ? "s" : ""}</span>
         )}
-        <FolderMenu onAdd={onAdd} onRename={onRename} onDelete={onDelete} />
+        {(onAdd || onRename || onDelete) && <FolderMenu onAdd={onAdd} onRename={onRename} onDelete={onDelete} />}
         <ChevronRight size={14} className="text-outline shrink-0" />
       </div>
     );
@@ -1278,7 +1278,7 @@ function FolderCard({ node, fileCount, onClick, onAdd, onRename, onDelete, viewM
           {subCount === 0 && fileCount === 0 ? "Empty" : ""}
         </p>
       </div>
-      <FolderMenu onAdd={onAdd} onRename={onRename} onDelete={onDelete} />
+      {(onAdd || onRename || onDelete) && <FolderMenu onAdd={onAdd} onRename={onRename} onDelete={onDelete} />}
     </div>
   );
 }
@@ -1598,13 +1598,15 @@ export default function DocumentsView({
             </div>
 
             {/* New Folder */}
-            <button
-              onClick={() => setAddingFolder(true)}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border-slate bg-white hover:bg-surface-container text-[12px] font-medium text-on-surface-variant transition-colors shrink-0"
-            >
-              <FolderPlus size={13} />
-              New Folder
-            </button>
+            {!isProjectTeam && (
+              <button
+                onClick={() => setAddingFolder(true)}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border-slate bg-white hover:bg-surface-container text-[12px] font-medium text-on-surface-variant transition-colors shrink-0"
+              >
+                <FolderPlus size={13} />
+                New Folder
+              </button>
+            )}
 
             {/* Upload Here */}
             {onUpload && (
@@ -1746,9 +1748,9 @@ export default function DocumentsView({
                         fileCount={fileCount}
                         viewMode={viewMode}
                         onClick={() => navigateInto(child.name)}
-                        onAdd={() => { setAddingSubIdx(originalIdx); setNewSubVal(""); }}
-                        onRename={() => { setRenamingIdx(originalIdx); setRenameVal(child.name); }}
-                        onDelete={() => setConfirmDelIdx(originalIdx)}
+                        onAdd={!isProjectTeam ? () => { setAddingSubIdx(originalIdx); setNewSubVal(""); } : undefined}
+                        onRename={!isProjectTeam ? () => { setRenamingIdx(originalIdx); setRenameVal(child.name); } : undefined}
+                        onDelete={!isProjectTeam ? () => setConfirmDelIdx(originalIdx) : undefined}
                       />
                     );
                   })}
