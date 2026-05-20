@@ -334,15 +334,6 @@ function requireProjectAccess(req, res, next) {
   }
 }
 
-/* ── Login rate limiter — max 10 attempts per 15 min ────────────── */
-const loginLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 10,
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: { error: 'Too many login attempts — please try again in 15 minutes.' },
-});
-
 /* ── Upload rate limiter — max 20 uploads per 15 min per IP ─────── */
 const uploadLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
@@ -1019,7 +1010,7 @@ app.patch('/api/users/me/password', async (req, res) => {
 });
 
 /* ── POST /api/login ────────────────────────────────────────────── */
-app.post('/api/login', loginLimiter, async (req, res) => {
+app.post('/api/login', async (req, res) => {
   const { username, password } = req.body;
   try {
     const user = db.prepare('SELECT * FROM users WHERE username = ?').get(username);
