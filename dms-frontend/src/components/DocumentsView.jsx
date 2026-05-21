@@ -1399,21 +1399,68 @@ export default function DocumentsView({
     setNewFolderVal("");
   };
 
-  const renameFolder = idx => {
+  const renameFolder = async idx => {
     const name = renameVal.trim();
     if (!name) { setRenamingIdx(null); return; }
+    
+    const oldName = subfolders[idx].name;
+    if (oldName === name) { setRenamingIdx(null); return; }
+
+    const oldPath = [tree.name, ...segments, oldName].join("/");
+    const newPath = [tree.name, ...segments, name].join("/");
+
+    // 1. Update tree model on server
     updateTree(next => {
       getNode(next, segments).children[idx].name = name;
       return next;
     });
+
+    // 2. Call backend to recursively update all drawings' folder paths
+    try {
+      const res = await fetch(`${API}/api/projects/${activeProject.id}/folders/rename`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ oldPath, newPath }),
+      });
+      if (res.ok) {
+        await onDrawingUpdate?.();
+        showToast(`Folder renamed to "${name}" and files updated.`, "success");
+      } else {
+        showToast("Error updating drawing paths on server.", "error");
+      }
+    } catch (err) {
+      console.error(err);
+      showToast("Network error updating folder files.", "error");
+    }
+
     setRenamingIdx(null);
   };
 
-  const deleteFolder = idx => {
+  const deleteFolder = async idx => {
+    const folderName = subfolders[idx].name;
+    const folderPath = [tree.name, ...segments, folderName].join("/");
+    const parentPath = [tree.name, ...segments].join("/");
+
+    // 1. Update tree model on server
     updateTree(next => {
       getNode(next, segments).children.splice(idx, 1);
       return next;
     });
+
+    // 2. Call backend to bubble up drawings
+    try {
+      const res = await fetch(`${API}/api/projects/${activeProject.id}/folders/delete`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ folderPath, parentPath }),
+      });
+      if (res.ok) {
+        await onDrawingUpdate?.();
+        showToast(`Folder deleted. Files bubbled up to parent folder.`, "success");
+      }
+    } catch (err) {
+      console.error(err);
+    }
   };
 
   const addSubfolder = (childIdx, name) => {

@@ -431,6 +431,62 @@ app.put('/api/projects/:id/folders', requireProjectAccess, (req, res) => {
   }
 });
 
+/* ── POST /api/projects/:id/folders/rename ───────────────────────── */
+app.post('/api/projects/:id/folders/rename', requireProjectAccess, (req, res) => {
+  const { oldPath, newPath } = req.body;
+  if (!oldPath || !newPath) return res.status(400).json({ error: 'oldPath and newPath are required.' });
+  try {
+    db.transaction(() => {
+      // 1. Update exact matching paths
+      db.prepare(`
+        UPDATE drawings 
+        SET folder_path = ? 
+        WHERE project_id = ? AND folder_path = ?
+      `).run(newPath, req.params.id, oldPath);
+
+      // 2. Update all nested subfolder paths recursively
+      db.prepare(`
+        UPDATE drawings 
+        SET folder_path = ? || SUBSTR(folder_path, ?) 
+        WHERE project_id = ? AND folder_path LIKE ? || '/%'
+      `).run(newPath, oldPath.length + 1, req.params.id, oldPath);
+    })();
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('❌ POST /api/projects/:id/folders/rename error:', err);
+    res.status(500).json({ error: 'Failed to update drawing folder paths.' });
+  }
+});
+
+/* ── POST /api/projects/:id/folders/delete ───────────────────────── */
+app.post('/api/projects/:id/folders/delete', requireProjectAccess, (req, res) => {
+  const { folderPath, parentPath } = req.body;
+  if (!folderPath) return res.status(400).json({ error: 'folderPath is required.' });
+  
+  const targetParent = parentPath || '';
+  try {
+    db.transaction(() => {
+      // Move all drawings in the deleted folder to the parent folder
+      db.prepare(`
+        UPDATE drawings 
+        SET folder_path = ? 
+        WHERE project_id = ? AND folder_path = ?
+      `).run(targetParent, req.params.id, folderPath);
+
+      // Bubble up drawings in nested subfolders to the parent folder
+      db.prepare(`
+        UPDATE drawings 
+        SET folder_path = ? 
+        WHERE project_id = ? AND folder_path LIKE ? || '/%'
+      `).run(targetParent, req.params.id, folderPath);
+    })();
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('❌ POST /api/projects/:id/folders/delete error:', err);
+    res.status(500).json({ error: 'Failed to bubble up drawing folder paths.' });
+  }
+});
+
 /* ── GET /api/drawings ──────────────────────────────────────────── */
 app.get('/api/drawings', requireProjectAccess, (req, res) => {
   const projectId = req.query.projectId || 1;
