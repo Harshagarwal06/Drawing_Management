@@ -104,6 +104,12 @@ export default function SettingsView({ currentUser, onUserUpdate, token }) {
   const [userSearch,         setUserSearch]         = useState('');
   const [roleFilter,         setRoleFilter]         = useState('All');
 
+  // Project rename
+  const [renamingProject, setRenamingProject] = useState(null); // { id, name, code }
+  const [renameForm,      setRenameForm]      = useState({ name: '', code: '' });
+  const [renameMsg,       setRenameMsg]       = useState(null);
+  const [renameLoading,   setRenameLoading]   = useState(false);
+
   // ⋮ menu
   const [menuOpenId, setMenuOpenId] = useState(null);
   const [menuAnchor, setMenuAnchor] = useState(null);
@@ -174,6 +180,31 @@ export default function SettingsView({ currentUser, onUserUpdate, token }) {
   };
 
   useEffect(() => { loadUsers(); loadProjects(); }, []);
+
+  const handleRenameProject = async (e) => {
+    e.preventDefault();
+    setRenameLoading(true);
+    setRenameMsg(null);
+    try {
+      const res = await fetch(`${API}/api/projects/${renamingProject.id}`, {
+        method:  'PATCH',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body:    JSON.stringify({ name: renameForm.name.trim(), code: renameForm.code.trim().toUpperCase() }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setRenameMsg({ type: 'success', text: 'Project renamed successfully.' });
+        loadProjects();
+        setTimeout(() => { setRenamingProject(null); setRenameMsg(null); }, 1000);
+      } else {
+        setRenameMsg({ type: 'error', text: data.error || 'Failed to rename project.' });
+      }
+    } catch {
+      setRenameMsg({ type: 'error', text: 'Cannot connect to server.' });
+    } finally {
+      setRenameLoading(false);
+    }
+  };
 
   const handleRoleChange = async (userId, role, allowedProjects) => {
     try {
@@ -671,6 +702,79 @@ export default function SettingsView({ currentUser, onUserUpdate, token }) {
             </form>
           )}
         </Section>
+      )}
+
+      {/* ── Projects ─────────────────────────────────────────────────── */}
+      {isAdmin && (
+        <Section title="Projects" icon="folder_open">
+          <div className="space-y-2">
+            {projects.length === 0 && (
+              <p className="text-[13px] text-on-surface-variant">No projects yet.</p>
+            )}
+            {projects.map(p => (
+              <div key={p.id} className="flex items-center gap-3 px-4 py-3 rounded-xl border border-border-slate bg-white hover:bg-surface-container-low transition-colors">
+                <span className="font-mono text-[12px] font-bold text-primary bg-primary/10 px-2 py-0.5 rounded shrink-0">{p.code}</span>
+                <span className="flex-1 text-[13px] text-on-surface truncate">{p.name}</span>
+                <button
+                  onClick={() => { setRenamingProject(p); setRenameForm({ name: p.name, code: p.code }); setRenameMsg(null); }}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border-slate text-[12px] font-medium text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-colors shrink-0"
+                >
+                  <span className="material-symbols-outlined text-[14px]">edit</span>
+                  Rename
+                </button>
+              </div>
+            ))}
+          </div>
+        </Section>
+      )}
+
+      {/* ── Rename project modal ─────────────────────────────────────── */}
+      {renamingProject && createPortal(
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4" style={{ background: 'rgba(15,23,42,0.4)' }}>
+          <div className="bg-white rounded-2xl shadow-xl border border-border-slate w-full max-w-sm overflow-hidden">
+            <div className="px-6 py-4 border-b border-border-slate flex items-center justify-between">
+              <h2 className="text-[15px] font-semibold text-on-surface">Rename Project</h2>
+              <button onClick={() => setRenamingProject(null)} className="text-on-surface-variant hover:text-on-surface transition p-1 rounded-lg hover:bg-surface-container">
+                <X size={16} />
+              </button>
+            </div>
+            <form onSubmit={handleRenameProject} className="px-6 py-5 space-y-4">
+              {renameMsg && (
+                <div className={`text-[13px] p-3 rounded-lg border ${bannerClass(renameMsg.type)}`}>{renameMsg.text}</div>
+              )}
+              <div>
+                <label className="block text-[12px] text-on-surface-variant mb-1.5 font-medium">Project Code</label>
+                <input
+                  value={renameForm.code}
+                  onChange={e => setRenameForm(f => ({ ...f, code: e.target.value.toUpperCase() }))}
+                  maxLength={10}
+                  required
+                  className="w-full bg-white border border-border-slate rounded-lg px-3 py-2 text-[14px] font-mono text-on-surface focus:outline-none focus:ring-1 focus:ring-primary/20 focus:border-primary"
+                />
+              </div>
+              <div>
+                <label className="block text-[12px] text-on-surface-variant mb-1.5 font-medium">Project Name</label>
+                <input
+                  value={renameForm.name}
+                  onChange={e => setRenameForm(f => ({ ...f, name: e.target.value }))}
+                  required
+                  className="w-full bg-white border border-border-slate rounded-lg px-3 py-2 text-[14px] text-on-surface focus:outline-none focus:ring-1 focus:ring-primary/20 focus:border-primary"
+                />
+              </div>
+              <div className="flex gap-2 justify-end pt-1">
+                <button type="button" onClick={() => setRenamingProject(null)}
+                  className="px-4 py-2 rounded-lg border border-border-slate text-on-surface-variant hover:bg-surface-container font-medium text-[13px] transition-colors">
+                  Cancel
+                </button>
+                <button type="submit" disabled={renameLoading}
+                  className="px-4 py-2 rounded-lg bg-primary text-white hover:bg-primary-container font-medium text-[13px] transition-colors disabled:opacity-60">
+                  {renameLoading ? 'Saving…' : 'Save Changes'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>,
+        document.body
       )}
 
       {/* ── Confirmation modal for deactivate / remove ── */}
