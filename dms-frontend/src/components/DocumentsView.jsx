@@ -1039,8 +1039,10 @@ function RevisionHistoryPanel({ drawing, token, onClose }) {
 
                 {[...revisions].reverse().map((rev, i) => {
                   const isCurrent = rev.current;
-                  const filename = rev.path?.split("/").pop() ?? "";
-                  const ext = filename.split(".").pop().toUpperCase();
+                  const filename  = rev.path?.split("/").pop() ?? "";
+                  const ext       = filename.split(".").pop().toUpperCase();
+                  const statusPill  = STATUS_PILL[rev.status]  ?? "bg-surface-container text-on-surface-variant";
+                  const statusLabel = STATUS_LABEL[rev.status] ?? rev.status;
 
                   return (
                     <div key={rev.id ?? "current"} className="relative pl-10 pb-6 last:pb-0">
@@ -1048,65 +1050,91 @@ function RevisionHistoryPanel({ drawing, token, onClose }) {
                       <div className={`absolute left-[9px] top-1.5 w-[13px] h-[13px] rounded-full border-2 ${
                         isCurrent
                           ? "bg-primary border-primary"
-                          : "bg-white border-border-slate"
+                          : "bg-surface-container border-border-slate"
                       }`} />
 
                       {/* Content card */}
-                      <div className={`rounded-xl border p-3.5 ${
+                      <div className={`rounded-xl border overflow-hidden ${
                         isCurrent
                           ? "border-primary/30 bg-primary/5"
-                          : "border-border-slate bg-white hover:bg-surface-container-low"
+                          : "border-border-slate bg-white opacity-80"
                       } transition-colors`}>
-                        <div className="flex items-center justify-between gap-2 mb-1.5">
-                          <div className="flex items-center gap-2">
+
+                        {/* Superseded warning banner — older revisions only */}
+                        {!isCurrent && (
+                          <div className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 border-b border-amber-200">
+                            <svg width="11" height="11" viewBox="0 0 16 16" fill="none" className="shrink-0 text-amber-600">
+                              <path d="M8 1L15 14H1L8 1Z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/>
+                              <path d="M8 6v4M8 11.5v.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                            </svg>
+                            <p className="text-[10px] font-medium text-amber-700">
+                              Older revision — use the current revision for latest work.
+                            </p>
+                          </div>
+                        )}
+
+                        <div className="p-3.5">
+                          {/* Badge row */}
+                          <div className="flex items-center gap-1.5 flex-wrap mb-1.5">
+                            {/* Rev pill */}
                             <span className={`px-2 py-0.5 rounded-full text-[11px] font-bold font-mono ${
                               isCurrent ? "bg-primary text-white" : "bg-surface-container text-on-surface-variant"
                             }`}>
                               Rev {rev.rev || "—"}
                             </span>
-                            {isCurrent && (
-                              <span className="px-1.5 py-0.5 rounded text-[9px] font-semibold uppercase tracking-wider bg-status-emerald-bg text-status-emerald-text">
-                                Current
+
+                            {/* CURRENT or SUPERSEDED label */}
+                            {isCurrent ? (
+                              <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider bg-status-emerald-bg text-status-emerald-text border border-status-emerald-text/20">
+                                ✓ Current
+                              </span>
+                            ) : (
+                              <span className="px-1.5 py-0.5 rounded text-[9px] font-semibold uppercase tracking-wider bg-amber-50 text-amber-700 border border-amber-200">
+                                Superseded
                               </span>
                             )}
-                            <span className={`px-1.5 py-0.5 rounded-full text-[9px] font-semibold ${
-                              STATUS_PILL[rev.status] ?? "bg-surface-container text-on-surface-variant"
-                            }`}>
-                              {STATUS_LABEL[rev.status] ?? rev.status}
-                            </span>
+
+                            {/* Real status badge — shown on all revisions */}
+                            {rev.status && (
+                              <span className={`px-1.5 py-0.5 rounded-full text-[9px] font-semibold ${statusPill}`}>
+                                {statusLabel}
+                              </span>
+                            )}
                           </div>
-                        </div>
 
-                        <p className="text-[12px] text-on-surface font-medium leading-snug mb-1">{rev.title}</p>
+                          <p className={`text-[12px] font-medium leading-snug mb-1 ${isCurrent ? "text-on-surface" : "text-on-surface-variant"}`}>
+                            {rev.title}
+                          </p>
 
-                        <div className="flex items-center gap-3 text-[11px] text-on-surface-variant">
-                          {rev.created_at && (
-                            <span>{new Date(rev.created_at).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}</span>
+                          <div className="flex items-center gap-3 text-[11px] text-on-surface-variant">
+                            {rev.created_at && (
+                              <span>{new Date(rev.created_at).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}</span>
+                            )}
+                            {rev.uploaded_by && <span>by {rev.uploaded_by}</span>}
+                            {rev.discipline  && <span>{rev.discipline}</span>}
+                          </div>
+
+                          {/* Actions — View & Download always available */}
+                          {rev.path && (
+                            <div className="flex items-center gap-1 mt-2.5">
+                              <a
+                                href={resolveUrl(rev.path)}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium text-on-surface-variant hover:text-primary hover:bg-surface-container transition-colors"
+                              >
+                                <Eye size={12} /> View
+                              </a>
+                              <a
+                                href={resolveUrl(rev.path)}
+                                download={`${drawing.number}_Rev${rev.rev || "X"}.${ext.toLowerCase()}`}
+                                className="flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium text-on-surface-variant hover:text-primary hover:bg-surface-container transition-colors"
+                              >
+                                <Download size={12} /> Download
+                              </a>
+                            </div>
                           )}
-                          {rev.uploaded_by && <span>by {rev.uploaded_by}</span>}
-                          {rev.discipline && <span>{rev.discipline}</span>}
                         </div>
-
-                        {/* Actions for this revision */}
-                        {rev.path && (
-                          <div className="flex items-center gap-1 mt-2.5">
-                            <a
-                              href={resolveUrl(rev.path)}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium text-on-surface-variant hover:text-primary hover:bg-surface-container transition-colors"
-                            >
-                              <Eye size={12} /> View
-                            </a>
-                            <a
-                              href={resolveUrl(rev.path)}
-                              download={`${drawing.number}_Rev${rev.rev || "X"}.${ext.toLowerCase()}`}
-                              className="flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium text-on-surface-variant hover:text-primary hover:bg-surface-container transition-colors"
-                            >
-                              <Download size={12} /> Download
-                            </a>
-                          </div>
-                        )}
                       </div>
                     </div>
                   );
