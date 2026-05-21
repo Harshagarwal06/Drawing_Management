@@ -267,7 +267,7 @@ for (const u of plainUsers) {
 console.log('✅ SQLite database ready');
 
 /* ── Multer — memory storage, file type + size validation ───────── */
-const ALLOWED_EXTENSIONS = new Set(['.pdf','.dwg','.dxf','.ifc','.rvt','.nwd','.jpg','.jpeg','.png','.tif','.tiff']);
+const ALLOWED_EXTENSIONS = new Set(['.pdf','.dwg','.dxf','.ifc','.rvt','.nwd','.jpg','.jpeg','.png','.tif','.tiff','.doc','.docx','.xls','.xlsx']);
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -275,7 +275,7 @@ const upload = multer({
   fileFilter: (req, file, cb) => {
     const ext = path.extname(file.originalname).toLowerCase();
     if (ALLOWED_EXTENSIONS.has(ext)) return cb(null, true);
-    cb(new Error('File type not allowed. Accepted: PDF, DWG, DXF, IFC, RVT, NWD, JPG, PNG, TIF'));
+    cb(new Error('File type not allowed. Accepted: PDF, DWG, DXF, IFC, RVT, NWD, JPG, PNG, TIF, DOC, DOCX, XLS, XLSX'));
   },
 });
 

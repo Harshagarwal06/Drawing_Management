@@ -102,7 +102,7 @@ export default function UploadModal({ onClose, onSubmit, initialFolder }) {
             <input
               ref={fileInputRef}
               type="file"
-              accept=".pdf,.dwg,.dxf"
+              accept=".pdf,.dwg,.dxf,.ifc,.rvt,.nwd,.jpg,.jpeg,.png,.tif,.tiff,.doc,.docx,.xls,.xlsx"
               className="hidden"
               onChange={ev => pickFile(ev.target.files[0])}
             />
@@ -128,9 +128,9 @@ export default function UploadModal({ onClose, onSubmit, initialFolder }) {
                 <div className="flex flex-col items-center gap-2">
                   <Upload className={`w-8 h-8 transition ${dragging ? "text-blue-500" : "text-slate-300 group-hover:text-blue-400"}`} />
                   <p className={`text-sm font-medium transition ${dragging ? "text-blue-600" : "text-slate-500 group-hover:text-blue-600"}`}>
-                    {dragging ? "Drop file here" : "Drag & drop PDF / DWG / DXF here"}
+                    {dragging ? "Drop file here" : "Drag & drop file here"}
                   </p>
-                  <p className="text-xs text-slate-400">or <span className="text-blue-500 underline">browse files</span> — max 50 MB</p>
+                  <p className="text-xs text-slate-400">PDF, DWG, DXF, DOC, DOCX, XLS, XLSX, JPG, PNG — max 50 MB</p>
                 </div>
               )}
             </div>
