@@ -199,8 +199,8 @@ export default function SettingsView({ currentUser, onUserUpdate, token }) {
       } else {
         setRenameMsg({ type: 'error', text: data.error || 'Failed to rename project.' });
       }
-    } catch {
-      setRenameMsg({ type: 'error', text: 'Cannot connect to server.' });
+    } catch (err) {
+      setRenameMsg({ type: 'error', text: err?.message || 'Cannot connect to server.' });
     } finally {
       setRenameLoading(false);
     }

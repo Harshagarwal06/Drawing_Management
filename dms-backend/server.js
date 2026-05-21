@@ -402,6 +402,24 @@ app.post('/api/projects', requireDirector, (req, res) => {
   }
 });
 
+/* ── PATCH /api/projects/:id — rename a project (Director only) ── */
+app.patch('/api/projects/:id', requireDirector, (req, res) => {
+  const { name, code } = req.body;
+  if (!name && !code) return res.status(400).json({ error: 'name or code is required.' });
+  try {
+    const existing = db.prepare('SELECT * FROM projects WHERE id = ?').get(req.params.id);
+    if (!existing) return res.status(404).json({ error: 'Project not found.' });
+    const newName = name ?? existing.name;
+    const newCode = code ?? existing.code;
+    db.prepare('UPDATE projects SET name = ?, code = ? WHERE id = ?').run(newName, newCode, req.params.id);
+    console.log(`✅ Project ${req.params.id} renamed → ${newCode} / ${newName}`);
+    res.json({ id: Number(req.params.id), name: newName, code: newCode });
+  } catch (err) {
+    console.error('❌ PATCH /api/projects/:id error:', err);
+    res.status(500).json({ error: 'Failed to rename project.' });
+  }
+});
+
 /* ── GET /api/projects/:id/folders ─────────────────────────────── */
 app.get('/api/projects/:id/folders', requireProjectAccess, (req, res) => {
   try {
