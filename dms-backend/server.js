@@ -11,7 +11,7 @@ const rateLimit    = require('express-rate-limit');
 const Database     = require('better-sqlite3');
 const PDFDocument  = require('pdfkit');
 const nodemailer   = require('nodemailer');
-const { S3Client, PutObjectCommand } = require('@aws-sdk/client-s3');
+const { S3Client, PutObjectCommand, DeleteObjectCommand } = require('@aws-sdk/client-s3');
 
 const app         = express();
 const PORT        = process.env.PORT        || 3000;
@@ -55,6 +55,19 @@ const r2 = R2_CONFIGURED ? new S3Client({
     secretAccessKey: R2_SECRET,
   },
 }) : null;
+
+/* ── R2 delete helper ───────────────────────────────────────────── */
+async function deleteFromR2(filePath) {
+  if (!r2 || !filePath) return;
+  try {
+    const key = filePath.replace(R2_PUBLIC_URL + '/', '');
+    await r2.send(new DeleteObjectCommand({ Bucket: R2_BUCKET, Key: key }));
+    console.log(`🗑️  R2 deleted: ${key}`);
+  } catch (err) {
+    console.warn(`⚠️  R2 delete failed for ${filePath}:`, err.message);
+    // Non-fatal — DB row is already deleted
+  }
+}
 
 /* ── Nodemailer transporter ─────────────────────────────────────── */
 const SMTP_CONFIGURED = !!(process.env.SMTP_HOST);
@@ -909,12 +922,21 @@ app.patch('/api/drawings/:id/void', requireWriteAccess, (req, res) => {
 app.delete('/api/drawings/:id', requireWriteAccess, (req, res) => {
   const { id } = req.params;
   try {
-    const drawing = db.prepare('SELECT number, project_id FROM drawings WHERE id = ?').get(id);
+    const drawing   = db.prepare('SELECT number, project_id, path FROM drawings WHERE id = ?').get(id);
     if (!drawing) return res.status(404).json({ error: 'Drawing not found.' });
+    const revisions = db.prepare('SELECT path FROM drawing_revisions WHERE drawing_id = ?').all(id);
+
+    // Delete DB rows (synchronous)
+    db.prepare('DELETE FROM drawing_revisions WHERE drawing_id = ?').run(id);
     db.prepare('DELETE FROM drawings WHERE id = ?').run(id);
     db.prepare('INSERT INTO activity_log (project_id,type,title,detail,created_at) VALUES (?,?,?,?,?)')
       .run(drawing.project_id, 'delete', `${drawing.number} deleted`, 'Drawing permanently removed', new Date().toISOString());
     console.log(`✅ Drawing ${drawing.number} deleted`);
+
+    // Fire-and-forget R2 cleanup (non-blocking)
+    const paths = [drawing.path, ...revisions.map(r => r.path)].filter(Boolean);
+    paths.forEach(p => deleteFromR2(p));
+
     res.json({ id, deleted: true });
   } catch (err) {
     console.error('❌ DELETE /api/drawings/:id error:', err);
