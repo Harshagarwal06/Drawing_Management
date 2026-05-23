@@ -548,8 +548,7 @@ function FolderPicker({ node, path, selected, onSelect, depth = 0 }) {
 }
 
 /* ────────────────────────── MoveFolderModal ────────────────────────── */
-function MoveFolderModal({ drawing, token, onSuccess, onClose }) {
-  const tree = loadTree();
+function MoveFolderModal({ drawing, token, tree, onSuccess, onClose }) {
   const [selectedPath, setSelectedPath] = useState(drawing.folderPath ?? "");
   const [loading, setLoading] = useState(false);
   const [error,   setError]   = useState("");
@@ -599,16 +598,6 @@ function MoveFolderModal({ drawing, token, onSuccess, onClose }) {
             onSelect={setSelectedPath}
             depth={0}
           />
-          {tree.children?.map((child, i) => (
-            <FolderPicker
-              key={i}
-              node={child}
-              path={`${tree.name}/${child.name}`}
-              selected={selectedPath}
-              onSelect={setSelectedPath}
-              depth={1}
-            />
-          ))}
         </div>
         {selectedPath && (
           <div className="px-6 py-2 bg-surface-container-low border-t border-border-slate shrink-0">
@@ -1960,6 +1949,7 @@ export default function DocumentsView({
         <MoveFolderModal
           drawing={moveDrawing}
           token={token}
+          tree={tree}
           onSuccess={handleDrawingUpdated}
           onClose={() => setMoveDrawing(null)}
         />
