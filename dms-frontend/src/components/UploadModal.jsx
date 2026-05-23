@@ -13,6 +13,7 @@ export default function UploadModal({ onClose, onSubmit, initialFolder }) {
     notes: "",
     folderPath: initialFolder || "",
   });
+  const [disciplineOther, setDisciplineOther] = useState("");
   const [file, setFile]             = useState(null);
   const [dragging, setDragging]     = useState(false);
   const [errors, setErrors]         = useState({});
@@ -36,12 +37,18 @@ export default function UploadModal({ onClose, onSubmit, initialFolder }) {
     pickFile(ev.dataTransfer.files[0]);
   };
 
+  const effectiveDiscipline = form.discipline === "__other__"
+    ? disciplineOther.trim()
+    : form.discipline;
+
   const validate = () => {
     const e = {};
-    if (!file)                  e.file      = "A file is required";
-    if (!form.title.trim())     e.title     = "Required";
-    if (!form.discipline)       e.discipline = "Required";
-    if (!form.revision.trim())  e.revision  = "Required";
+    if (!file)                       e.file       = "A file is required";
+    if (!form.title.trim())          e.title      = "Required";
+    if (!form.discipline)            e.discipline = "Required";
+    if (form.discipline === "__other__" && !disciplineOther.trim())
+                                     e.discipline = "Please specify the drawing type";
+    if (!form.revision.trim())       e.revision   = "Required";
     return e;
   };
 
@@ -53,7 +60,7 @@ export default function UploadModal({ onClose, onSubmit, initialFolder }) {
     // Auto-generate drawing number from filename (strip extension)
     const autoNumber = file.name.replace(/\.[^/.]+$/, "");
     try {
-      await onSubmit({ ...form, drawingNumber: autoNumber, originator: "" }, file);
+      await onSubmit({ ...form, discipline: effectiveDiscipline, drawingNumber: autoNumber, originator: "" }, file);
     } finally {
       setSubmitting(false);
     }
@@ -149,7 +156,15 @@ export default function UploadModal({ onClose, onSubmit, initialFolder }) {
 
           <div className="grid grid-cols-2 gap-4">
             <Field errors={errors} label="Drawing Type" id="discipline" req>
-              <select id="discipline" className={inputCls("discipline")} value={form.discipline} onChange={e => set("discipline", e.target.value)}>
+              <select
+                id="discipline"
+                className={inputCls("discipline")}
+                value={form.discipline}
+                onChange={e => {
+                  set("discipline", e.target.value);
+                  if (e.target.value !== "__other__") setDisciplineOther("");
+                }}
+              >
                 <option value="">Select drawing type</option>
                 <option>Architecture</option>
                 <option>Structure</option>
@@ -157,10 +172,24 @@ export default function UploadModal({ onClose, onSubmit, initialFolder }) {
                   <option>Electrical</option>
                   <option>Plumbing</option>
                   <option>Fire</option>
+                  <option>HVAC</option>
                 </optgroup>
                 <option>Civil</option>
                 <option>Interior</option>
+                <option value="__other__">Other…</option>
               </select>
+              {form.discipline === "__other__" && (
+                <input
+                  autoFocus
+                  placeholder="Specify drawing type…"
+                  className={`${inputCls("discipline")} mt-2`}
+                  value={disciplineOther}
+                  onChange={e => {
+                    setDisciplineOther(e.target.value);
+                    setErrors(err => ({ ...err, discipline: "" }));
+                  }}
+                />
+              )}
             </Field>
             <Field errors={errors} label="Revision" id="revision" req>
               <input

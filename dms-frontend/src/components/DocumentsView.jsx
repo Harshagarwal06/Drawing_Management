@@ -325,13 +325,18 @@ function FolderMenu({ onAdd, onRename, onMove, onDelete }) {
 
 /* ──────────────────────── EditMetadataModal ────────────────────────── */
 function EditMetadataModal({ drawing, token, onSuccess, onClose }) {
-  const [number,     setNumber]     = useState(drawing.number     ?? "");
-  const [title,      setTitle]      = useState(drawing.title      ?? "");
-  const [discipline, setDiscipline] = useState(drawing.discipline ?? "");
-  const [revision,   setRevision]   = useState(drawing.rev        ?? "");
-  const [originator, setOriginator] = useState(drawing.originator ?? "");
-  const [loading,    setLoading]    = useState(false);
-  const [error,      setError]      = useState("");
+  const knownDisciplines = ["Architecture", "Structure", "Electrical", "Plumbing", "Fire", "HVAC", "Civil", "Interior"];
+  const initIsOther      = !!drawing.discipline && !knownDisciplines.includes(drawing.discipline);
+  const [number,           setNumber]           = useState(drawing.number     ?? "");
+  const [title,            setTitle]            = useState(drawing.title      ?? "");
+  const [discipline,       setDiscipline]       = useState(initIsOther ? "__other__" : (drawing.discipline ?? ""));
+  const [disciplineOther,  setDisciplineOther]  = useState(initIsOther ? (drawing.discipline ?? "") : "");
+  const [revision,         setRevision]         = useState(drawing.rev        ?? "");
+  const [originator,       setOriginator]       = useState(drawing.originator ?? "");
+  const [loading,          setLoading]          = useState(false);
+  const [error,            setError]            = useState("");
+
+  const effectiveDiscipline = discipline === "__other__" ? disciplineOther.trim() : discipline;
 
   const handleSave = async () => {
     setLoading(true);
@@ -340,7 +345,7 @@ function EditMetadataModal({ drawing, token, onSuccess, onClose }) {
       const res = await fetch(`${API}/api/drawings/${drawing.id}`, {
         method:  "PATCH",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body:    JSON.stringify({ number, title, discipline, revision, originator, status: drawing.status }),
+        body:    JSON.stringify({ number, title, discipline: effectiveDiscipline, revision, originator, status: drawing.status }),
       });
       const data = await res.json();
       if (!res.ok) { setError(data.error || "Failed to save changes."); setLoading(false); return; }
@@ -399,12 +404,34 @@ function EditMetadataModal({ drawing, token, onSuccess, onClose }) {
             <label className="block text-[11px] font-semibold text-on-surface-variant uppercase tracking-wider mb-1.5">Discipline</label>
             <select
               value={discipline}
-              onChange={e => setDiscipline(e.target.value)}
+              onChange={e => {
+                setDiscipline(e.target.value);
+                if (e.target.value !== "__other__") setDisciplineOther("");
+              }}
               className="w-full px-3 py-2 text-[13px] border border-border-slate rounded-lg text-on-surface bg-white focus:outline-none focus:ring-1 focus:ring-primary/30 focus:border-primary"
             >
               <option value="">— Select —</option>
-              {DISCIPLINES.map(d => <option key={d} value={d}>{d}</option>)}
+              <option>Architecture</option>
+              <option>Structure</option>
+              <optgroup label="MEP">
+                <option>Electrical</option>
+                <option>Plumbing</option>
+                <option>Fire</option>
+                <option>HVAC</option>
+              </optgroup>
+              <option>Civil</option>
+              <option>Interior</option>
+              <option value="__other__">Other…</option>
             </select>
+            {discipline === "__other__" && (
+              <input
+                autoFocus
+                placeholder="Specify drawing type…"
+                className="mt-2 w-full px-3 py-2 text-[13px] border border-border-slate rounded-lg text-on-surface focus:outline-none focus:ring-1 focus:ring-primary/30 focus:border-primary"
+                value={disciplineOther}
+                onChange={e => setDisciplineOther(e.target.value)}
+              />
+            )}
           </div>
           <div>
             <label className="block text-[11px] font-semibold text-on-surface-variant uppercase tracking-wider mb-1.5">Originator</label>

@@ -76,8 +76,8 @@ export const DISCIPLINE_COLORS = {
   Interior:     "bg-pink-100 text-pink-700",
 };
 
-export const DISCIPLINES  = ["Architecture", "Structure", "Electrical", "Plumbing", "Fire", "Civil", "Interior"];
-export const MEP_SUBTYPES = ["Electrical", "Plumbing", "Fire"];
+export const DISCIPLINES  = ["Architecture", "Structure", "Electrical", "Plumbing", "Fire", "HVAC", "Civil", "Interior"];
+export const MEP_SUBTYPES = ["Electrical", "Plumbing", "Fire", "HVAC"];
 export const STATUSES     = ["S1", "S2", "S3", "VOID"];
 export const ORIGINATORS  = ["HDA Architects", "Turner Eng.", "AirFlow MEP", "Terrain Civil", "Spatial Studio", "GreenAxis"];
 export const ROLES        = ["Director", "In House Architect", "Project Team"];
