@@ -245,7 +245,7 @@ function ProjectWorkspaceBar({
 }
 
 /* ─────────────────────────── FolderMenu ────────────────────────────── */
-function FolderMenu({ onAdd, onRename, onDelete }) {
+function FolderMenu({ onAdd, onRename, onMove, onDelete }) {
   const [open, setOpen] = useState(false);
   const [pos,  setPos]  = useState({ top: 0, left: 0 });
   const btnRef  = useRef(null);
@@ -289,19 +289,33 @@ function FolderMenu({ onAdd, onRename, onDelete }) {
           className="w-44 bg-white border border-border-slate rounded-xl shadow-lg py-1 overflow-hidden"
           onClick={e => e.stopPropagation()}
         >
-          <button onClick={() => { onAdd(); setOpen(false); }}
-            className="w-full flex items-center gap-2 px-3 py-2 text-[12px] font-medium text-on-surface-variant hover:bg-surface-container-low transition-colors">
-            <FolderPlus size={13} /> Add subfolder
-          </button>
-          <button onClick={() => { onRename(); setOpen(false); }}
-            className="w-full flex items-center gap-2 px-3 py-2 text-[12px] font-medium text-on-surface-variant hover:bg-surface-container-low transition-colors">
-            <Pencil size={13} /> Rename
-          </button>
-          <div className="h-px bg-border-slate mx-2 my-1" />
-          <button onClick={() => { onDelete(); setOpen(false); }}
-            className="w-full flex items-center gap-2 px-3 py-2 text-[12px] font-medium text-status-rose-text hover:bg-status-rose-bg transition-colors">
-            <Trash2 size={13} /> Delete
-          </button>
+          {onAdd && (
+            <button onClick={() => { onAdd(); setOpen(false); }}
+              className="w-full flex items-center gap-2 px-3 py-2 text-[12px] font-medium text-on-surface-variant hover:bg-surface-container-low transition-colors">
+              <FolderPlus size={13} /> Add subfolder
+            </button>
+          )}
+          {onRename && (
+            <button onClick={() => { onRename(); setOpen(false); }}
+              className="w-full flex items-center gap-2 px-3 py-2 text-[12px] font-medium text-on-surface-variant hover:bg-surface-container-low transition-colors">
+              <Pencil size={13} /> Rename
+            </button>
+          )}
+          {onMove && (
+            <button onClick={() => { onMove(); setOpen(false); }}
+              className="w-full flex items-center gap-2 px-3 py-2 text-[12px] font-medium text-on-surface-variant hover:bg-surface-container-low transition-colors">
+              <FolderInput size={13} /> Move to Folder
+            </button>
+          )}
+          {onDelete && (
+            <>
+              <div className="h-px bg-border-slate mx-2 my-1" />
+              <button onClick={() => { onDelete(); setOpen(false); }}
+                className="w-full flex items-center gap-2 px-3 py-2 text-[12px] font-medium text-status-rose-text hover:bg-status-rose-bg transition-colors">
+                <Trash2 size={13} /> Delete
+              </button>
+            </>
+          )}
         </div>,
         document.body
       )}
@@ -499,18 +513,22 @@ function RenameModal({ drawing, token, onSuccess, onClose }) {
 }
 
 /* ─────────────────────────── FolderPicker ──────────────────────────── */
-function FolderPicker({ node, path, selected, onSelect, depth = 0 }) {
+function FolderPicker({ node, path, selected, onSelect, depth = 0, disabledPrefix = "" }) {
   const [expanded, setExpanded] = useState(depth < 2);
   const hasChildren = node.children && node.children.length > 0;
+  const isDisabled  = disabledPrefix && (path === disabledPrefix || path.startsWith(disabledPrefix + "/"));
 
   return (
     <div>
       <button
-        onClick={() => onSelect(path)}
+        onClick={() => !isDisabled && onSelect(path)}
+        disabled={isDisabled}
         className={`w-full flex items-center gap-2 py-1.5 rounded-lg transition-colors text-left text-[13px] ${
-          selected === path
-            ? "bg-primary/10 text-primary font-semibold"
-            : "text-on-surface hover:bg-surface-container-low"
+          isDisabled
+            ? "opacity-35 cursor-not-allowed text-on-surface-variant"
+            : selected === path
+              ? "bg-primary/10 text-primary font-semibold"
+              : "text-on-surface hover:bg-surface-container-low"
         }`}
         style={{ paddingLeft: 12 + depth * 16, paddingRight: 12 }}
       >
@@ -539,6 +557,7 @@ function FolderPicker({ node, path, selected, onSelect, depth = 0 }) {
               selected={selected}
               onSelect={onSelect}
               depth={depth + 1}
+              disabledPrefix={disabledPrefix}
             />
           ))}
         </div>
@@ -602,6 +621,81 @@ function MoveFolderModal({ drawing, token, tree, onSuccess, onClose }) {
         {selectedPath && (
           <div className="px-6 py-2 bg-surface-container-low border-t border-border-slate shrink-0">
             <p className="text-[11px] text-on-surface-variant font-mono truncate">→ {selectedPath}</p>
+          </div>
+        )}
+        <div className="px-6 py-4 border-t border-border-slate flex justify-end gap-2 shrink-0">
+          <button
+            onClick={onClose}
+            disabled={loading}
+            className="px-4 py-2 rounded-lg border border-border-slate bg-white text-on-surface-variant hover:bg-surface-container text-[13px] font-medium transition-colors disabled:opacity-50"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleMove}
+            disabled={loading || confirmDisabled}
+            className="px-4 py-2 rounded-lg bg-primary text-white hover:bg-primary-container text-[13px] font-medium transition-colors disabled:opacity-60 flex items-center gap-1.5"
+          >
+            {loading ? <><Loader2 size={13} className="animate-spin" />Moving…</> : "Move Here"}
+          </button>
+        </div>
+      </div>
+    </div>,
+    document.body
+  );
+}
+
+/* ──────────────────────── MoveFolderNodeModal ──────────────────────── */
+function MoveFolderNodeModal({ folderName, folderPath, tree, onConfirm, onClose }) {
+  // The folder's current parent path (where it already lives)
+  const parentPath    = folderPath.split("/").slice(0, -1).join("/");
+  const [selectedPath, setSelectedPath] = useState("");
+  const [loading,      setLoading]      = useState(false);
+  const [error,        setError]        = useState("");
+
+  const confirmDisabled = !selectedPath || selectedPath === parentPath;
+
+  const handleMove = async () => {
+    setLoading(true);
+    setError("");
+    try {
+      await onConfirm(selectedPath);
+      onClose();
+    } catch {
+      setError("Move failed — please try again.");
+      setLoading(false);
+    }
+  };
+
+  return createPortal(
+    <div
+      className="fixed inset-0 z-[9990] flex items-center justify-center p-4"
+      style={{ background: "rgba(0,0,0,0.45)" }}
+    >
+      <div className="bg-white rounded-2xl shadow-xl border border-border-slate w-full max-w-sm overflow-hidden flex flex-col max-h-[80vh]">
+        <div className="h-1 bg-primary shrink-0" />
+        <div className="px-6 py-4 border-b border-border-slate shrink-0">
+          <h2 className="text-[15px] font-semibold text-on-surface">Move Folder</h2>
+          <p className="text-[11px] text-on-surface-variant font-mono mt-0.5 truncate">{folderName}</p>
+        </div>
+        <div className="flex-1 overflow-y-auto px-3 py-3 custom-scrollbar">
+          {error && (
+            <div className="mb-2 px-4 py-2.5 rounded-lg bg-status-rose-bg text-status-rose-text text-[12px] font-medium border border-status-rose-text/20">
+              {error}
+            </div>
+          )}
+          <FolderPicker
+            node={tree}
+            path={tree.name}
+            selected={selectedPath}
+            onSelect={setSelectedPath}
+            depth={0}
+            disabledPrefix={folderPath}
+          />
+        </div>
+        {selectedPath && (
+          <div className="px-6 py-2 bg-surface-container-low border-t border-border-slate shrink-0">
+            <p className="text-[11px] text-on-surface-variant font-mono truncate">→ {selectedPath}/{folderName}</p>
           </div>
         )}
         <div className="px-6 py-4 border-t border-border-slate flex justify-end gap-2 shrink-0">
@@ -1255,8 +1349,9 @@ function FileCard({ d, viewMode, onDelete, onEditMetadata, onRename, onMove, onN
 }
 
 /* ─────────────────────────── FolderCard ────────────────────────────── */
-function FolderCard({ node, fileCount, onClick, onAdd, onRename, onDelete, viewMode }) {
+function FolderCard({ node, fileCount, onClick, onAdd, onRename, onMove, onDelete, viewMode }) {
   const subCount = countDescendants(node);
+  const hasMenu  = onAdd || onRename || onMove || onDelete;
 
   if (viewMode === "list") {
     return (
@@ -1272,7 +1367,7 @@ function FolderCard({ node, fileCount, onClick, onAdd, onRename, onDelete, viewM
         {subCount > 0 && (
           <span className="text-[11px] text-on-surface-variant">{subCount} folder{subCount !== 1 ? "s" : ""}</span>
         )}
-        {(onAdd || onRename || onDelete) && <FolderMenu onAdd={onAdd} onRename={onRename} onDelete={onDelete} />}
+        {hasMenu && <FolderMenu onAdd={onAdd} onRename={onRename} onMove={onMove} onDelete={onDelete} />}
         <ChevronRight size={14} className="text-outline shrink-0" />
       </div>
     );
@@ -1295,7 +1390,7 @@ function FolderCard({ node, fileCount, onClick, onAdd, onRename, onDelete, viewM
           {subCount === 0 && fileCount === 0 ? "Empty" : ""}
         </p>
       </div>
-      {(onAdd || onRename || onDelete) && <FolderMenu onAdd={onAdd} onRename={onRename} onDelete={onDelete} />}
+      {hasMenu && <FolderMenu onAdd={onAdd} onRename={onRename} onMove={onMove} onDelete={onDelete} />}
     </div>
   );
 }
@@ -1336,6 +1431,9 @@ export default function DocumentsView({
   const [moveDrawing,     setMoveDrawing]     = useState(null);
   const [revisionDrawing, setRevisionDrawing] = useState(null);
   const [historyDrawing,  setHistoryDrawing]  = useState(null);
+
+  /* Folder move state */
+  const [moveFolderIdx,   setMoveFolderIdx]   = useState(null);
 
   /* Local toast for actions + delete feedback */
   const [localToast, setLocalToast] = useState(null);
@@ -1477,6 +1575,45 @@ export default function DocumentsView({
       }
     } catch (err) {
       console.error(err);
+    }
+  };
+
+  const moveFolder = async (targetPath) => {
+    const idx        = moveFolderIdx;
+    const folderNode = subfolders[idx];
+    const folderName = folderNode.name;
+    const oldPath    = [tree.name, ...segments, folderName].join("/");
+    const newPath    = targetPath + "/" + folderName;
+
+    // 1. Update tree: remove from current parent, insert under target
+    updateTree(next => {
+      const parentNode = getNode(next, segments);
+      const [moved]    = parentNode.children.splice(idx, 1);
+      const targetSegs = targetPath.split("/").slice(1); // strip root name
+      const targetNode = getNode(next, targetSegs);
+      if (!targetNode.children) targetNode.children = [];
+      targetNode.children.push(moved);
+      return next;
+    });
+
+    setMoveFolderIdx(null);
+
+    // 2. Update drawing folder_paths on backend
+    try {
+      const res = await fetch(`${API}/api/projects/${activeProject.id}/folders/move`, {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body:    JSON.stringify({ oldPath, newPath }),
+      });
+      if (res.ok) {
+        await onDrawingUpdate?.();
+        showToast(`"${folderName}" moved successfully.`, "success");
+      } else {
+        showToast("Error updating drawing paths on server.", "error");
+      }
+    } catch (err) {
+      console.error(err);
+      showToast("Network error moving folder.", "error");
     }
   };
 
@@ -1814,6 +1951,7 @@ export default function DocumentsView({
                         onClick={() => navigateInto(child.name)}
                         onAdd={!isProjectTeam ? () => { setAddingSubIdx(originalIdx); setNewSubVal(""); } : undefined}
                         onRename={!isProjectTeam ? () => { setRenamingIdx(originalIdx); setRenameVal(child.name); } : undefined}
+                        onMove={!isProjectTeam ? () => setMoveFolderIdx(originalIdx) : undefined}
                         onDelete={!isProjectTeam ? () => setConfirmDelIdx(originalIdx) : undefined}
                       />
                     );
@@ -1952,6 +2090,17 @@ export default function DocumentsView({
           tree={tree}
           onSuccess={handleDrawingUpdated}
           onClose={() => setMoveDrawing(null)}
+        />
+      )}
+
+      {/* ── Move Folder modal ── */}
+      {moveFolderIdx !== null && subfolders[moveFolderIdx] && (
+        <MoveFolderNodeModal
+          folderName={subfolders[moveFolderIdx].name}
+          folderPath={[tree.name, ...segments, subfolders[moveFolderIdx].name].join("/")}
+          tree={tree}
+          onConfirm={moveFolder}
+          onClose={() => setMoveFolderIdx(null)}
         />
       )}
 

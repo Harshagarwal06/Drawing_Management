@@ -518,6 +518,32 @@ app.post('/api/projects/:id/folders/delete', requireProjectAccess, (req, res) =>
   }
 });
 
+/* ── POST /api/projects/:id/folders/move ────────────────────────── */
+app.post('/api/projects/:id/folders/move', requireProjectAccess, (req, res) => {
+  const { oldPath, newPath } = req.body;
+  if (!oldPath || !newPath) return res.status(400).json({ error: 'oldPath and newPath are required.' });
+  try {
+    db.transaction(() => {
+      // 1. Update drawings in the moved folder exactly
+      db.prepare(`
+        UPDATE drawings
+        SET folder_path = ?
+        WHERE project_id = ? AND folder_path = ?
+      `).run(newPath, req.params.id, oldPath);
+      // 2. Update drawings in any nested subfolder recursively
+      db.prepare(`
+        UPDATE drawings
+        SET folder_path = ? || SUBSTR(folder_path, ?)
+        WHERE project_id = ? AND folder_path LIKE ? || '/%'
+      `).run(newPath, oldPath.length + 1, req.params.id, oldPath);
+    })();
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('❌ POST /api/projects/:id/folders/move error:', err);
+    res.status(500).json({ error: 'Failed to move folder paths.' });
+  }
+});
+
 /* ── GET /api/drawings ──────────────────────────────────────────── */
 app.get('/api/drawings', requireProjectAccess, (req, res) => {
   const projectId = req.query.projectId || 1;
