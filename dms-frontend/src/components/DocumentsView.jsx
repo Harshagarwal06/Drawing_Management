@@ -413,7 +413,8 @@ function EditMetadataModal({ drawing, token, onSuccess, onClose }) {
               <option value="">— Select —</option>
               <option>Architecture</option>
               <option>Structure</option>
-              <optgroup label="MEP">
+              <option>MEP</option>
+              <optgroup label="MEP Subtypes">
                 <option>Electrical</option>
                 <option>Plumbing</option>
                 <option>Fire</option>

@@ -168,7 +168,8 @@ export default function UploadModal({ onClose, onSubmit, initialFolder }) {
                 <option value="">Select drawing type</option>
                 <option>Architecture</option>
                 <option>Structure</option>
-                <optgroup label="MEP">
+                <option>MEP</option>
+                <optgroup label="MEP Subtypes">
                   <option>Electrical</option>
                   <option>Plumbing</option>
                   <option>Fire</option>
