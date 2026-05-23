@@ -42,8 +42,12 @@ export default function Sidebar({
         `}
       >
         {/* Logo + close button on mobile */}
-        <div className="flex items-center justify-between mb-8 px-2">
-          <img src="/logo.png" alt="Unique Properties" className="h-24 w-auto max-w-[220px] object-contain" />
+        <div className="flex items-center justify-between px-4 pt-6 pb-8">
+          <img
+            src="/logo.png"
+            alt="Unique Properties"
+            className="w-[165px] h-auto object-contain object-left"
+          />
           {/* Close button — mobile only */}
           <button
             onClick={onMobileClose}
