@@ -124,7 +124,7 @@ export default function Dashboard({
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
 
         {/* Chart (Discipline Breakdown) */}
-        <div className="lg:col-span-8 bg-white border border-border-slate rounded-xl p-8 flex flex-col">
+        <div className="lg:col-span-8 bg-white border border-border-slate rounded-xl p-8 flex flex-col lg:h-[460px]">
           <div className="flex justify-between items-center mb-8">
             <div>
               <h4 className="font-headline-md text-headline-md text-on-surface">Drawings by Discipline</h4>
@@ -173,12 +173,12 @@ export default function Dashboard({
         </div>
 
         {/* Activity Feed — timeline style */}
-        <div className="lg:col-span-4 bg-white border border-border-slate rounded-xl flex flex-col">
+        <div className="lg:col-span-4 bg-white border border-border-slate rounded-xl flex flex-col lg:h-[460px]">
           <div className="p-6 border-b border-border-slate">
             <h4 className="font-headline-md text-headline-md text-on-surface">Activity Feed</h4>
             <p className="font-body-sm text-on-surface-variant">Recent project events and updates.</p>
           </div>
-          <div className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar max-h-[400px] lg:max-h-none">
+          <div className="flex-1 min-h-0 overflow-y-auto p-6 space-y-6 custom-scrollbar">
             {activityError ? (
               <div className="flex flex-col items-center justify-center h-40 gap-3 text-on-surface-variant">
                 <span className="material-symbols-outlined text-[36px] opacity-30">wifi_off</span>
@@ -214,6 +214,14 @@ export default function Dashboard({
                 );
               })
             )}
+          </div>
+          <div className="px-6 py-3 border-t border-border-slate shrink-0">
+            <button
+              onClick={() => navigate("/register")}
+              className="w-full text-center text-[12px] font-medium text-primary hover:underline"
+            >
+              View All Activity
+            </button>
           </div>
         </div>
       </div>
