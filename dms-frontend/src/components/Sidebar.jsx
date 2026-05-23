@@ -42,22 +42,8 @@ export default function Sidebar({
         `}
       >
         {/* Logo + close button on mobile */}
-        <div className="flex items-center gap-3 mb-8 px-2">
-          <img src="/logo.png" alt="Unique Properties" className="h-9 w-auto object-contain shrink-0" />
-          <div className="flex-1 min-w-0">
-            <h1
-              className="text-[18px] font-bold leading-tight"
-              style={{
-                background: "linear-gradient(90deg, #F4A223 0%, #C9A06A 50%, #1B6ABF 100%)",
-                WebkitBackgroundClip: "text",
-                WebkitTextFillColor: "transparent",
-                backgroundClip: "text",
-              }}
-            >
-              Unique Properties
-            </h1>
-            <p className="text-[12px] text-on-surface-variant">Enterprise Management</p>
-          </div>
+        <div className="flex items-center justify-between mb-8 px-2">
+          <img src="/logo.png" alt="Unique Properties" className="h-12 w-auto object-contain" />
           {/* Close button — mobile only */}
           <button
             onClick={onMobileClose}
