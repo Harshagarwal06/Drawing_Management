@@ -42,11 +42,11 @@ export default function Sidebar({
         `}
       >
         {/* Logo + close button on mobile */}
-        <div className="flex items-center justify-between px-4 pt-6 pb-8">
+        <div className="flex items-center justify-between px-5 pt-5 pb-5">
           <img
             src="/logo.png"
             alt="Unique Properties"
-            className="w-[165px] h-auto object-contain object-left"
+            className="w-[238px] h-auto object-contain object-left"
           />
           {/* Close button — mobile only */}
           <button
