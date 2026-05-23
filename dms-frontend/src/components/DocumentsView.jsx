@@ -1651,24 +1651,29 @@ export default function DocumentsView({
   };
 
   /* ── Local search ── */
+  const _naturalSort = new Intl.Collator(undefined, { numeric: true, sensitivity: "base" });
+
   const filteredSubfolderEntries = subfolders
     .map((child, originalIdx) => ({ child, originalIdx }))
     .filter(({ child }) =>
       !localSearch || child.name.toLowerCase().includes(localSearch.toLowerCase())
-    );
+    )
+    .sort((a, b) => _naturalSort.compare(a.child.name, b.child.name));
 
-  const filteredFiles = currentFiles.filter(d => {
-    if (!localSearch) return true;
-    const q        = localSearch.toLowerCase();
-    const filename = d.path?.split("/").pop()?.toLowerCase() ?? "";
-    return (
-      d.number?.toLowerCase().includes(q) ||
-      d.title?.toLowerCase().includes(q)  ||
-      d.rev?.toLowerCase().includes(q)    ||
-      d.status?.toLowerCase().includes(q) ||
-      filename.includes(q)
-    );
-  });
+  const filteredFiles = currentFiles
+    .filter(d => {
+      if (!localSearch) return true;
+      const q        = localSearch.toLowerCase();
+      const filename = d.path?.split("/").pop()?.toLowerCase() ?? "";
+      return (
+        d.number?.toLowerCase().includes(q) ||
+        d.title?.toLowerCase().includes(q)  ||
+        d.rev?.toLowerCase().includes(q)    ||
+        d.status?.toLowerCase().includes(q) ||
+        filename.includes(q)
+      );
+    })
+    .sort((a, b) => _naturalSort.compare(a.number ?? "", b.number ?? ""));
 
   const searchActive = localSearch.length > 0;
   const noResults    = searchActive && filteredSubfolderEntries.length === 0 && filteredFiles.length === 0 && !addingFolder;
