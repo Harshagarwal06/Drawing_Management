@@ -12,6 +12,7 @@ const Database     = require('better-sqlite3');
 const PDFDocument  = require('pdfkit');
 const nodemailer   = require('nodemailer');
 const { S3Client, PutObjectCommand, DeleteObjectCommand } = require('@aws-sdk/client-s3');
+const helmet       = require('helmet');
 
 const app         = express();
 const PORT        = process.env.PORT        || 3000;
@@ -38,11 +39,11 @@ const R2_CONFIGURED = !!(R2_BUCKET && R2_PUBLIC_URL && CLOUDFLARE_ACCT_ID && R2_
 // ── Startup validation ──────────────────────────────────────────────
 console.log('');
 console.log('=== DrawVault Storage Configuration ===');
-console.log(`  R2_BUCKET_NAME        : ${R2_BUCKET        || '❌ NOT SET'}`);
-console.log(`  R2_PUBLIC_URL         : ${R2_PUBLIC_URL     || '❌ NOT SET'}`);
-console.log(`  CLOUDFLARE_ACCOUNT_ID : ${CLOUDFLARE_ACCT_ID || '❌ NOT SET'}`);
-console.log(`  R2_ACCESS_KEY_ID      : ${R2_KEY_ID ? '✅ set (' + R2_KEY_ID.slice(0, 6) + '…)' : '❌ NOT SET'}`);
-console.log(`  R2_SECRET_ACCESS_KEY  : ${R2_SECRET ? '✅ set'          : '❌ NOT SET'}`);
+console.log(`  R2_BUCKET_NAME        : ${R2_BUCKET        ? '✅ set' : '❌ NOT SET'}`);
+console.log(`  R2_PUBLIC_URL         : ${R2_PUBLIC_URL     ? '✅ set' : '❌ NOT SET'}`);
+console.log(`  CLOUDFLARE_ACCOUNT_ID : ${CLOUDFLARE_ACCT_ID ? '✅ set' : '❌ NOT SET'}`);
+console.log(`  R2_ACCESS_KEY_ID      : ${R2_KEY_ID         ? '✅ set' : '❌ NOT SET'}`);
+console.log(`  R2_SECRET_ACCESS_KEY  : ${R2_SECRET         ? '✅ set' : '❌ NOT SET'}`);
 console.log(`  Storage mode          : ${R2_CONFIGURED ? '☁️  Cloudflare R2' : '⛔ UNCONFIGURED — uploads will be rejected'}`);
 console.log('=======================================');
 console.log('');
@@ -89,6 +90,7 @@ if (SMTP_CONFIGURED) {
 
 /* ── Middleware ─────────────────────────────────────────────────── */
 app.set('trust proxy', 1); // Railway / Vercel sit behind a reverse proxy
+app.use(helmet());
 app.use(cors({ origin: CORS_ORIGIN, credentials: true }));
 app.use(express.json());
 
@@ -262,13 +264,6 @@ const ensureUser = db.prepare('INSERT OR IGNORE INTO users (username, password, 
 ensureUser.run('director',  bcrypt.hashSync('Unique123!', SALT_ROUNDS), 'Harsh Agarwal', 'Director',           'HA', '*');
 ensureUser.run('architect', bcrypt.hashSync('arch123',    SALT_ROUNDS), 'Priya Sharma',  'In House Architect', 'PS', '*');
 ensureUser.run('team',      bcrypt.hashSync('team123',    SALT_ROUNDS), 'Carlos Mendez', 'Project Team',       'CM', '[1]');
-
-// ── Force director password to Unique123! on every boot ──────────────
-try {
-  db.prepare("UPDATE users SET password = ? WHERE username = 'director'")
-    .run(bcrypt.hashSync('Unique123!', SALT_ROUNDS));
-  console.log('✅ Director password enforced → Unique123!');
-} catch (e) { console.warn('Director password enforcement note:', e.message); }
 
 /* ── Migrate any remaining plaintext passwords ──────────────────── */
 const plainUsers = db.prepare("SELECT id, password FROM users WHERE password NOT LIKE '$2b$%'").all();
@@ -636,7 +631,6 @@ app.post('/api/upload', requireWriteAccess, uploadLimiter, upload.single('drawin
     res.json({ message: 'Drawing saved successfully.', path: filePath });
   } catch (err) {
     console.error('❌ R2 upload failed:', err.message || err);
-    console.error('   Bucket:', R2_BUCKET, '| Key:', r2Key, '| Endpoint:', `https://${CLOUDFLARE_ACCT_ID}.r2.cloudflarestorage.com`);
     res.status(500).json({ error: 'Failed to upload file to cloud storage. Check server logs.' });
   }
 });
@@ -896,6 +890,14 @@ app.get('/api/transmittals/:id/pdf', verifyTokenForDownload, (req, res) => {
   try {
     const t = db.prepare('SELECT * FROM transmittals WHERE id = ?').get(req.params.id);
     if (!t) return res.status(404).json({ error: 'Transmittal not found.' });
+
+    const allowed = req.user?.allowedProjects;
+    if (allowed !== '*') {
+      const ids = JSON.parse(allowed || '[]');
+      if (!ids.includes(t.project_id)) {
+        return res.status(403).json({ error: 'Access denied — you do not have access to this project.' });
+      }
+    }
 
     let drawingIds = [], recipients = [];
     try { drawingIds = JSON.parse(t.drawing_ids); } catch {}

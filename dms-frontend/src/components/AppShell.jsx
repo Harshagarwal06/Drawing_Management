@@ -1,4 +1,5 @@
 import { Outlet, useLocation } from "react-router-dom";
+import ErrorBoundary from "./ErrorBoundary";
 import Sidebar from "./Sidebar";
 import ProjectSelector from "./ProjectSelector";
 
@@ -107,7 +108,9 @@ export default function AppShell({
 
         {/* ── Page content rendered by child route ── */}
         <main className="flex-1 p-4 md:p-[40px]">
-          <Outlet />
+          <ErrorBoundary>
+            <Outlet />
+          </ErrorBoundary>
         </main>
       </div>
     </div>
