@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo, memo } from "react";
 import { createPortal } from "react-dom";
 import {
   Folder, FolderOpen, ChevronRight, ChevronDown, Home, LayoutGrid, List,
@@ -290,8 +290,19 @@ export default function DocumentsView({
   const currentFolderPath = [tree.name, ...segments].join("/");
   const currentFiles      = drawings.filter(d => (d.folderPath || "") === currentFolderPath && d.path);
 
+  // Pre-compute file counts per folder path (O(n) instead of O(n²))
+  const folderFileCounts = useMemo(() => {
+    const counts = {};
+    for (const d of drawings) {
+      if (!d.path) continue;
+      const fp = d.folderPath || "";
+      counts[fp] = (counts[fp] || 0) + 1;
+    }
+    return counts;
+  }, [drawings]);
+
   const countFilesUnder = (node, basePath) => {
-    let count = drawings.filter(d => (d.folderPath || "") === basePath && d.path).length;
+    let count = folderFileCounts[basePath] || 0;
     for (const child of node.children ?? [])
       count += countFilesUnder(child, `${basePath}/${child.name}`);
     return count;

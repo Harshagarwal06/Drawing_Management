@@ -91,7 +91,7 @@ if (SMTP_CONFIGURED) {
 /* ── Middleware ─────────────────────────────────────────────────── */
 app.set('trust proxy', 1); // Railway / Vercel sit behind a reverse proxy
 app.use(helmet());
-app.use(cors({ origin: CORS_ORIGIN, credentials: true }));
+app.use(cors({ origin: CORS_ORIGIN, credentials: true, exposedHeaders: ['X-Total-Count'] }));
 app.use(express.json());
 
 /* ── Uploads folder ─────────────────────────────────────────────── */
@@ -100,6 +100,7 @@ app.use('/uploads', express.static(UPLOAD_DIR));
 
 /* ── SQLite setup ───────────────────────────────────────────────── */
 const db = new Database(DB_PATH);
+db.pragma('foreign_keys = ON');
 
 db.exec(`
   CREATE TABLE IF NOT EXISTS activity_log (
@@ -542,9 +543,12 @@ app.post('/api/projects/:id/folders/move', requireProjectAccess, (req, res) => {
 /* ── GET /api/drawings ──────────────────────────────────────────── */
 app.get('/api/drawings', requireProjectAccess, (req, res) => {
   const projectId = req.query.projectId || 1;
+  const limit     = Math.min(parseInt(req.query.limit)  || 500, 2000);
+  const offset    = Math.max(parseInt(req.query.offset)  || 0, 0);
   try {
-    const rows = db.prepare('SELECT * FROM drawings WHERE project_id = ? ORDER BY id DESC').all(projectId);
-    res.json(rows.map(r => ({
+    const total = db.prepare('SELECT COUNT(*) as n FROM drawings WHERE project_id = ?').get(projectId).n;
+    const rows  = db.prepare('SELECT * FROM drawings WHERE project_id = ? ORDER BY id DESC LIMIT ? OFFSET ?').all(projectId, limit, offset);
+    const data = rows.map(r => ({
       id:           r.id,
       number:       r.number,
       title:        r.title,
@@ -556,7 +560,9 @@ app.get('/api/drawings', requireProjectAccess, (req, res) => {
       transmittals: r.transmittals,
       path:         r.path,
       folderPath:   r.folder_path || '',
-    })));
+    }));
+    res.set('X-Total-Count', String(total));
+    res.json(data);
   } catch (err) {
     console.error('❌ GET /api/drawings error:', err);
     res.status(500).json({ error: 'Failed to fetch drawings.' });
@@ -672,14 +678,19 @@ app.get('/api/drawings/:id/revisions', (req, res) => {
 /* ── GET /api/transmittals ──────────────────────────────────────── */
 app.get('/api/transmittals', requireProjectAccess, (req, res) => {
   const projectId = req.query.projectId || 1;
+  const limit     = Math.min(parseInt(req.query.limit)  || 200, 1000);
+  const offset    = Math.max(parseInt(req.query.offset)  || 0, 0);
   try {
-    const rows = db.prepare('SELECT * FROM transmittals WHERE project_id = ? ORDER BY id DESC').all(projectId);
-    res.json(rows.map(r => {
+    const total = db.prepare('SELECT COUNT(*) as n FROM transmittals WHERE project_id = ?').get(projectId).n;
+    const rows  = db.prepare('SELECT * FROM transmittals WHERE project_id = ? ORDER BY id DESC LIMIT ? OFFSET ?').all(projectId, limit, offset);
+    const data = rows.map(r => {
       let drawingIds = [], recipients = [];
       try { drawingIds = JSON.parse(r.drawing_ids); } catch {}
       try { recipients = JSON.parse(r.recipients);  } catch {}
       return { id: r.id, number: r.number, drawingIds, recipients, purpose: r.purpose, remarks: r.remarks, issuedAt: r.issued_at };
-    }));
+    });
+    res.set('X-Total-Count', String(total));
+    res.json(data);
   } catch (err) {
     console.error('❌ GET /api/transmittals error:', err);
     res.status(500).json({ error: 'Failed to fetch transmittals.' });

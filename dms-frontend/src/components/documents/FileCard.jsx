@@ -1,8 +1,9 @@
+import { memo } from "react";
 import { Eye, Download } from "lucide-react";
 import { resolveUrl, STATUS_PILL, STATUS_LABEL, STATUS_BAR, EXT_STYLE } from "./constants";
 import FileMenu from "./FileMenu";
 
-export default function FileCard({ d, viewMode, onDelete, onEditMetadata, onRename, onMove, onNewRevision, onViewHistory }) {
+export default memo(function FileCard({ d, viewMode, onDelete, onEditMetadata, onRename, onMove, onNewRevision, onViewHistory }) {
   const filename    = d.path?.split("/").pop() ?? "";
   const ext         = filename.split(".").pop().toUpperCase();
   const extStyle    = EXT_STYLE[ext] ?? "bg-surface-container text-on-surface-variant";
@@ -99,4 +100,4 @@ export default function FileCard({ d, viewMode, onDelete, onEditMetadata, onRena
       </div>
     </div>
   );
-}
+})

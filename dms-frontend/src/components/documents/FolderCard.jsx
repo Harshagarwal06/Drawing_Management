@@ -1,8 +1,9 @@
+import { memo } from "react";
 import { Folder, ChevronRight } from "lucide-react";
 import { countDescendants } from "./constants";
 import FolderMenu from "./FolderMenu";
 
-export default function FolderCard({ node, fileCount, onClick, onAdd, onRename, onMove, onDelete, viewMode }) {
+export default memo(function FolderCard({ node, fileCount, onClick, onAdd, onRename, onMove, onDelete, viewMode }) {
   const subCount = countDescendants(node);
   const hasMenu  = onAdd || onRename || onMove || onDelete;
 
@@ -46,4 +47,4 @@ export default function FolderCard({ node, fileCount, onClick, onAdd, onRename, 
       {hasMenu && <FolderMenu onAdd={onAdd} onRename={onRename} onMove={onMove} onDelete={onDelete} />}
     </div>
   );
-}
+})
