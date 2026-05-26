@@ -2,8 +2,10 @@ import { useState, useRef, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { Loader2 } from "lucide-react";
 import { API } from "./constants";
+import useModalClose from "./useModalClose";
 
 export default function RenameModal({ drawing, token, onSuccess, onClose }) {
+  const { handleBackdrop } = useModalClose(onClose);
   const [title,   setTitle]   = useState(drawing.title ?? "");
   const [loading, setLoading] = useState(false);
   const [error,   setError]   = useState("");
@@ -35,6 +37,10 @@ export default function RenameModal({ drawing, token, onSuccess, onClose }) {
     <div
       className="fixed inset-0 z-[9990] flex items-center justify-center p-4"
       style={{ background: "rgba(0,0,0,0.45)" }}
+      onClick={handleBackdrop}
+      role="dialog"
+      aria-modal="true"
+      aria-label="Rename drawing"
     >
       <div className="bg-white rounded-2xl shadow-xl border border-border-slate w-full max-w-sm overflow-hidden">
         <div className="h-1 bg-primary" />

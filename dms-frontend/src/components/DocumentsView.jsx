@@ -506,7 +506,7 @@ export default function DocumentsView({
         {/* Card header: breadcrumb + toolbar */}
         <div className="flex items-center gap-x-3 gap-y-2 px-5 py-3 border-b border-border-slate flex-wrap">
           <nav className="flex items-center gap-1 flex-1 min-w-0 flex-wrap">
-            <button onClick={navigateRoot} className="p-1 rounded-md text-on-surface-variant hover:text-primary hover:bg-surface-container transition-colors shrink-0" title="Root">
+            <button onClick={navigateRoot} className="p-1 rounded-md text-on-surface-variant hover:text-primary hover:bg-surface-container transition-colors shrink-0" title="Root" aria-label="Go to root folder">
               <Home size={14} />
             </button>
             <ChevronRight size={13} className="text-outline shrink-0" />
@@ -551,7 +551,7 @@ export default function DocumentsView({
                 className="pl-8 pr-7 py-1.5 text-[12px] w-full sm:w-[200px] bg-surface-container-low border border-border-slate rounded-lg text-on-surface placeholder:text-on-surface-variant focus:outline-none focus:ring-1 focus:ring-primary/20 focus:border-primary transition-all"
               />
               {localSearch && (
-                <button onClick={() => setLocalSearch("")} className="absolute right-2 top-1/2 -translate-y-1/2 text-on-surface-variant hover:text-on-surface transition-colors">
+                <button onClick={() => setLocalSearch("")} className="absolute right-2 top-1/2 -translate-y-1/2 text-on-surface-variant hover:text-on-surface transition-colors" aria-label="Clear search">
                   <X size={12} />
                 </button>
               )}
@@ -562,6 +562,7 @@ export default function DocumentsView({
                 onClick={() => setViewMode("grid")}
                 className={`p-1.5 rounded-md transition-colors ${viewMode === "grid" ? "bg-white shadow-sm text-primary" : "text-on-surface-variant hover:text-on-surface"}`}
                 title="Grid view"
+                aria-label="Grid view"
               >
                 <LayoutGrid size={14} />
               </button>
@@ -569,6 +570,7 @@ export default function DocumentsView({
                 onClick={() => setViewMode("list")}
                 className={`p-1.5 rounded-md transition-colors ${viewMode === "list" ? "bg-white shadow-sm text-primary" : "text-on-surface-variant hover:text-on-surface"}`}
                 title="List view"
+                aria-label="List view"
               >
                 <List size={14} />
               </button>

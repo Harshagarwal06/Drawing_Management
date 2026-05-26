@@ -2,8 +2,10 @@ import { useState } from "react";
 import { createPortal } from "react-dom";
 import { Loader2 } from "lucide-react";
 import { API } from "./constants";
+import useModalClose from "./useModalClose";
 
 export default function EditMetadataModal({ drawing, token, onSuccess, onClose }) {
+  const { handleBackdrop } = useModalClose(onClose);
   const knownDisciplines = ["Architecture", "Structure", "Electrical", "Plumbing", "Fire", "HVAC", "Civil", "Interior"];
   const initIsOther      = !!drawing.discipline && !knownDisciplines.includes(drawing.discipline);
   const [number,           setNumber]           = useState(drawing.number     ?? "");
@@ -40,6 +42,10 @@ export default function EditMetadataModal({ drawing, token, onSuccess, onClose }
     <div
       className="fixed inset-0 z-[9990] flex items-center justify-center p-4"
       style={{ background: "rgba(0,0,0,0.45)" }}
+      onClick={handleBackdrop}
+      role="dialog"
+      aria-modal="true"
+      aria-label="Edit metadata"
     >
       <div className="bg-white rounded-2xl shadow-xl border border-border-slate w-full max-w-lg overflow-hidden">
         <div className="h-1 bg-primary" />

@@ -159,7 +159,7 @@ export default function MasterRegisterTable({
             onChange={e => onSearch?.(e.target.value)}
           />
           {search && (
-            <button onClick={() => onSearch?.("")} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-on-surface-variant hover:text-on-surface transition-colors">
+            <button onClick={() => onSearch?.("")} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-on-surface-variant hover:text-on-surface transition-colors" aria-label="Clear search">
               <span className="material-symbols-outlined text-[16px]">close</span>
             </button>
           )}
@@ -237,7 +237,6 @@ export default function MasterRegisterTable({
             <thead className="bg-surface-container-low border-b border-border-slate">
               <tr>
                 <th className="py-2.5 px-4 w-10 text-left">
-                  <input type="checkbox" className="rounded border-border-slate text-primary focus:ring-primary/30" />
                 </th>
                 {[
                   { key: "number",     label: "Drawing No."  },
@@ -304,9 +303,7 @@ export default function MasterRegisterTable({
                 return (
                   <tr key={d.id} className="border-b border-border-slate hover:bg-surface-container-low/50 transition-colors group">
 
-                    {/* Checkbox */}
                     <td className="py-2.5 px-4 text-left">
-                      <input type="checkbox" className="rounded border-border-slate text-primary focus:ring-primary/30 opacity-0 group-hover:opacity-100 transition-opacity" />
                     </td>
 
                     {/* Drawing No. + filename */}

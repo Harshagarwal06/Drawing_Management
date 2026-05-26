@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { X, Search, Send, Loader2, Plus, UserPlus } from "lucide-react";
 import FieldLabel from "./FieldLabel";
 import { TRANSMITTAL_PURPOSES, STATUS_META } from "../constants";
@@ -13,6 +13,11 @@ const STATUS_PILL = {
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export default function TransmittalModal({ drawings, onClose, onSubmit }) {
+  useEffect(() => {
+    const h = e => { if (e.key === "Escape") onClose(); };
+    document.addEventListener("keydown", h);
+    return () => document.removeEventListener("keydown", h);
+  }, [onClose]);
   const [selectedDrawings,   setSelectedDrawings]   = useState([]);
   const [selectedRecipients, setSelectedRecipients] = useState([]);
   const [recipientName,      setRecipientName]      = useState("");
@@ -72,7 +77,7 @@ export default function TransmittalModal({ drawings, onClose, onSubmit }) {
   const fieldBorder = key => errors[key] ? "border-status-rose-text" : "border-border-slate";
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.3)" }}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.3)" }} onClick={e => { if (e.target === e.currentTarget) onClose(); }} role="dialog" aria-modal="true" aria-label="Create transmittal">
       <div className="modal-enter bg-white rounded-2xl shadow-xl border border-border-slate w-full max-w-3xl overflow-hidden flex flex-col" style={{ maxHeight: "92vh" }}>
 
         {/* Header */}
@@ -81,7 +86,7 @@ export default function TransmittalModal({ drawings, onClose, onSubmit }) {
             <h2 className="text-[16px] font-semibold text-on-surface">Create Transmittal</h2>
             <p className="text-[12px] text-on-surface-variant mt-0.5">Issue drawings to project recipients</p>
           </div>
-          <button onClick={onClose} className="p-1.5 rounded-lg text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-colors">
+          <button onClick={onClose} className="p-1.5 rounded-lg text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-colors" aria-label="Close">
             <X className="w-5 h-5" />
           </button>
         </div>

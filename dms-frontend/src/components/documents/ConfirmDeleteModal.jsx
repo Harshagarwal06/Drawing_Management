@@ -1,11 +1,22 @@
+import { useEffect } from "react";
 import { createPortal } from "react-dom";
 import { Trash2, Loader2 } from "lucide-react";
 
 export default function ConfirmDeleteModal({ drawing, onConfirm, onCancel, loading }) {
+  useEffect(() => {
+    const h = e => { if (e.key === "Escape") onCancel(); };
+    document.addEventListener("keydown", h);
+    return () => document.removeEventListener("keydown", h);
+  }, [onCancel]);
+
   return createPortal(
     <div
       className="fixed inset-0 z-[9998] flex items-center justify-center p-4"
       style={{ background: "rgba(0,0,0,0.4)" }}
+      onClick={e => { if (e.target === e.currentTarget) onCancel(); }}
+      role="dialog"
+      aria-modal="true"
+      aria-label="Confirm delete"
     >
       <div className="bg-white rounded-2xl shadow-xl border border-border-slate w-full max-w-sm overflow-hidden">
         <div className="h-1 bg-red-500" />

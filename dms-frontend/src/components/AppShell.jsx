@@ -93,6 +93,7 @@ export default function AppShell({
               onClick={onLogout}
               className="p-2 text-on-surface-variant hover:bg-status-rose-bg hover:text-status-rose-text rounded-full transition-colors"
               title="Sign out"
+              aria-label="Sign out"
             >
               <span className="material-symbols-outlined text-[20px]">logout</span>
             </button>

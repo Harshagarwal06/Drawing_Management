@@ -2,8 +2,10 @@ import { useState, useRef } from "react";
 import { createPortal } from "react-dom";
 import { Upload, Loader2 } from "lucide-react";
 import { API, nextRev } from "./constants";
+import useModalClose from "./useModalClose";
 
 export default function NewRevisionModal({ drawing, token, projectId, onSuccess, onClose }) {
+  const { handleBackdrop } = useModalClose(onClose);
   const [title,      setTitle]      = useState(drawing.title      ?? "");
   const [revision,   setRevision]   = useState(nextRev(drawing.rev));
   const [file,       setFile]       = useState(null);
@@ -49,6 +51,10 @@ export default function NewRevisionModal({ drawing, token, projectId, onSuccess,
     <div
       className="fixed inset-0 z-[9990] flex items-center justify-center p-4"
       style={{ background: "rgba(0,0,0,0.45)" }}
+      onClick={handleBackdrop}
+      role="dialog"
+      aria-modal="true"
+      aria-label="Upload new revision"
     >
       <div className="bg-white rounded-2xl shadow-xl border border-border-slate w-full max-w-md overflow-hidden">
         <div className="h-1 bg-primary" />

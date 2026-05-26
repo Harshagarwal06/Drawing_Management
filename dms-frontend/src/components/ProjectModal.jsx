@@ -1,7 +1,12 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { X, FolderPlus, Loader2 } from "lucide-react";
 
 export default function ProjectModal({ onClose, onSubmit }) {
+  useEffect(() => {
+    const h = e => { if (e.key === "Escape") onClose(); };
+    document.addEventListener("keydown", h);
+    return () => document.removeEventListener("keydown", h);
+  }, [onClose]);
   const [name, setName] = useState("");
   const [code, setCode] = useState("");
   const [error, setError] = useState("");
@@ -25,7 +30,7 @@ export default function ProjectModal({ onClose, onSubmit }) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(15,23,42,0.55)" }}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(15,23,42,0.55)" }} onClick={e => { if (e.target === e.currentTarget) onClose(); }} role="dialog" aria-modal="true" aria-label="New project">
       <div className="modal-enter bg-white/95 backdrop-blur-xl rounded-2xl shadow-2xl border border-white/50 w-full max-w-md overflow-hidden">
         {/* Header */}
         <div className="px-6 py-5 border-b border-slate-100 flex items-center justify-between bg-gradient-to-r from-slate-900 to-slate-800">
@@ -36,7 +41,7 @@ export default function ProjectModal({ onClose, onSubmit }) {
             </h2>
             <p className="text-xs text-slate-400 mt-0.5">Create a new drawing management project.</p>
           </div>
-          <button onClick={onClose} className="text-slate-400 hover:text-white transition p-1 rounded-lg hover:bg-white/10">
+          <button onClick={onClose} className="text-slate-400 hover:text-white transition p-1 rounded-lg hover:bg-white/10" aria-label="Close">
             <X className="w-5 h-5" />
           </button>
         </div>

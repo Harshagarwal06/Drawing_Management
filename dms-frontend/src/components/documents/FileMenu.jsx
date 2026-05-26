@@ -46,6 +46,7 @@ export default function FileMenu({ onEditMetadata, onRename, onMove, onSupersede
         onClick={toggle}
         className="p-1 rounded-lg text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-colors shrink-0"
         title="More actions"
+        aria-label="More actions"
       >
         <MoreVertical size={14} />
       </button>

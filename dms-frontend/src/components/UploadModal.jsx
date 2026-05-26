@@ -1,8 +1,13 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { X, Upload, CheckCircle2, Loader2, FolderOpen } from "lucide-react";
 import Field from "./Field";
 
 export default function UploadModal({ onClose, onSubmit, initialFolder }) {
+  useEffect(() => {
+    const h = e => { if (e.key === "Escape") onClose(); };
+    document.addEventListener("keydown", h);
+    return () => document.removeEventListener("keydown", h);
+  }, [onClose]);
   const [form, setForm] = useState({
     drawingNumber: "",
     title: "",
@@ -80,7 +85,7 @@ export default function UploadModal({ onClose, onSubmit, initialFolder }) {
   ].join(" ");
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(15,23,42,0.4)" }}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(15,23,42,0.4)" }} onClick={e => { if (e.target === e.currentTarget) onClose(); }} role="dialog" aria-modal="true" aria-label="Upload drawing">
       <div className="modal-enter bg-surface rounded-2xl shadow-card-lg border border-outline-variant w-full max-w-xl overflow-hidden">
 
         {/* Header */}
@@ -97,7 +102,7 @@ export default function UploadModal({ onClose, onSubmit, initialFolder }) {
             </div>
             <p className="text-xs text-on-surface-variant mt-0.5">Register a new drawing to the Master Drawing Register</p>
           </div>
-          <button onClick={onClose} className="text-on-surface-variant hover:text-on-surface transition p-1.5 rounded-lg hover:bg-surface-container">
+          <button onClick={onClose} className="text-on-surface-variant hover:text-on-surface transition p-1.5 rounded-lg hover:bg-surface-container" aria-label="Close">
             <X className="w-5 h-5" />
           </button>
         </div>

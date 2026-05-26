@@ -35,6 +35,7 @@ export default function FolderMenu({ onAdd, onRename, onMove, onDelete }) {
         ref={btnRef}
         onClick={toggle}
         className="p-1.5 rounded-lg hover:bg-black/8 transition-colors opacity-0 group-hover:opacity-100 shrink-0"
+        aria-label="Folder actions"
       >
         <MoreVertical size={14} className="text-on-surface-variant" />
       </button>
