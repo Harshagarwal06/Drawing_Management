@@ -1168,7 +1168,11 @@ app.use((err, req, res, next) => {
 });
 
 /* ── Start ──────────────────────────────────────────────────────── */
-app.listen(PORT, () => {
-  console.log(`\n🚀 DMS Backend running → http://localhost:${PORT}`);
-  console.log(`   CORS origin: ${CORS_ORIGIN}\n`);
-});
+if (process.env.NODE_ENV !== 'test') {
+  app.listen(PORT, () => {
+    console.log(`\n🚀 DMS Backend running → http://localhost:${PORT}`);
+    console.log(`   CORS origin: ${CORS_ORIGIN}\n`);
+  });
+}
+
+module.exports = { app, db };
