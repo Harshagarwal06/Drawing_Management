@@ -20,6 +20,7 @@ module.exports = [
         require: 'readonly',
         exports: 'readonly',
         setImmediate: 'readonly',
+        fetch: 'readonly',
       },
     },
     rules: {

@@ -88,6 +88,32 @@ if (SMTP_CONFIGURED) {
   console.log('📧 SMTP not configured — email delivery disabled (set SMTP_HOST to enable)');
 }
 
+/* ── Slack notifications (per-project incoming webhooks) ─────────── */
+// Only genuine Slack webhook URLs are accepted — guards against SSRF.
+const SLACK_WEBHOOK_PREFIX = 'https://hooks.slack.com/';
+function isValidSlackWebhook(url) {
+  return typeof url === 'string' && url.startsWith(SLACK_WEBHOOK_PREFIX);
+}
+
+// Fire-and-forget: posts a message to a project's Slack channel if one is
+// configured. Never throws and never blocks the API response — mirrors the
+// async-email pattern used for transmittals.
+async function postToSlack(projectId, text) {
+  try {
+    const proj = db.prepare('SELECT slack_webhook_url FROM projects WHERE id = ?').get(projectId);
+    const url  = proj?.slack_webhook_url;
+    if (!isValidSlackWebhook(url)) return;          // not configured / invalid → skip silently
+    const resp = await fetch(url, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ text }),
+    });
+    if (!resp.ok) console.error(`⚠️  Slack post failed: ${resp.status} ${resp.statusText}`);
+  } catch (err) {
+    console.error('⚠️  Slack post failed:', err.message);
+  }
+}
+
 /* ── Middleware ─────────────────────────────────────────────────── */
 app.set('trust proxy', 1); // Railway / Vercel sit behind a reverse proxy
 app.use(helmet());
@@ -196,6 +222,7 @@ try {
 try { db.exec('ALTER TABLE drawings ADD COLUMN project_id INTEGER DEFAULT 1;');     } catch {}
 try { db.exec("ALTER TABLE drawings ADD COLUMN folder_path TEXT DEFAULT '';");       } catch {}
 try { db.exec('ALTER TABLE transmittals ADD COLUMN project_id INTEGER DEFAULT 1;'); } catch {}
+try { db.exec("ALTER TABLE projects ADD COLUMN slack_webhook_url TEXT DEFAULT '';"); } catch {}
 
 // ── Drawing Revisions table ──────────────────────────────────────────
 // Each row is a snapshot of a drawing at the moment it was superseded.
@@ -384,14 +411,17 @@ app.get('/api/activity', requireProjectAccess, (req, res) => {
 /* ── GET /api/projects — filtered by user's allowed projects ─────── */
 app.get('/api/projects', (req, res) => {
   try {
+    // Never expose the raw webhook secret — return a boolean flag instead.
+    const cols = `id, name, code, created_at,
+      CASE WHEN slack_webhook_url IS NOT NULL AND slack_webhook_url != '' THEN 1 ELSE 0 END AS slackConfigured`;
     const allowed = req.user?.allowedProjects;
     if (allowed === '*') {
-      return res.json(db.prepare('SELECT * FROM projects ORDER BY id ASC').all());
+      return res.json(db.prepare(`SELECT ${cols} FROM projects ORDER BY id ASC`).all());
     }
     const ids = JSON.parse(allowed || '[]');
     if (ids.length === 0) return res.json([]);
     const placeholders = ids.map(() => '?').join(',');
-    res.json(db.prepare(`SELECT * FROM projects WHERE id IN (${placeholders}) ORDER BY id ASC`).all(ids));
+    res.json(db.prepare(`SELECT ${cols} FROM projects WHERE id IN (${placeholders}) ORDER BY id ASC`).all(ids));
   } catch (err) {
     console.error('❌ GET /api/projects error:', err);
     res.status(500).json({ error: 'Failed to fetch projects.' });
@@ -426,6 +456,43 @@ app.patch('/api/projects/:id', requireDirector, (req, res) => {
   } catch (err) {
     console.error('❌ PATCH /api/projects/:id error:', err);
     res.status(500).json({ error: 'Failed to rename project.' });
+  }
+});
+
+/* ── PATCH /api/projects/:id/slack — set/clear Slack webhook (Director) ── */
+app.patch('/api/projects/:id/slack', requireDirector, (req, res) => {
+  const { slackWebhookUrl } = req.body;
+  const url = (slackWebhookUrl || '').trim();
+  // Empty string clears the webhook; otherwise must be a genuine Slack URL.
+  if (url && !isValidSlackWebhook(url)) {
+    return res.status(400).json({ error: 'Webhook URL must start with https://hooks.slack.com/' });
+  }
+  try {
+    const existing = db.prepare('SELECT id FROM projects WHERE id = ?').get(req.params.id);
+    if (!existing) return res.status(404).json({ error: 'Project not found.' });
+    db.prepare('UPDATE projects SET slack_webhook_url = ? WHERE id = ?').run(url, req.params.id);
+    console.log(`✅ Project ${req.params.id} Slack webhook ${url ? 'set' : 'cleared'}`);
+    res.json({ id: Number(req.params.id), slackConfigured: !!url });
+  } catch (err) {
+    console.error('❌ PATCH /api/projects/:id/slack error:', err);
+    res.status(500).json({ error: 'Failed to update Slack webhook.' });
+  }
+});
+
+/* ── POST /api/projects/:id/slack/test — send a test message (Director) ── */
+app.post('/api/projects/:id/slack/test', requireDirector, async (req, res) => {
+  try {
+    const proj = db.prepare('SELECT code, slack_webhook_url FROM projects WHERE id = ?').get(req.params.id);
+    if (!proj) return res.status(404).json({ error: 'Project not found.' });
+    if (!isValidSlackWebhook(proj.slack_webhook_url)) {
+      return res.status(400).json({ error: 'No Slack webhook configured for this project.' });
+    }
+    const tag = proj.code ? ` · ${proj.code}` : '';
+    await postToSlack(req.params.id, `✅ DrawVault test message${tag} — Slack is connected.`);
+    res.json({ sent: true });
+  } catch (err) {
+    console.error('❌ POST /api/projects/:id/slack/test error:', err);
+    res.status(500).json({ error: 'Failed to send test message.' });
   }
 });
 
@@ -635,6 +702,16 @@ app.post('/api/upload', requireWriteAccess, uploadLimiter, upload.single('drawin
            title, new Date().toISOString());
 
     res.json({ message: 'Drawing saved successfully.', path: filePath });
+
+    // ── Async Slack notification (metadata only — never the file link) ──
+    setImmediate(() => {
+      const proj = db.prepare('SELECT code FROM projects WHERE id = ?').get(pId);
+      const tag  = proj?.code ? ` · ${proj.code}` : '';
+      const msg  = existing
+        ? `⚠️ *${drawingNumber}* updated to Rev ${revision}${tag}`
+        : `📄 *${drawingNumber}* registered (Rev ${revision})${tag}`;
+      postToSlack(pId, msg);
+    });
   } catch (err) {
     console.error('❌ R2 upload failed:', err.message || err);
     res.status(500).json({ error: 'Failed to upload file to cloud storage. Check server logs.' });
@@ -722,6 +799,13 @@ app.post('/api/transmittals', requireWriteAccess, (req, res) => {
 
     const trnId = result.lastInsertRowid;
     res.status(201).json({ id: trnId, number });
+
+    // ── Async Slack notification (independent of email config) ──
+    setImmediate(() => {
+      const proj = db.prepare('SELECT code FROM projects WHERE id = ?').get(pId);
+      const tag  = proj?.code ? ` · ${proj.code}` : '';
+      postToSlack(pId, `📋 *${number}* issued — ${drawingIds.length} drawing(s), "${purpose}"${tag}`);
+    });
 
     // ── Async: generate PDF and send emails (don't block response) ──
     if (SMTP_CONFIGURED && recipients.length > 0) {

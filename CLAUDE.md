@@ -173,7 +173,7 @@ const isProjectTeam = activeRole === "Project Team";
 
 ```sql
 users               (id, username, password, name, role, avatar, allowed_projects, active)
-projects            (id, name, code, created_at)
+projects            (id, name, code, created_at, slack_webhook_url)
 drawings            (id, number, title, discipline, rev, status, issue_date, originator,
                      transmittals, path, folder_path, project_id)
 drawing_revisions   (id, drawing_id, rev, title, discipline, status, originator,
@@ -225,6 +225,32 @@ SMTP_USER
 SMTP_PASS
 SMTP_FROM
 ```
+
+---
+
+## Slack notifications (per-project incoming webhooks)
+
+Each project can have its own Slack channel via an **Incoming Webhook**. Events are posted
+**asynchronously** (fire-and-forget via `setImmediate`) so they never block or break API responses.
+
+**Events posted** (metadata only — never the file/R2 link):
+| Event | Trigger | Example message |
+|-------|---------|-----------------|
+| Transmittal issued | `POST /api/transmittals` | `📋 *TRN-014* issued — 3 drawing(s), "For Construction" · QUE-154` |
+| New revision | `POST /api/upload` (existing drawing) | `⚠️ *A-101* updated to Rev C · QUE-154` |
+| New drawing | `POST /api/upload` (new drawing) | `📄 *A-205* registered (Rev A) · QUE-154` |
+
+**Config** (Director only, via Settings → Projects → Slack):
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `PATCH` | `/api/projects/:id/slack` | Set/clear webhook (`slackWebhookUrl`; empty string clears) |
+| `POST`  | `/api/projects/:id/slack/test` | Send a test message to confirm wiring |
+
+**Security**
+- Webhook URL stored in `projects.slack_webhook_url` (added via migration). Must start with
+  `https://hooks.slack.com/` — anything else is rejected (SSRF guard).
+- `GET /api/projects` returns a `slackConfigured` boolean, **never the raw webhook secret**.
+- No global env var — config is entirely per-project in the DB. `helpers`: `postToSlack(projectId, text)`.
 
 ---
 

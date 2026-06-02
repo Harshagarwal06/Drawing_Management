@@ -110,6 +110,12 @@ export default function SettingsView({ currentUser, onUserUpdate, token }) {
   const [renameMsg,       setRenameMsg]       = useState(null);
   const [renameLoading,   setRenameLoading]   = useState(false);
 
+  // Slack webhook config
+  const [slackProject, setSlackProject] = useState(null); // { id, name, code, slackConfigured }
+  const [slackUrl,     setSlackUrl]     = useState('');
+  const [slackMsg,     setSlackMsg]     = useState(null);
+  const [slackLoading, setSlackLoading] = useState(false);
+
   // ⋮ menu
   const [menuOpenId, setMenuOpenId] = useState(null);
   const [menuAnchor, setMenuAnchor] = useState(null);
@@ -174,7 +180,8 @@ export default function SettingsView({ currentUser, onUserUpdate, token }) {
     fetch(`${API}/api/projects`, { headers: { Authorization: `Bearer ${token}` } })
       .then(r => r.ok ? r.json() : [])
       .then(ps => {
-        setProjects(ps);
+        // Coerce SQLite's 0/1 to real booleans so {cond && ...} never renders "0".
+        setProjects(ps.map(p => ({ ...p, slackConfigured: !!p.slackConfigured })));
       })
       .catch(() => {});
   };
@@ -203,6 +210,55 @@ export default function SettingsView({ currentUser, onUserUpdate, token }) {
       setRenameMsg({ type: 'error', text: err?.message || 'Cannot connect to server.' });
     } finally {
       setRenameLoading(false);
+    }
+  };
+
+  const openSlackEditor = (p) => {
+    setSlackProject(p);
+    setSlackUrl('');          // never pre-fill the secret; blank = leave unchanged when configured
+    setSlackMsg(null);
+  };
+
+  const handleSaveSlack = async (e) => {
+    e.preventDefault();
+    setSlackLoading(true);
+    setSlackMsg(null);
+    try {
+      const res = await fetch(`${API}/api/projects/${slackProject.id}/slack`, {
+        method:  'PATCH',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body:    JSON.stringify({ slackWebhookUrl: slackUrl.trim() }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setSlackMsg({ type: 'success', text: slackUrl.trim() ? 'Slack webhook saved.' : 'Slack webhook cleared.' });
+        loadProjects();
+        setSlackProject(p => p ? { ...p, slackConfigured: data.slackConfigured } : p);
+      } else {
+        setSlackMsg({ type: 'error', text: data.error || 'Failed to save webhook.' });
+      }
+    } catch (err) {
+      setSlackMsg({ type: 'error', text: err?.message || 'Cannot connect to server.' });
+    } finally {
+      setSlackLoading(false);
+    }
+  };
+
+  const handleTestSlack = async () => {
+    setSlackLoading(true);
+    setSlackMsg(null);
+    try {
+      const res = await fetch(`${API}/api/projects/${slackProject.id}/slack/test`, {
+        method:  'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      if (res.ok) setSlackMsg({ type: 'success', text: 'Test message sent — check your Slack channel.' });
+      else        setSlackMsg({ type: 'error', text: data.error || 'Failed to send test message.' });
+    } catch (err) {
+      setSlackMsg({ type: 'error', text: err?.message || 'Cannot connect to server.' });
+    } finally {
+      setSlackLoading(false);
     }
   };
 
@@ -715,6 +771,20 @@ export default function SettingsView({ currentUser, onUserUpdate, token }) {
               <div key={p.id} className="flex items-center gap-3 px-4 py-3 rounded-xl border border-border-slate bg-white hover:bg-surface-container-low transition-colors">
                 <span className="font-mono text-[12px] font-bold text-primary bg-primary/10 px-2 py-0.5 rounded shrink-0">{p.code}</span>
                 <span className="flex-1 text-[13px] text-on-surface truncate">{p.name}</span>
+                {!!p.slackConfigured && (
+                  <span className="hidden sm:inline-flex items-center gap-1 text-[11px] font-medium text-status-emerald-600 bg-status-emerald-50 px-2 py-0.5 rounded-full shrink-0">
+                    <span className="material-symbols-outlined text-[12px]">check_circle</span>
+                    Slack
+                  </span>
+                )}
+                <button
+                  onClick={() => openSlackEditor(p)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border-slate text-[12px] font-medium text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-colors shrink-0"
+                  title="Configure Slack notifications"
+                >
+                  <span className="material-symbols-outlined text-[14px]">chat</span>
+                  <span className="hidden sm:inline">Slack</span>
+                </button>
                 <button
                   onClick={() => { setRenamingProject(p); setRenameForm({ name: p.name, code: p.code }); setRenameMsg(null); }}
                   className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border-slate text-[12px] font-medium text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-colors shrink-0"
@@ -770,6 +840,72 @@ export default function SettingsView({ currentUser, onUserUpdate, token }) {
                   className="px-4 py-2 rounded-lg bg-primary text-white hover:bg-primary-container font-medium text-[13px] transition-colors disabled:opacity-60">
                   {renameLoading ? 'Saving…' : 'Save Changes'}
                 </button>
+              </div>
+            </form>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* ── Slack webhook modal ──────────────────────────────────────── */}
+      {slackProject && createPortal(
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4" style={{ background: 'rgba(15,23,42,0.4)' }}>
+          <div className="bg-white rounded-2xl shadow-xl border border-border-slate w-full max-w-md overflow-hidden">
+            <div className="px-6 py-4 border-b border-border-slate flex items-center justify-between">
+              <h2 className="text-[15px] font-semibold text-on-surface">
+                Slack Notifications — <span className="font-mono text-primary">{slackProject.code}</span>
+              </h2>
+              <button onClick={() => setSlackProject(null)} aria-label="Close" className="text-on-surface-variant hover:text-on-surface transition p-1 rounded-lg hover:bg-surface-container">
+                <X size={16} />
+              </button>
+            </div>
+            <form onSubmit={handleSaveSlack} className="px-6 py-5 space-y-4">
+              {slackMsg && (
+                <div className={`text-[13px] p-3 rounded-lg border ${bannerClass(slackMsg.type)}`}>{slackMsg.text}</div>
+              )}
+              <p className="text-[12px] text-on-surface-variant leading-relaxed">
+                Post transmittal, new-drawing, and revision events to a Slack channel. Create an{' '}
+                <span className="font-medium text-on-surface">Incoming Webhook</span> in Slack and paste the URL below.
+                {slackProject.slackConfigured && (
+                  <span className="block mt-1.5 text-status-emerald-600 font-medium">
+                    ✓ A webhook is currently configured. Leave blank to keep it, or paste a new one to replace it.
+                  </span>
+                )}
+              </p>
+              <div>
+                <label className="block text-[12px] text-on-surface-variant mb-1.5 font-medium">Webhook URL</label>
+                <input
+                  value={slackUrl}
+                  onChange={e => setSlackUrl(e.target.value)}
+                  placeholder="https://hooks.slack.com/services/..."
+                  className="w-full bg-white border border-border-slate rounded-lg px-3 py-2 text-[13px] font-mono text-on-surface focus:outline-none focus:ring-1 focus:ring-primary/20 focus:border-primary"
+                />
+              </div>
+              <div className="flex flex-wrap gap-2 justify-between items-center pt-1">
+                <div className="flex gap-2">
+                  {slackProject.slackConfigured && (
+                    <button type="button" onClick={handleTestSlack} disabled={slackLoading}
+                      className="px-3 py-2 rounded-lg border border-border-slate text-on-surface-variant hover:bg-surface-container font-medium text-[13px] transition-colors disabled:opacity-60">
+                      Send Test
+                    </button>
+                  )}
+                  {slackProject.slackConfigured && (
+                    <button type="button" onClick={() => { setSlackUrl(''); handleSaveSlack({ preventDefault: () => {} }); }} disabled={slackLoading}
+                      className="px-3 py-2 rounded-lg border border-status-rose-200 text-status-rose-600 hover:bg-status-rose-50 font-medium text-[13px] transition-colors disabled:opacity-60">
+                      Disconnect
+                    </button>
+                  )}
+                </div>
+                <div className="flex gap-2">
+                  <button type="button" onClick={() => setSlackProject(null)}
+                    className="px-4 py-2 rounded-lg border border-border-slate text-on-surface-variant hover:bg-surface-container font-medium text-[13px] transition-colors">
+                    Cancel
+                  </button>
+                  <button type="submit" disabled={slackLoading || !slackUrl.trim()}
+                    className="px-4 py-2 rounded-lg bg-primary text-white hover:bg-primary-container font-medium text-[13px] transition-colors disabled:opacity-60">
+                    {slackLoading ? 'Saving…' : 'Save'}
+                  </button>
+                </div>
               </div>
             </form>
           </div>
