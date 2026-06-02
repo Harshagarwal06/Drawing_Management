@@ -78,7 +78,7 @@ function getNode(tree, segments) {
 /* ──────────────────────────── StatChip ─────────────────────────────── */
 function StatChip({ label, value, Icon, colorCls }) {
   return (
-    <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-surface-container-low border border-border-slate w-[118px] shrink-0">
+    <div className="flex items-center gap-2 px-2.5 sm:px-3 py-2 rounded-lg bg-surface-container-low border border-border-slate w-[100px] sm:w-[118px] shrink-0">
       <div className={`w-6 h-6 rounded-md flex items-center justify-center shrink-0 ${colorCls}`}>
         <Icon size={13} />
       </div>
@@ -189,7 +189,7 @@ function ProjectWorkspaceBar({
           </span>
         </div>
 
-        <div className="flex items-center gap-2 flex-nowrap overflow-x-auto">
+        <div className="flex items-center gap-2 overflow-x-auto pb-1 -mb-1 scrollbar-hide">
           <StatChip label="Folders"      value={totalFolders}      Icon={Layers}    colorCls="bg-primary/10 text-primary" />
           <StatChip label="Drawings"     value={totalDrawings}     Icon={FileText}  colorCls="bg-blue-50 text-blue-600" />
           <StatChip label="Transmittals" value={totalTransmittals} Icon={Send}      colorCls="bg-status-emerald-bg text-status-emerald-text" />
@@ -515,7 +515,7 @@ export default function DocumentsView({
       <div className="bg-white border border-border-slate rounded-xl overflow-hidden">
 
         {/* Card header: breadcrumb + toolbar */}
-        <div className="flex items-center gap-x-3 gap-y-2 px-5 py-3 border-b border-border-slate flex-wrap">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-x-3 gap-y-2 px-5 py-3 border-b border-border-slate flex-wrap">
           <nav className="flex items-center gap-1 flex-1 min-w-0 flex-wrap">
             <button onClick={navigateRoot} className="p-1 rounded-md text-on-surface-variant hover:text-primary hover:bg-surface-container transition-colors shrink-0" title="Root" aria-label="Go to root folder">
               <Home size={14} />
@@ -551,8 +551,8 @@ export default function DocumentsView({
             })}
           </nav>
 
-          <div className="flex items-center gap-2 flex-wrap">
-            <div className="relative">
+          <div className="flex items-center gap-2 flex-wrap w-full sm:w-auto">
+            <div className="relative flex-1 sm:flex-none">
               <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-on-surface-variant pointer-events-none" />
               <input
                 type="text"
@@ -591,9 +591,10 @@ export default function DocumentsView({
               <button
                 onClick={() => setAddingFolder(true)}
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border-slate bg-white hover:bg-surface-container text-[12px] font-medium text-on-surface-variant transition-colors shrink-0"
+                title="New Folder"
               >
                 <FolderPlus size={13} />
-                New Folder
+                <span className="hidden sm:inline">New Folder</span>
               </button>
             )}
 
@@ -601,9 +602,10 @@ export default function DocumentsView({
               <button
                 onClick={() => onUpload(currentFolderPath)}
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary text-white hover:bg-primary-container text-[12px] font-medium shadow-sm transition-all active:scale-[0.98] shrink-0"
+                title="Upload Here"
               >
                 <Upload size={13} />
-                Upload Here
+                <span className="hidden sm:inline">Upload Here</span>
               </button>
             )}
           </div>

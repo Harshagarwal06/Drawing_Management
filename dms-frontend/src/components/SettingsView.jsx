@@ -470,7 +470,7 @@ export default function SettingsView({ currentUser, onUserUpdate, token }) {
                             value={u.role}
                             onChange={e => handleRoleChange(u.id, e.target.value, u.allowed_projects)}
                             disabled={isSelf}
-                            className="bg-white border border-border-slate rounded-lg px-2 py-1.5 text-[12px] text-on-surface focus:outline-none focus:ring-1 focus:ring-primary/20 disabled:opacity-50 max-w-[120px] sm:max-w-none"
+                            className="bg-white border border-border-slate rounded-lg px-2 py-1.5 text-[12px] text-on-surface focus:outline-none focus:ring-1 focus:ring-primary/20 disabled:opacity-50 max-w-[150px] sm:max-w-none"
                           >
                             {ROLES.map(r => <option key={r} value={r}>{r}</option>)}
                           </select>
@@ -720,7 +720,7 @@ export default function SettingsView({ currentUser, onUserUpdate, token }) {
                   className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border-slate text-[12px] font-medium text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-colors shrink-0"
                 >
                   <span className="material-symbols-outlined text-[14px]">edit</span>
-                  Rename
+                  <span className="hidden sm:inline">Rename</span>
                 </button>
               </div>
             ))}

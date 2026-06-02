@@ -116,40 +116,43 @@ export default function MasterRegisterTable({
         </div>
 
         {/* ── Contextual Action Bar ── */}
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex items-center gap-2 shrink-0 flex-wrap">
           {onNewTransmittal && (
             <button
               onClick={onNewTransmittal}
-              className="bg-white border border-border-slate text-on-surface-variant hover:bg-surface-container-low px-4 py-2 rounded-lg flex items-center gap-2 text-[14px] font-medium transition-colors active:scale-[0.98]"
+              className="bg-white border border-border-slate text-on-surface-variant hover:bg-surface-container-low px-3 sm:px-4 py-2 rounded-lg flex items-center gap-2 text-[14px] font-medium transition-colors active:scale-[0.98]"
+              title="New Transmittal"
             >
               <span className="material-symbols-outlined text-[17px]">send</span>
-              New Transmittal
+              <span className="hidden sm:inline">New Transmittal</span>
             </button>
           )}
           <button
             onClick={handleExport}
-            className="bg-white border border-border-slate text-on-surface-variant hover:bg-surface-container-low px-4 py-2 rounded-lg flex items-center gap-2 text-[14px] font-medium transition-colors active:scale-[0.98]"
+            className="bg-white border border-border-slate text-on-surface-variant hover:bg-surface-container-low px-3 sm:px-4 py-2 rounded-lg flex items-center gap-2 text-[14px] font-medium transition-colors active:scale-[0.98]"
+            title="Export"
           >
             <span className="material-symbols-outlined text-[17px]">ios_share</span>
-            Export
+            <span className="hidden sm:inline">Export</span>
           </button>
           {!isRestricted && (
             <button
               onClick={onNewEntry}
-              className="bg-primary text-white rounded-lg hover:bg-primary-container px-4 py-2 font-medium flex items-center gap-2 text-[14px] transition-colors active:scale-[0.98]"
+              className="bg-primary text-white rounded-lg hover:bg-primary-container px-3 sm:px-4 py-2 font-medium flex items-center gap-2 text-[14px] transition-colors active:scale-[0.98]"
+              title="Upload to Project"
             >
               <span className="material-symbols-outlined text-[17px]">upload</span>
-              Upload to Project
+              <span className="hidden sm:inline">Upload to Project</span>
             </button>
           )}
         </div>
       </div>
 
       {/* ── Toolbar ── */}
-      <div className="relative z-20 bg-white border border-border-slate rounded-xl p-3 flex flex-wrap gap-3 items-center">
+      <div className="relative z-20 bg-white border border-border-slate rounded-xl p-3 flex flex-wrap gap-2 sm:gap-3 items-center">
 
         {/* Search */}
-        <div className="relative flex-1 min-w-[200px] max-w-xs">
+        <div className="relative flex-1 min-w-[140px] sm:min-w-[200px] max-w-xs">
           <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant text-[18px]">search</span>
           <input
             className="w-full bg-surface-container-low border border-border-slate rounded-lg pl-9 pr-8 py-2 text-on-surface text-[14px] placeholder:text-on-surface-variant focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/20 transition-all"
@@ -176,12 +179,13 @@ export default function MasterRegisterTable({
             }`}
           >
             <span className="material-symbols-outlined text-[16px]">category</span>
-            {filterDisc === "All" ? "Drawing Type" : filterDisc}
+            <span className="hidden sm:inline">{filterDisc === "All" ? "Drawing Type" : filterDisc}</span>
+            <span className="sm:hidden">{filterDisc === "All" ? "Type" : filterDisc}</span>
             <span className="material-symbols-outlined text-[14px]">{discOpen ? "expand_less" : "expand_more"}</span>
           </button>
 
           {discOpen && (
-            <div className="absolute top-full left-0 mt-1.5 w-52 bg-white border border-border-slate rounded-xl shadow-lg z-50 py-1.5 overflow-hidden">
+            <div className="absolute top-full left-0 sm:left-0 mt-1.5 w-52 max-w-[calc(100vw-2rem)] bg-white border border-border-slate rounded-xl shadow-lg z-50 py-1.5 overflow-hidden">
               <TypeItem label="All"          active={filterDisc === "All"}          onClick={() => { onFilterDisc?.("All");          setDiscOpen(false); }} />
               <TypeItem label="Architecture" active={filterDisc === "Architecture"} onClick={() => { onFilterDisc?.("Architecture"); setDiscOpen(false); }} />
               <TypeItem label="Structure"    active={filterDisc === "Structure"}    onClick={() => { onFilterDisc?.("Structure");    setDiscOpen(false); }} />
