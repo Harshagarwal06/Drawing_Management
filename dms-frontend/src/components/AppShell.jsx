@@ -20,6 +20,16 @@ export default function AppShell({
   const { pathname } = useLocation();
   const isDocuments  = pathname === "/documents";
 
+  const MOBILE_TITLES = {
+    "/dashboard":    "Dashboard",
+    "/documents":    "Documents",
+    "/register":     "Drawing Register",
+    "/transmittals": "Transmittals",
+    "/analytics":    "Analytics",
+    "/settings":     "Settings",
+  };
+  const mobileTitle = MOBILE_TITLES[pathname] ?? "";
+
   return (
     <div className="bg-background text-on-surface font-outfit min-h-screen flex">
 
@@ -43,6 +53,9 @@ export default function AppShell({
           >
             <span className="material-symbols-outlined text-[24px]">menu</span>
           </button>
+
+          {/* Page title — mobile only; desktop views render their own headers */}
+          <h1 className="md:hidden text-[15px] font-semibold text-on-surface truncate">{mobileTitle}</h1>
 
           {/* Spacer — page-level views provide their own scoped search */}
           <div className="flex-1" />

@@ -41,7 +41,7 @@ export default memo(function FileCard({ d, viewMode, onDelete, onEditMetadata, o
           <a
             href={resolveUrl(d.path)} target="_blank" rel="noreferrer"
             onClick={anchorClick(resolveUrl(d.path))}
-            className="p-1.5 rounded-lg hover:bg-surface-container-low text-on-surface-variant hover:text-primary transition-colors"
+            className="p-2 md:p-1.5 rounded-lg hover:bg-surface-container-low text-on-surface-variant hover:text-primary transition-colors"
             title="View"
           >
             <Eye size={14} />
@@ -49,7 +49,7 @@ export default memo(function FileCard({ d, viewMode, onDelete, onEditMetadata, o
           <a
             href={resolveUrl(d.path)} download={filename}
             onClick={anchorClick(resolveUrl(d.path))}
-            className="p-1.5 rounded-lg hover:bg-surface-container-low text-on-surface-variant hover:text-primary transition-colors"
+            className="p-2 md:p-1.5 rounded-lg hover:bg-surface-container-low text-on-surface-variant hover:text-primary transition-colors"
             title="Download"
           >
             <Download size={14} />
@@ -85,7 +85,7 @@ export default memo(function FileCard({ d, viewMode, onDelete, onEditMetadata, o
             <a
               href={resolveUrl(d.path)} target="_blank" rel="noreferrer"
               onClick={anchorClick(resolveUrl(d.path))}
-              className="p-1.5 rounded-lg hover:bg-surface-container text-on-surface-variant hover:text-primary transition-colors"
+              className="p-2 md:p-1.5 rounded-lg hover:bg-surface-container text-on-surface-variant hover:text-primary transition-colors"
               title="View"
             >
               <Eye size={13} />
@@ -93,7 +93,7 @@ export default memo(function FileCard({ d, viewMode, onDelete, onEditMetadata, o
             <a
               href={resolveUrl(d.path)} download={filename}
               onClick={anchorClick(resolveUrl(d.path))}
-              className="p-1.5 rounded-lg hover:bg-surface-container text-on-surface-variant hover:text-primary transition-colors"
+              className="p-2 md:p-1.5 rounded-lg hover:bg-surface-container text-on-surface-variant hover:text-primary transition-colors"
               title="Download"
             >
               <Download size={13} />

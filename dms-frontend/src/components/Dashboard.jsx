@@ -73,7 +73,7 @@ export default function Dashboard({
     .slice(0, 5);
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6 md:space-y-8">
       {/* Page Header */}
       <div>
         <h2 className="font-semibold text-[22px] md:text-headline-lg text-on-surface">Project Dashboard</h2>
@@ -81,7 +81,7 @@ export default function Dashboard({
       </div>
 
       {/* Metric Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
         <MetricCard
           icon="architecture"
           title="TOTAL DRAWINGS"
@@ -122,16 +122,16 @@ export default function Dashboard({
       </div>
 
       {/* Chart + Activity */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 md:gap-8">
 
         {/* Chart (Discipline Breakdown) */}
-        <div className="lg:col-span-8 bg-white border border-border-slate rounded-xl p-8 flex flex-col lg:h-[460px]">
-          <div className="flex justify-between items-center mb-8">
+        <div className="lg:col-span-8 bg-white border border-border-slate rounded-xl p-5 md:p-8 flex flex-col lg:h-[460px]">
+          <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-3 mb-6 md:mb-8">
             <div>
               <h4 className="font-headline-md text-headline-md text-on-surface">Drawings by Discipline</h4>
               <p className="font-body-sm text-on-surface-variant">Status breakdown per drawing type.</p>
             </div>
-            <div className="flex gap-2 flex-wrap justify-end">
+            <div className="flex gap-x-3 gap-y-1.5 flex-wrap md:justify-end">
               {Object.entries(STATUS_META).map(([code, { label, color }]) => (
                 <div key={code} className="flex items-center gap-2">
                   <div className="w-3 h-3 rounded-full" style={{ backgroundColor: color }} />
@@ -150,7 +150,7 @@ export default function Dashboard({
             <div className="flex-1 min-h-0 overflow-y-auto custom-scrollbar space-y-4">
               {discEntries.map(([disc, counts]) => (
                 <div key={disc} className="flex items-center gap-4">
-                  <span className="font-label-sm text-[12px] text-on-surface-variant w-32 shrink-0 truncate" title={disc}>{disc}</span>
+                  <span className="font-label-sm text-[12px] text-on-surface-variant w-20 md:w-32 shrink-0 truncate" title={disc}>{disc}</span>
                   <div className="flex-1 flex h-6 rounded-md overflow-hidden bg-surface-container">
                     {Object.entries(STATUS_META).map(([code, { color }]) =>
                       counts[code] > 0 ? (
@@ -226,7 +226,7 @@ export default function Dashboard({
 
       {/* Latest Drawing Revisions Table */}
       <div className="bg-white border border-border-slate rounded-xl overflow-hidden">
-        <div className="p-6 border-b border-border-slate flex justify-between items-center">
+        <div className="p-5 md:p-6 border-b border-border-slate flex justify-between items-center gap-3">
           <div>
             <h4 className="font-headline-md text-headline-md text-on-surface">Latest Drawing Revisions</h4>
             <p className="font-body-sm text-on-surface-variant">Recently uploaded and updated drawings.</p>
@@ -246,7 +246,7 @@ export default function Dashboard({
               <thead className="bg-surface-container-low border-b border-border-slate">
                 <tr>
                   {["Sheet No.", "Title", "Rev", "Date", "Status"].map((h) => (
-                    <th key={h} className="px-6 py-4 font-label-sm text-on-surface-variant uppercase tracking-wider text-[11px]">{h}</th>
+                    <th key={h} className="px-4 md:px-6 py-3 md:py-4 font-label-sm text-on-surface-variant uppercase tracking-wider text-[11px] whitespace-nowrap">{h}</th>
                   ))}
                 </tr>
               </thead>
@@ -255,11 +255,11 @@ export default function Dashboard({
                   const s = STATUS_DISPLAY[d.status] || { label: d.status, textCls: "text-on-surface-variant", bgCls: "bg-surface-container" };
                   return (
                     <tr key={d.id} className="hover:bg-surface-container-low transition-colors">
-                      <td className="px-6 py-4 font-body-md font-bold text-primary text-[13px]">{d.number}</td>
-                      <td className="px-6 py-4 font-body-md text-on-surface text-[13px] max-w-[260px] truncate">{d.title || "Untitled"}</td>
-                      <td className="px-6 py-4 font-body-md text-[13px]">Rev {d.rev}</td>
-                      <td className="px-6 py-4 font-body-md text-on-surface-variant text-[13px]">{d.issueDate ?? "—"}</td>
-                      <td className="px-6 py-4">
+                      <td className="px-4 md:px-6 py-3 md:py-4 font-body-md font-bold text-primary text-[13px]">{d.number}</td>
+                      <td className="px-4 md:px-6 py-3 md:py-4 font-body-md text-on-surface text-[13px] max-w-[260px] truncate">{d.title || "Untitled"}</td>
+                      <td className="px-4 md:px-6 py-3 md:py-4 font-body-md text-[13px]">Rev {d.rev}</td>
+                      <td className="px-4 md:px-6 py-3 md:py-4 font-body-md text-on-surface-variant text-[13px]">{d.issueDate ?? "—"}</td>
+                      <td className="px-4 md:px-6 py-3 md:py-4">
                         <span className={`px-3 py-1 rounded-full font-label-sm text-[11px] ${s.bgCls} ${s.textCls}`}>{s.label}</span>
                       </td>
                     </tr>
@@ -277,17 +277,17 @@ export default function Dashboard({
 function MetricCard({ icon, badge, title, value, sub, iconBg, iconColor, onClick }) {
   return (
     <div
-      className={`bg-white border border-border-slate p-5 rounded-xl hover:shadow-md transition-shadow flex items-start gap-4 ${onClick ? "cursor-pointer" : ""}`}
+      className={`bg-white border border-border-slate p-3.5 md:p-5 rounded-xl hover:shadow-md transition-shadow flex flex-col md:flex-row items-start gap-2.5 md:gap-4 ${onClick ? "cursor-pointer" : ""}`}
       onClick={onClick}
       role={onClick ? "button" : undefined}
       tabIndex={onClick ? 0 : undefined}
       onKeyDown={onClick ? (e) => { if (e.key === "Enter" || e.key === " ") onClick(); } : undefined}
     >
-      <div className={`p-2.5 rounded-lg shrink-0 ${iconBg} ${iconColor}`}>
-        <span className="material-symbols-outlined text-[22px]" style={{ fontVariationSettings: "'FILL' 0" }}>{icon}</span>
+      <div className={`p-2 md:p-2.5 rounded-lg shrink-0 ${iconBg} ${iconColor}`}>
+        <span className="material-symbols-outlined text-[18px] md:text-[22px]" style={{ fontVariationSettings: "'FILL' 0" }}>{icon}</span>
       </div>
       <div className="min-w-0">
-        <p className="font-label-sm text-[11px] text-on-surface-variant uppercase tracking-wider truncate">{title}</p>
+        <p className="font-label-sm text-[10px] md:text-[11px] text-on-surface-variant uppercase tracking-wider truncate">{title}</p>
         <div className="flex items-center gap-2 mt-0.5">
           <h3 className="font-headline-md text-headline-md text-on-surface font-bold">{value}</h3>
           {badge && (
