@@ -65,8 +65,8 @@ export default function RevisionHistoryPanel({ drawing, token, onClose }) {
               <X size={16} />
             </button>
           </div>
-          <p className="text-[13px] font-mono font-bold text-primary">{drawing.number}</p>
-          <p className="text-[11px] text-on-surface-variant mt-0.5">{drawing.title}</p>
+          <p className="text-[13px] font-mono font-bold text-primary break-all">{drawing.number}</p>
+          <p className="text-[11px] text-on-surface-variant mt-0.5 break-words">{drawing.title}</p>
         </div>
 
         <div className="flex-1 overflow-y-auto">

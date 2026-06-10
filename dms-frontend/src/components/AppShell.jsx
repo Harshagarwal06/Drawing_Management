@@ -40,7 +40,7 @@ export default function AppShell({
       />
 
       {/* ── Right column ── */}
-      <div className="flex flex-col flex-1 md:ml-[280px]">
+      <div className="flex flex-col flex-1 min-w-0 md:ml-[280px]">
 
         {/* ── Top App Bar ── */}
         <header className="bg-glass-surface/80 backdrop-blur-md border-b border-border-slate sticky top-0 z-40 h-topbar-safe pt-safe flex items-center justify-between px-4 md:px-10 gap-4 md:gap-6">
@@ -109,7 +109,7 @@ export default function AppShell({
         </header>
 
         {/* ── Page content rendered by child route ── */}
-        <main className="flex-1 p-4 md:p-[40px]">
+        <main className="flex-1 p-4 md:p-[40px] overflow-x-hidden">
           <ErrorBoundary>
             <Outlet />
           </ErrorBoundary>

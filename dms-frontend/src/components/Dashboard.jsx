@@ -199,10 +199,10 @@ export default function Dashboard({
                     <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 z-10 ${meta.bgCls}`}>
                       <span className={`material-symbols-outlined text-[18px] ${meta.textCls}`}>{meta.icon}</span>
                     </div>
-                    <div>
-                      <p className="font-body-md text-on-surface text-[13px] leading-snug">{item.title}</p>
+                    <div className="min-w-0 flex-1">
+                      <p className="font-body-md text-on-surface text-[13px] leading-snug break-words">{item.title}</p>
                       {item.detail && (
-                        <p className="font-label-sm text-[11px] text-on-surface-variant mt-1">{item.detail} · {timeAgo(item.created_at)}</p>
+                        <p className="font-label-sm text-[11px] text-on-surface-variant mt-1 break-words">{item.detail} · {timeAgo(item.created_at)}</p>
                       )}
                       {!item.detail && (
                         <p className="font-label-sm text-[11px] text-on-surface-variant mt-1">{timeAgo(item.created_at)}</p>
@@ -255,7 +255,7 @@ export default function Dashboard({
                   const s = STATUS_DISPLAY[d.status] || { label: d.status, textCls: "text-on-surface-variant", bgCls: "bg-surface-container" };
                   return (
                     <tr key={d.id} className="hover:bg-surface-container-low transition-colors">
-                      <td className="px-4 md:px-6 py-3 md:py-4 font-body-md font-bold text-primary text-[13px]">{d.number}</td>
+                      <td className="px-4 md:px-6 py-3 md:py-4 font-body-md font-bold text-primary text-[13px] max-w-[160px] truncate" title={d.number}>{d.number}</td>
                       <td className="px-4 md:px-6 py-3 md:py-4 font-body-md text-on-surface text-[13px] max-w-[260px] truncate">{d.title || "Untitled"}</td>
                       <td className="px-4 md:px-6 py-3 md:py-4 font-body-md text-[13px]">Rev {d.rev}</td>
                       <td className="px-4 md:px-6 py-3 md:py-4 font-body-md text-on-surface-variant text-[13px]">{d.issueDate ?? "—"}</td>

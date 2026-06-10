@@ -102,13 +102,13 @@ export default function TransmittalsView({ transmittals = [], drawings = [], loa
                   </div>
 
                   {/* Middle: drawings list */}
-                  <div className="flex-1">
+                  <div className="flex-1 min-w-0">
                     <p className="font-label-sm text-label-sm text-outline mb-2 uppercase tracking-wider">
                       {allDrawings.length} Drawing{allDrawings.length !== 1 ? "s" : ""}
                     </p>
                     <div className="flex flex-wrap gap-2">
                       {visibleDrawings.map(d => (
-                        <span key={d.id} className="px-2 py-1 rounded bg-surface-container border border-outline-variant text-on-surface-variant text-[11px] font-mono">
+                        <span key={d.id} className="px-2 py-1 rounded bg-surface-container border border-outline-variant text-on-surface-variant text-[11px] font-mono break-all">
                           {d.number} Rev {d.rev}
                         </span>
                       ))}
