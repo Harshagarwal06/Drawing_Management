@@ -28,3 +28,9 @@ dist-ssr
 .env.*
 !.env.example
 .vercel
+
+# Capacitor iOS (generated/native deps)
+ios/App/Pods
+ios/App/App/public
+ios/App/output
+ios/DerivedData

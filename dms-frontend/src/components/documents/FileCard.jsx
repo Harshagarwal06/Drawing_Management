@@ -1,6 +1,7 @@
 import { memo } from "react";
 import { Eye, Download } from "lucide-react";
 import { resolveUrl, STATUS_PILL, STATUS_LABEL, STATUS_BAR, EXT_STYLE } from "./constants";
+import { anchorClick } from "../../utils/native";
 import FileMenu from "./FileMenu";
 
 export default memo(function FileCard({ d, viewMode, onDelete, onEditMetadata, onRename, onMove, onNewRevision, onViewHistory }) {
@@ -39,7 +40,7 @@ export default memo(function FileCard({ d, viewMode, onDelete, onEditMetadata, o
         <div className="flex items-center gap-0.5 shrink-0">
           <a
             href={resolveUrl(d.path)} target="_blank" rel="noreferrer"
-            onClick={e => e.stopPropagation()}
+            onClick={anchorClick(resolveUrl(d.path))}
             className="p-1.5 rounded-lg hover:bg-surface-container-low text-on-surface-variant hover:text-primary transition-colors"
             title="View"
           >
@@ -47,7 +48,7 @@ export default memo(function FileCard({ d, viewMode, onDelete, onEditMetadata, o
           </a>
           <a
             href={resolveUrl(d.path)} download={filename}
-            onClick={e => e.stopPropagation()}
+            onClick={anchorClick(resolveUrl(d.path))}
             className="p-1.5 rounded-lg hover:bg-surface-container-low text-on-surface-variant hover:text-primary transition-colors"
             title="Download"
           >
@@ -83,6 +84,7 @@ export default memo(function FileCard({ d, viewMode, onDelete, onEditMetadata, o
           <div className="flex items-center gap-0.5">
             <a
               href={resolveUrl(d.path)} target="_blank" rel="noreferrer"
+              onClick={anchorClick(resolveUrl(d.path))}
               className="p-1.5 rounded-lg hover:bg-surface-container text-on-surface-variant hover:text-primary transition-colors"
               title="View"
             >
@@ -90,6 +92,7 @@ export default memo(function FileCard({ d, viewMode, onDelete, onEditMetadata, o
             </a>
             <a
               href={resolveUrl(d.path)} download={filename}
+              onClick={anchorClick(resolveUrl(d.path))}
               className="p-1.5 rounded-lg hover:bg-surface-container text-on-surface-variant hover:text-primary transition-colors"
               title="Download"
             >

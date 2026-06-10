@@ -1,0 +1,8 @@
+{
+  "appId": "com.uniqueproperties.drawvault",
+  "appName": "DrawVault",
+  "webDir": "dist",
+  "ios": {
+    "contentInset": "never"
+  }
+}

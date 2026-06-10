@@ -9,6 +9,15 @@
   }
 }
 
+/* iOS safe areas (Capacitor shell) — env() resolves to 0 in regular browsers */
+.pt-safe { padding-top: env(safe-area-inset-top, 0px); }
+.h-topbar-safe { height: calc(4rem + env(safe-area-inset-top, 0px)); }
+/* Sidebar uses p-4 (1rem) — keep it and add the inset on top */
+.sidebar-safe {
+  padding-top: calc(1rem + env(safe-area-inset-top, 0px));
+  padding-bottom: calc(1rem + env(safe-area-inset-bottom, 0px));
+}
+
 .custom-scrollbar::-webkit-scrollbar {
     width: 4px;
 }

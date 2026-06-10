@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { History, X, Loader2, Eye, Download } from "lucide-react";
 import { API, resolveUrl, STATUS_PILL, STATUS_LABEL } from "./constants";
+import { anchorClick } from "../../utils/native";
 
 const SLIDE_STYLE = document.getElementById("dms-slide-right") || (() => {
   const s = document.createElement("style");
@@ -170,6 +171,7 @@ export default function RevisionHistoryPanel({ drawing, token, onClose }) {
                                 href={resolveUrl(rev.path)}
                                 target="_blank"
                                 rel="noreferrer"
+                                onClick={anchorClick(resolveUrl(rev.path))}
                                 className="flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium text-on-surface-variant hover:text-primary hover:bg-surface-container transition-colors"
                               >
                                 <Eye size={12} /> View
@@ -177,6 +179,7 @@ export default function RevisionHistoryPanel({ drawing, token, onClose }) {
                               <a
                                 href={resolveUrl(rev.path)}
                                 download={`${drawing.number}_Rev${rev.rev || "X"}.${ext.toLowerCase()}`}
+                                onClick={anchorClick(resolveUrl(rev.path))}
                                 className="flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium text-on-surface-variant hover:text-primary hover:bg-surface-container transition-colors"
                               >
                                 <Download size={12} /> Download

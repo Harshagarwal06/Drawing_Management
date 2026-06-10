@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { useLocation } from "react-router-dom";
 import { createPortal } from "react-dom";
 import { MoreVertical, Eye, Download, Ban } from "lucide-react";
+import { isNative, openExternal, saveBlob } from "../utils/native";
 
 const API = import.meta.env.VITE_API_URL;
 
@@ -84,18 +85,16 @@ export default function MasterRegisterTable({
     const headers = ["Drawing No.", "Title", "Discipline", "Rev", "Status", "Date", "Originator", "Transmittals"];
     const rows    = allDrawings.map(d => [d.number, d.title, d.discipline, d.rev, d.status, d.issueDate ?? "", d.originator, d.transmittals ?? 0]);
     const csv     = [headers, ...rows].map(r => r.map(v => `"${String(v ?? "").replace(/"/g, '""')}"`).join(",")).join("\n");
-    const blob    = new Blob([csv], { type: "text/csv" });
-    const url     = URL.createObjectURL(blob);
-    const a       = document.createElement("a"); a.href = url; a.download = "drawing-register.csv"; a.click();
-    URL.revokeObjectURL(url);
+    saveBlob("drawing-register.csv", new Blob([csv], { type: "text/csv" }));
   };
 
   /* Supports both legacy local paths (/uploads/…) and full R2 URLs */
   const resolveUrl = p => p?.startsWith('http') ? p : `${API}${p}`;
 
-  const handleView     = d => { if (d.path) window.open(resolveUrl(d.path), "_blank"); };
+  const handleView     = d => { if (d.path) openExternal(resolveUrl(d.path)); };
   const handleDownload = d => {
     if (!d.path) return;
+    if (isNative()) return openExternal(resolveUrl(d.path));
     const ext = d.path.slice(d.path.lastIndexOf("."));
     const a   = document.createElement("a"); a.href = resolveUrl(d.path); a.download = `${d.number}_Rev${d.rev}${ext}`; a.click();
   };

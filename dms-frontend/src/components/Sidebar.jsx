@@ -34,7 +34,7 @@ export default function Sidebar({
       <aside
         className={`
           flex flex-col h-screen bg-surface border-r border-border-slate w-[280px]
-          fixed left-0 top-0 z-50 p-4 gap-2
+          fixed left-0 top-0 z-50 p-4 gap-2 sidebar-safe
           transition-transform duration-300 ease-in-out
           ${mobileOpen ? "translate-x-0" : "-translate-x-full"}
           md:translate-x-0

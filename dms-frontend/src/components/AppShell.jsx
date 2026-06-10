@@ -33,7 +33,7 @@ export default function AppShell({
       <div className="flex flex-col flex-1 md:ml-[280px]">
 
         {/* ── Top App Bar ── */}
-        <header className="bg-glass-surface/80 backdrop-blur-md border-b border-border-slate sticky top-0 z-40 h-16 flex items-center justify-between px-4 md:px-10 gap-4 md:gap-6">
+        <header className="bg-glass-surface/80 backdrop-blur-md border-b border-border-slate sticky top-0 z-40 h-topbar-safe pt-safe flex items-center justify-between px-4 md:px-10 gap-4 md:gap-6">
 
           {/* Hamburger — mobile only */}
           <button

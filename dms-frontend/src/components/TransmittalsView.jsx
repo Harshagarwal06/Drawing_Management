@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { openExternal } from "../utils/native";
 
 const TRUNCATE_AT = 5; // show first N drawings, rest behind "+X more"
 
@@ -155,7 +156,7 @@ export default function TransmittalsView({ transmittals = [], drawings = [], loa
                       })}
                     </div>
                     <button
-                      onClick={() => window.open(`${API}/api/transmittals/${t.id}/pdf?token=${token}`, "_blank")}
+                      onClick={() => openExternal(`${API}/api/transmittals/${t.id}/pdf?token=${token}`)}
                       className="mt-1 inline-flex items-center gap-1.5 text-[11px] font-medium text-primary hover:underline w-fit"
                     >
                       <span className="material-symbols-outlined text-[14px]">download</span>
