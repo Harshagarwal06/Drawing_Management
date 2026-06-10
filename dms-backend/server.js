@@ -11,6 +11,7 @@ const rateLimit    = require('express-rate-limit');
 const Database     = require('better-sqlite3');
 const PDFDocument  = require('pdfkit');
 const nodemailer   = require('nodemailer');
+const crypto       = require('crypto');
 const { S3Client, PutObjectCommand, DeleteObjectCommand } = require('@aws-sdk/client-s3');
 const helmet       = require('helmet');
 
@@ -114,6 +115,20 @@ async function postToSlack(projectId, text) {
   } catch (err) {
     console.error('⚠️  Slack post failed:', err.message);
   }
+}
+
+/* ── Public-URL + HTML helpers (transmittal acknowledgments) ─────── */
+// Base URL recipients reach this server on. PUBLIC_BASE_URL (Railway URL)
+// wins; otherwise derived from the request (trust proxy makes this honest).
+function publicBaseUrl(req) {
+  return (process.env.PUBLIC_BASE_URL || `${req.protocol}://${req.get('host')}`).replace(/\/+$/, '');
+}
+
+// Recipient names are free-typed — escape anything interpolated into HTML.
+function escapeHtml(s) {
+  return String(s ?? '')
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
 
 /* ── Middleware ─────────────────────────────────────────────────── */
@@ -244,6 +259,21 @@ db.exec(`
   );
 `);
 
+// ── Transmittal acknowledgments ──────────────────────────────────────
+// One row per recipient per transmittal; acked_at NULL until the recipient
+// confirms receipt via their tokenized public link (/ack/:token).
+db.exec(`
+  CREATE TABLE IF NOT EXISTS transmittal_acks (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    transmittal_id  INTEGER NOT NULL,
+    recipient_name  TEXT NOT NULL,
+    recipient_email TEXT DEFAULT '',
+    token           TEXT NOT NULL UNIQUE,
+    acked_at        TEXT,
+    created_at      TEXT NOT NULL
+  );
+`);
+
 // Performance indexes (safe to run every boot — IF NOT EXISTS)
 try {
   db.exec(`
@@ -252,6 +282,7 @@ try {
     CREATE INDEX IF NOT EXISTS idx_transmittals_project_id      ON transmittals(project_id);
     CREATE INDEX IF NOT EXISTS idx_activity_project_id          ON activity_log(project_id);
     CREATE INDEX IF NOT EXISTS idx_drawing_revisions_drawing_id ON drawing_revisions(drawing_id);
+    CREATE INDEX IF NOT EXISTS idx_transmittal_acks_tid         ON transmittal_acks(transmittal_id);
   `);
 } catch (e) { console.warn('Index creation note:', e.message); }
 try { db.exec("ALTER TABLE users ADD COLUMN allowed_projects TEXT DEFAULT '*';");   } catch {}
@@ -762,11 +793,28 @@ app.get('/api/transmittals', requireProjectAccess, (req, res) => {
   try {
     const total = db.prepare('SELECT COUNT(*) as n FROM transmittals WHERE project_id = ?').get(projectId).n;
     const rows  = db.prepare('SELECT * FROM transmittals WHERE project_id = ? ORDER BY id DESC LIMIT ? OFFSET ?').all(projectId, limit, offset);
+
+    // Per-recipient acknowledgment state, batched (old transmittals → [])
+    const ackMap = {};
+    if (rows.length > 0) {
+      const ids  = rows.map(r => r.id);
+      const acks = db.prepare(`SELECT * FROM transmittal_acks WHERE transmittal_id IN (${ids.map(() => '?').join(',')})`).all(ids);
+      const base = publicBaseUrl(req);
+      for (const a of acks) {
+        (ackMap[a.transmittal_id] ||= []).push({
+          name:    a.recipient_name,
+          email:   a.recipient_email,
+          ackedAt: a.acked_at,
+          ackUrl:  `${base}/ack/${a.token}`,
+        });
+      }
+    }
+
     const data = rows.map(r => {
       let drawingIds = [], recipients = [];
       try { drawingIds = JSON.parse(r.drawing_ids); } catch {}
       try { recipients = JSON.parse(r.recipients);  } catch {}
-      return { id: r.id, number: r.number, drawingIds, recipients, purpose: r.purpose, remarks: r.remarks, issuedAt: r.issued_at };
+      return { id: r.id, number: r.number, drawingIds, recipients, purpose: r.purpose, remarks: r.remarks, issuedAt: r.issued_at, acks: ackMap[r.id] || [] };
     });
     res.set('X-Total-Count', String(total));
     res.json(data);
@@ -800,6 +848,17 @@ app.post('/api/transmittals', requireWriteAccess, (req, res) => {
     console.log(`✅ Transmittal ${number} saved`);
 
     const trnId = result.lastInsertRowid;
+
+    // One acknowledgment token per recipient (index-aligned with `recipients`)
+    const base = publicBaseUrl(req);
+    const ackRows = recipients.map(r => ({
+      name:  typeof r === 'string' ? r : (r.name  || ''),
+      email: typeof r === 'string' ? '' : (r.email || ''),
+      token: crypto.randomBytes(24).toString('hex'),
+    }));
+    const insAck = db.prepare('INSERT INTO transmittal_acks (transmittal_id,recipient_name,recipient_email,token,created_at) VALUES (?,?,?,?,?)');
+    for (const a of ackRows) insAck.run(trnId, a.name, a.email, a.token, new Date().toISOString());
+
     res.status(201).json({ id: trnId, number });
 
     // ── Async Slack notification (independent of email config) ──
@@ -829,16 +888,15 @@ app.post('/api/transmittals', requireWriteAccess, (req, res) => {
             doc.end();
           });
 
-          // Send to each recipient
-          for (const r of recipients) {
-            const name  = typeof r === 'string' ? r : (r.name  || '');
-            const email = typeof r === 'string' ? '' : (r.email || '');
+          // Send to each recipient (ackRows[i] matches recipients[i])
+          for (let i = 0; i < recipients.length; i++) {
+            const { name, email, token } = ackRows[i];
             if (!email) { console.log(`⚠️  No email for recipient "${name}" — skipping`); continue; }
             await mailer.sendMail({
               from:    process.env.SMTP_FROM || process.env.SMTP_USER,
               to:      `${name} <${email}>`,
               subject: `Transmittal ${number} — ${purpose} | ${project?.code || 'Project'}`,
-              html: buildEmailHtml({ number, purpose, today, project, recipients, drws, remarks }),
+              html: buildEmailHtml({ number, purpose, today, project, recipients, drws, remarks, ackUrl: `${base}/ack/${token}` }),
               attachments: [{ filename: `${number}.pdf`, content: pdfBuffer, contentType: 'application/pdf' }],
             });
             console.log(`✅ Email sent to ${email}`);
@@ -943,7 +1001,7 @@ function buildTransmittalPdf(doc, { number, purpose, today, project, recipients,
       50, 810, { width: W, align: 'center' });
 }
 
-function buildEmailHtml({ number, purpose, today, project, recipients, drws, remarks }) {
+function buildEmailHtml({ number, purpose, today, project, recipients, drws, remarks, ackUrl }) {
   const rows = drws.map(d =>
     `<tr><td style="padding:4px 8px;border-bottom:1px solid #e2e8f0">${d.number}</td>
          <td style="padding:4px 8px;border-bottom:1px solid #e2e8f0">${d.title}</td>
@@ -963,6 +1021,15 @@ function buildEmailHtml({ number, purpose, today, project, recipients, drws, rem
       <tr><td style="color:#64748b;font-size:12px">PURPOSE</td><td>${purpose}</td></tr>
       <tr><td style="color:#64748b;font-size:12px">RECIPIENTS</td><td>${recipients.map(r => typeof r === 'string' ? r : r.name).join(', ')}</td></tr>
     </table>
+    ${ackUrl ? `
+    <table role="presentation" style="margin:20px auto"><tr><td style="border-radius:8px;background:#16a34a">
+      <a href="${ackUrl}" style="display:inline-block;padding:14px 36px;font-family:Arial,sans-serif;font-size:15px;font-weight:bold;color:#ffffff;text-decoration:none;border-radius:8px">
+        &#10003; Acknowledge Receipt
+      </a>
+    </td></tr></table>
+    <p style="text-align:center;color:#64748b;font-size:12px;margin:0 0 8px">
+      Please click above to confirm you received this transmittal.
+    </p>` : ''}
     <h3 style="color:#1B3A6B;border-bottom:2px solid #1B3A6B;padding-bottom:4px">Drawings Issued (${drws.length})</h3>
     <table style="width:100%;border-collapse:collapse;font-size:13px">
       <thead><tr style="background:#1B3A6B;color:#fff">
@@ -981,6 +1048,116 @@ function buildEmailHtml({ number, purpose, today, project, recipients, drws, rem
   </div>
 </body></html>`;
 }
+
+/* ── Public acknowledgment pages (no login — tokenized links) ────── */
+// Lives OUTSIDE /api so the verifyToken gate never applies. Helmet's default
+// CSP blocks inline <script>, so the confirm step is a plain form POST.
+const ackLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 60,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: 'Too many requests — please try again later.',
+});
+
+function getAckByToken(token) {
+  return db.prepare(`
+    SELECT a.*, t.number AS trn_number, t.project_id, t.purpose, t.issued_at
+    FROM transmittal_acks a
+    LEFT JOIN transmittals t ON t.id = a.transmittal_id
+    WHERE a.token = ?
+  `).get(token);
+}
+
+function renderAckPage(res, status, { heading, message, detailRows = [], form = '' }) {
+  const rows = detailRows
+    .map(([k, v]) => `<tr><td style="padding:6px 12px;color:#64748b;font-size:12px;text-transform:uppercase;letter-spacing:.05em">${escapeHtml(k)}</td><td style="padding:6px 12px;font-weight:600">${escapeHtml(v)}</td></tr>`)
+    .join('');
+  res.status(status).send(`<!doctype html>
+<html lang="en"><head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Transmittal Acknowledgment — DrawVault</title>
+</head>
+<body style="margin:0;font-family:Arial,Helvetica,sans-serif;background:#f1f5f9;color:#0f172a">
+  <div style="max-width:480px;margin:48px auto;padding:0 16px">
+    <div style="background:#1B3A6B;padding:24px;border-radius:12px 12px 0 0">
+      <h1 style="color:#fff;margin:0;font-size:20px">Unique Properties</h1>
+      <p style="color:#F4A223;margin:6px 0 0;font-size:13px">Enterprise Drawing Management</p>
+    </div>
+    <div style="background:#fff;border:1px solid #e2e8f0;border-top:0;border-radius:0 0 12px 12px;padding:28px;text-align:center">
+      <h2 style="margin:0 0 8px;font-size:18px">${heading}</h2>
+      <p style="color:#64748b;font-size:14px;margin:0 0 20px">${message}</p>
+      ${rows ? `<table style="margin:0 auto 20px;border-collapse:collapse;text-align:left">${rows}</table>` : ''}
+      ${form}
+      <p style="color:#94a3b8;font-size:11px;margin:24px 0 0">This page was generated automatically by Unique Properties DMS.</p>
+    </div>
+  </div>
+</body></html>`);
+}
+
+// GET — render only, zero side effects (email scanners prefetch links)
+app.get('/ack/:token', ackLimiter, (req, res) => {
+  const row = getAckByToken(req.params.token);
+  if (!row || !row.trn_number) {
+    return renderAckPage(res, 404, {
+      heading: 'Link not available',
+      message: 'This acknowledgment link is invalid or no longer available.',
+    });
+  }
+  if (row.acked_at) {
+    return renderAckPage(res, 200, {
+      heading: '&#10003; Already acknowledged',
+      message: `This transmittal was acknowledged on ${escapeHtml(row.acked_at.slice(0, 10))}.`,
+      detailRows: [['Transmittal', row.trn_number], ['Recipient', row.recipient_name]],
+    });
+  }
+  renderAckPage(res, 200, {
+    heading: `Transmittal ${escapeHtml(row.trn_number)}`,
+    message: `Hello ${escapeHtml(row.recipient_name)} — please confirm you received this transmittal.`,
+    detailRows: [
+      ['Transmittal', row.trn_number],
+      ['Purpose',     row.purpose || '—'],
+      ['Issued',      row.issued_at || '—'],
+    ],
+    form: `<form method="POST" action="/ack/${escapeHtml(req.params.token)}">
+      <button type="submit" style="background:#16a34a;color:#fff;border:0;border-radius:8px;padding:14px 36px;font-size:15px;font-weight:bold;cursor:pointer">&#10003; Acknowledge Receipt</button>
+    </form>`,
+  });
+});
+
+// POST — idempotent state flip; side effects only on the first ack
+app.post('/ack/:token', ackLimiter, (req, res) => {
+  const row = getAckByToken(req.params.token);
+  if (!row || !row.trn_number) {
+    return renderAckPage(res, 404, {
+      heading: 'Link not available',
+      message: 'This acknowledgment link is invalid or no longer available.',
+    });
+  }
+  const now  = new Date().toISOString();
+  const info = db.prepare('UPDATE transmittal_acks SET acked_at = ? WHERE token = ? AND acked_at IS NULL')
+    .run(now, req.params.token);
+  if (info.changes === 0) {
+    return renderAckPage(res, 200, {
+      heading: '&#10003; Already acknowledged',
+      message: `This transmittal was acknowledged on ${escapeHtml((row.acked_at || now).slice(0, 10))}.`,
+      detailRows: [['Transmittal', row.trn_number], ['Recipient', row.recipient_name]],
+    });
+  }
+  renderAckPage(res, 200, {
+    heading: '&#10003; Receipt acknowledged',
+    message: `Thank you, ${escapeHtml(row.recipient_name)} — your acknowledgment has been recorded.`,
+    detailRows: [['Transmittal', row.trn_number], ['Acknowledged', now.slice(0, 10)]],
+  });
+  setImmediate(() => {
+    postToSlack(row.project_id, `✅ ${row.recipient_name} acknowledged *${row.trn_number}*`);
+    try {
+      db.prepare('INSERT INTO activity_log (project_id,type,title,detail,created_at) VALUES (?,?,?,?,?)')
+        .run(row.project_id, 'ack', `${row.trn_number} acknowledged`, `by ${row.recipient_name}`, now);
+    } catch (e) { console.warn('ack activity_log note:', e.message); }
+  });
+});
 
 /* ── GET /api/transmittals/:id/pdf ───────────────────────────────── */
 app.get('/api/transmittals/:id/pdf', verifyTokenForDownload, (req, res) => {

@@ -21,6 +21,7 @@ const ACTIVITY_ICONS = {
   upload:      { icon: "upload_file",      bgCls: "bg-primary-fixed/30",     textCls: "text-primary"              },
   revision:    { icon: "edit",             bgCls: "bg-primary-fixed/30",     textCls: "text-primary"              },
   transmittal: { icon: "check_circle",     bgCls: "bg-status-emerald-bg",    textCls: "text-status-emerald-text"  },
+  ack:         { icon: "task_alt",         bgCls: "bg-status-emerald-bg",    textCls: "text-status-emerald-text"  },
   void:        { icon: "error",            bgCls: "bg-status-rose-bg",       textCls: "text-status-rose-text"     },
 };
 

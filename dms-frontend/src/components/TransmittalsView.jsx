@@ -41,6 +41,8 @@ export default function TransmittalsView({ transmittals = [], drawings = [], loa
   const drawingMap = Object.fromEntries(drawings.map(d => [d.id, d]));
   // Track which transmittal cards are expanded (showing all drawings)
   const [expandedIds, setExpandedIds] = useState(new Set());
+  // Which ack link was just copied — flips the copy icon to a check briefly
+  const [copiedUrl, setCopiedUrl] = useState(null);
 
   const toggleExpand = id => {
     setExpandedIds(prev => {
@@ -48,6 +50,13 @@ export default function TransmittalsView({ transmittals = [], drawings = [], loa
       next.has(id) ? next.delete(id) : next.add(id);
       return next;
     });
+  };
+
+  const copyLink = url => {
+    navigator.clipboard?.writeText(url).then(() => {
+      setCopiedUrl(url);
+      setTimeout(() => setCopiedUrl(null), 1500);
+    }).catch(() => {});
   };
 
   return (
@@ -82,6 +91,13 @@ export default function TransmittalsView({ transmittals = [], drawings = [], loa
           {transmittals.map(t => {
             const colors = PURPOSE_COLOR[t.purpose] || { dot: "bg-outline", text: "text-on-surface-variant", bg: "bg-surface-container border-outline-variant" };
             const allDrawings  = (t.drawingIds || []).map(id => drawingMap[id]).filter(Boolean);
+            const acks = t.acks || [];
+            const findAck = r => {
+              const name  = typeof r === "string" ? r : (r.name || "");
+              const email = typeof r === "string" ? "" : (r.email || "");
+              return acks.find(a => (email && a.email === email) || (!email && a.name === name));
+            };
+            const ackedCount = acks.filter(a => a.ackedAt).length;
             const isExpanded   = expandedIds.has(t.id);
             const visibleDrawings = isExpanded ? allDrawings : allDrawings.slice(0, TRUNCATE_AT);
             const hiddenCount    = allDrawings.length - TRUNCATE_AT;
@@ -98,6 +114,15 @@ export default function TransmittalsView({ transmittals = [], drawings = [], loa
                       <span className="text-[11px] font-medium">{t.purpose}</span>
                     </div>
                     <span className="font-label-sm text-label-sm text-on-surface-variant">{t.issuedAt}</span>
+                    {acks.length > 0 && (
+                      <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border w-fit text-[11px] font-medium ${
+                        ackedCount === acks.length
+                          ? "bg-emerald-50 border-emerald-200 text-emerald-700"
+                          : "bg-amber-50 border-amber-200 text-amber-700"
+                      }`}>
+                        {ackedCount}/{acks.length} acknowledged
+                      </span>
+                    )}
                   </div>
 
                   {/* Middle: drawings list */}
@@ -144,12 +169,34 @@ export default function TransmittalsView({ transmittals = [], drawings = [], loa
                       {(t.recipients || []).map((r, i) => {
                         const name = typeof r === "string" ? r : (r.name || "");
                         const initial = name.charAt(0).toUpperCase();
+                        const ack = findAck(r);
                         return (
                           <div key={i} className="flex items-center gap-2">
                             <div className="w-6 h-6 rounded-full bg-primary flex items-center justify-center text-on-primary text-[10px] font-bold shrink-0">
                               {initial}
                             </div>
                             <span className="font-body-sm text-[12px] text-on-surface-variant truncate">{name}</span>
+                            {ack && (ack.ackedAt ? (
+                              <span className="shrink-0 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-emerald-50 border border-emerald-200 text-emerald-700">
+                                ✓ {ack.ackedAt.slice(0, 10)}
+                              </span>
+                            ) : (
+                              <>
+                                <span className="shrink-0 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-amber-50 border border-amber-200 text-amber-700">
+                                  Pending
+                                </span>
+                                <button
+                                  onClick={() => copyLink(ack.ackUrl)}
+                                  className="shrink-0 p-1 rounded-md text-on-surface-variant hover:text-primary hover:bg-surface-container transition-colors"
+                                  title="Copy acknowledgment link"
+                                  aria-label={`Copy acknowledgment link for ${name}`}
+                                >
+                                  <span className="material-symbols-outlined text-[13px]">
+                                    {copiedUrl === ack.ackUrl ? "check" : "content_copy"}
+                                  </span>
+                                </button>
+                              </>
+                            ))}
                           </div>
                         );
                       })}
