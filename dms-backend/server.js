@@ -1251,7 +1251,7 @@ app.post('/api/login', async (req, res) => {
 });
 
 /* ── Global error handler (catches Multer errors cleanly) ────────── */
-app.use((err, req, res, next) => {
+app.use((err, req, res, _next) => {
   if (err.code === 'LIMIT_FILE_SIZE') {
     return res.status(400).json({ error: 'File too large — maximum size is 50 MB.' });
   }
