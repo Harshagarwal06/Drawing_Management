@@ -272,8 +272,6 @@ export default function App() {
     isDirector,
     isProjectTeam,
     isRestricted,
-    search,
-    onSearch: handleSearch,
     mobileNavOpen,
     setMobileNavOpen,
     onNewDrawing: () => { setModalFolder(""); setShowModal(true); },

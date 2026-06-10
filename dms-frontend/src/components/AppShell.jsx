@@ -11,8 +11,6 @@ export default function AppShell({
   isDirector,
   isProjectTeam,
   isRestricted,
-  search,
-  onSearch,
   mobileNavOpen,
   setMobileNavOpen,
   onNewDrawing,
@@ -26,7 +24,6 @@ export default function AppShell({
     <div className="bg-background text-on-surface font-outfit min-h-screen flex">
 
       <Sidebar
-        activeProject={activeProject}
         isDirector={isDirector}
         mobileOpen={mobileNavOpen}
         onMobileClose={() => setMobileNavOpen(false)}
@@ -47,17 +44,8 @@ export default function AppShell({
             <span className="material-symbols-outlined text-[24px]">menu</span>
           </button>
 
-          {/* Search */}
-          <div className="relative w-full max-w-md">
-            <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant text-[20px]">search</span>
-            <input
-              type="text"
-              value={search}
-              onChange={e => onSearch(e.target.value)}
-              placeholder="Search drawings…"
-              className="w-full pl-10 pr-4 py-2 bg-surface-container-low border border-border-slate rounded-lg text-body-sm text-on-surface placeholder:text-on-surface-variant focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/20 transition-all"
-            />
-          </div>
+          {/* Spacer — page-level views provide their own scoped search */}
+          <div className="flex-1" />
 
           {/* Utility icons */}
           <div className="flex items-center gap-1 shrink-0">

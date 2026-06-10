@@ -9,7 +9,7 @@ export default defineConfig({
     setupFiles: './src/test/setup.js',
   },
   server: {
-    port: 5173,
+    port: Number(process.env.PORT) || 5173,
     proxy: {
       '/api': {
         target: 'http://localhost:3000',

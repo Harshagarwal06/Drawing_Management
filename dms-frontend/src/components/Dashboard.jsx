@@ -81,39 +81,40 @@ export default function Dashboard({
       </div>
 
       {/* Metric Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <MetricCard
           icon="architecture"
-          badge={{ label: `${drawings.filter(d=>d.status==="S3").length} issued`, cls: "text-status-emerald-text bg-status-emerald-bg" }}
           title="TOTAL DRAWINGS"
           value={totalDrawings}
+          sub={`${drawings.filter(d => d.status === "S3").length} for construction`}
           iconBg="bg-primary/5"
           iconColor="text-primary"
           onClick={() => navigate("/register")}
         />
         <MetricCard
           icon="move_to_inbox"
-          badge={{ label: "+recent", cls: "text-status-emerald-text bg-status-emerald-bg" }}
           title="ISSUED TRANSMITTALS"
           value={totalTransmittals}
+          sub="Sent to recipients"
           iconBg="bg-primary/5"
           iconColor="text-primary"
           onClick={() => navigate("/transmittals")}
         />
         <MetricCard
           icon="update"
-          badge={{ label: "Active", cls: "text-status-amber-text bg-status-amber-bg" }}
           title="PENDING APPROVAL"
           value={latestRevisions}
+          sub="Awaiting review"
           iconBg="bg-primary/5"
           iconColor="text-primary"
           onClick={() => navigate("/register", { state: { filterStat: "S2" } })}
         />
         <MetricCard
           icon="warning"
-          badge={{ label: overdueItems > 0 ? "Critical" : "On Track", cls: overdueItems > 0 ? "text-status-rose-text bg-status-rose-bg" : "text-status-emerald-text bg-status-emerald-bg" }}
           title="OVERDUE ITEMS"
           value={overdueItems}
+          sub={overdueItems > 0 ? "Needs attention" : "Nothing overdue"}
+          badge={overdueItems > 0 ? { label: "Critical", cls: "text-status-rose-text bg-status-rose-bg" } : undefined}
           iconBg={overdueItems > 0 ? "bg-status-rose-bg" : "bg-status-emerald-bg"}
           iconColor={overdueItems > 0 ? "text-status-rose-text" : "text-status-emerald-text"}
           onClick={() => navigate("/transmittals")}
@@ -146,26 +147,23 @@ export default function Dashboard({
               <p className="font-body-sm text-body-sm">Upload drawings to see the breakdown</p>
             </div>
           ) : (
-            <div className="flex-1 flex items-end gap-3 h-52 w-full">
-              {discEntries.slice(0, 8).map(([disc, counts]) => (
-                <div key={disc} className="flex-1 flex flex-col justify-end items-center gap-1 h-full">
-                  <div className="w-full flex flex-col justify-end gap-0.5 flex-1">
+            <div className="flex-1 min-h-0 overflow-y-auto custom-scrollbar space-y-4">
+              {discEntries.map(([disc, counts]) => (
+                <div key={disc} className="flex items-center gap-4">
+                  <span className="font-label-sm text-[12px] text-on-surface-variant w-32 shrink-0 truncate" title={disc}>{disc}</span>
+                  <div className="flex-1 flex h-6 rounded-md overflow-hidden bg-surface-container">
                     {Object.entries(STATUS_META).map(([code, { color }]) =>
                       counts[code] > 0 ? (
                         <div
                           key={code}
                           title={`${STATUS_META[code].label}: ${counts[code]}`}
-                          className="w-full rounded-t-sm transition-all"
-                          style={{
-                            height: `${(counts[code] / maxTotal) * 160}px`,
-                            backgroundColor: color,
-                            opacity: 0.85,
-                          }}
+                          className="h-full transition-all"
+                          style={{ width: `${(counts[code] / maxTotal) * 100}%`, backgroundColor: color, opacity: 0.85 }}
                         />
                       ) : null
                     )}
                   </div>
-                  <span className="text-center font-label-sm text-[10px] text-on-surface-variant mt-2 truncate w-full text-center">{disc.slice(0,4)}</span>
+                  <span className="font-mono text-[12px] text-on-surface w-8 text-right shrink-0">{counts.total}</span>
                 </div>
               ))}
             </div>
@@ -276,23 +274,28 @@ export default function Dashboard({
   );
 }
 
-function MetricCard({ icon, badge, title, value, iconBg, iconColor, onClick }) {
+function MetricCard({ icon, badge, title, value, sub, iconBg, iconColor, onClick }) {
   return (
     <div
-      className={`bg-white border border-border-slate p-6 rounded-xl hover:shadow-md transition-shadow ${onClick ? "cursor-pointer" : ""}`}
+      className={`bg-white border border-border-slate p-5 rounded-xl hover:shadow-md transition-shadow flex items-start gap-4 ${onClick ? "cursor-pointer" : ""}`}
       onClick={onClick}
       role={onClick ? "button" : undefined}
       tabIndex={onClick ? 0 : undefined}
       onKeyDown={onClick ? (e) => { if (e.key === "Enter" || e.key === " ") onClick(); } : undefined}
     >
-      <div className="flex justify-between items-start mb-4">
-        <div className={`p-2 rounded-lg ${iconBg} ${iconColor}`}>
-          <span className="material-symbols-outlined text-[22px]" style={{ fontVariationSettings: "'FILL' 0" }}>{icon}</span>
-        </div>
-        <span className={`px-2 py-1 rounded-full font-label-sm text-[10px] ${badge.cls}`}>{badge.label}</span>
+      <div className={`p-2.5 rounded-lg shrink-0 ${iconBg} ${iconColor}`}>
+        <span className="material-symbols-outlined text-[22px]" style={{ fontVariationSettings: "'FILL' 0" }}>{icon}</span>
       </div>
-      <p className="font-label-sm text-on-surface-variant mb-1 uppercase tracking-wider">{title}</p>
-      <h3 className="font-headline-md text-headline-md text-on-surface font-bold">{value}</h3>
+      <div className="min-w-0">
+        <p className="font-label-sm text-[11px] text-on-surface-variant uppercase tracking-wider truncate">{title}</p>
+        <div className="flex items-center gap-2 mt-0.5">
+          <h3 className="font-headline-md text-headline-md text-on-surface font-bold">{value}</h3>
+          {badge && (
+            <span className={`px-2 py-0.5 rounded-full font-label-sm text-[10px] ${badge.cls}`}>{badge.label}</span>
+          )}
+        </div>
+        {sub && <p className="font-body-sm text-[11px] text-on-surface-variant mt-0.5 truncate">{sub}</p>}
+      </div>
     </div>
   );
 }

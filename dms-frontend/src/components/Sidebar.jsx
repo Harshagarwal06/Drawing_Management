@@ -13,7 +13,6 @@ const RESTRICTED_NAV = [
 ];
 
 export default function Sidebar({
-  activeProject,
   isDirector    = false,
   mobileOpen    = false,
   onMobileClose = () => {},
@@ -42,11 +41,11 @@ export default function Sidebar({
         `}
       >
         {/* Logo + close button on mobile */}
-        <div className="flex items-center justify-between px-5 pt-5 pb-5">
+        <div className="flex items-center justify-between px-5 pt-4 pb-4">
           <img
             src="/logo.png"
             alt="Unique Properties"
-            className="w-[238px] h-auto object-contain object-left"
+            className="w-[160px] h-auto object-contain object-left"
           />
           {/* Close button — mobile only */}
           <button
@@ -113,21 +112,6 @@ export default function Sidebar({
               </>
             )}
           </NavLink>
-
-          {/* Active project chip */}
-          {activeProject && (
-            <div className="flex items-center gap-3 px-2 py-2 mt-1">
-              <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-white text-[12px] font-bold shrink-0">
-                {activeProject.code?.charAt(0) ?? "P"}
-              </div>
-              <div className="overflow-hidden">
-                <p className="text-[13px] font-bold text-on-surface truncate">{activeProject.code}</p>
-                <p className="text-[11px] text-on-surface-variant truncate">
-                  {activeProject.name?.split("—")[1]?.trim() ?? activeProject.name}
-                </p>
-              </div>
-            </div>
-          )}
         </div>
       </aside>
     </>
