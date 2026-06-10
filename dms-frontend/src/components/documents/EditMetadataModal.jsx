@@ -47,13 +47,13 @@ export default function EditMetadataModal({ drawing, token, onSuccess, onClose }
       aria-modal="true"
       aria-label="Edit metadata"
     >
-      <div className="bg-white rounded-2xl shadow-xl border border-border-slate w-full max-w-lg overflow-hidden">
+      <div className="bg-white rounded-2xl shadow-xl border border-border-slate w-full max-w-lg overflow-hidden flex flex-col max-h-[92vh]">
         <div className="h-1 bg-primary" />
         <div className="px-6 py-4 border-b border-border-slate">
           <h2 className="text-[15px] font-semibold text-on-surface">Edit Metadata</h2>
           <p className="text-[12px] text-on-surface-variant mt-0.5 font-mono">{drawing.number}</p>
         </div>
-        <div className="px-6 py-5 space-y-4">
+        <div className="px-5 md:px-6 py-5 space-y-4 overflow-y-auto flex-1">
           {error && (
             <div className="px-4 py-2.5 rounded-lg bg-status-rose-bg text-status-rose-text text-[12px] font-medium border border-status-rose-text/20">
               {error}

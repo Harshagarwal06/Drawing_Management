@@ -86,7 +86,7 @@ export default function UploadModal({ onClose, onSubmit, initialFolder }) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(15,23,42,0.4)" }} onClick={e => { if (e.target === e.currentTarget) onClose(); }} role="dialog" aria-modal="true" aria-label="Upload drawing">
-      <div className="modal-enter bg-surface rounded-2xl shadow-card-lg border border-outline-variant w-full max-w-xl overflow-hidden">
+      <div className="modal-enter bg-surface rounded-2xl shadow-card-lg border border-outline-variant w-full max-w-xl overflow-hidden flex flex-col max-h-[92vh]">
 
         {/* Header */}
         <div className="px-6 py-4 border-b border-outline-variant flex items-center justify-between bg-surface-container-low">
@@ -107,7 +107,7 @@ export default function UploadModal({ onClose, onSubmit, initialFolder }) {
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-6 space-y-5">
+        <form onSubmit={handleSubmit} className="p-5 md:p-6 space-y-5 overflow-y-auto flex-1">
 
           {/* Drop zone */}
           <div>

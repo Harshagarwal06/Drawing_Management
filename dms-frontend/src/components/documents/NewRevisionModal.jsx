@@ -56,13 +56,13 @@ export default function NewRevisionModal({ drawing, token, projectId, onSuccess,
       aria-modal="true"
       aria-label="Upload new revision"
     >
-      <div className="bg-white rounded-2xl shadow-xl border border-border-slate w-full max-w-md overflow-hidden">
+      <div className="bg-white rounded-2xl shadow-xl border border-border-slate w-full max-w-md overflow-hidden flex flex-col max-h-[92vh]">
         <div className="h-1 bg-primary" />
         <div className="px-6 py-4 border-b border-border-slate">
           <h2 className="text-[15px] font-semibold text-on-surface">Upload New Revision</h2>
           <p className="text-[11px] text-on-surface-variant font-mono mt-0.5">{drawing.number} — locked</p>
         </div>
-        <div className="px-6 py-5 space-y-4">
+        <div className="px-5 md:px-6 py-5 space-y-4 overflow-y-auto flex-1">
           {error && (
             <div className="px-4 py-2.5 rounded-lg bg-status-rose-bg text-status-rose-text text-[12px] font-medium border border-status-rose-text/20">
               {error}

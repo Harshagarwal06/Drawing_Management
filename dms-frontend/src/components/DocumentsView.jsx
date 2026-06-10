@@ -116,7 +116,7 @@ function SwitchProjectDropdown({ projects, activeProject, onProjectChange }) {
       </button>
 
       {open && (
-        <div className="absolute right-0 top-full mt-2 w-72 bg-surface border border-outline-variant rounded-xl shadow-card-lg z-50 overflow-hidden">
+        <div className="absolute left-0 md:left-auto md:right-0 top-full mt-2 w-[min(18rem,calc(100vw-2.5rem))] bg-surface border border-outline-variant rounded-xl shadow-card-lg z-50 overflow-hidden">
           <div className="px-4 pt-3 pb-2 border-b border-border-slate">
             <p className="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest">
               Switch Project

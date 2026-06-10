@@ -6,6 +6,7 @@
   body {
     background-color: #ffffff;
     @apply text-on-surface font-outfit antialiased;
+    -webkit-tap-highlight-color: transparent;
   }
 }
 

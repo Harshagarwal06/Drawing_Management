@@ -132,7 +132,7 @@ export default function AnalyticsView({ drawings, transmittals }) {
               <div className="flex items-end gap-1 h-32">
                 {months.map(m => (
                   <div key={m.key} className="flex-1 flex flex-col items-center gap-1 group">
-                    <span className="font-mono text-[9px] text-on-surface-variant opacity-0 group-hover:opacity-100 transition-opacity">{m.count || ''}</span>
+                    <span className="font-mono text-[9px] text-on-surface-variant opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">{m.count || ''}</span>
                     <div
                       className="w-full rounded-t-sm bg-primary/60 group-hover:bg-primary transition-colors"
                       style={{ height: `${(m.count / maxCount) * 100}%`, minHeight: m.count > 0 ? '4px' : '0' }}

@@ -24,7 +24,7 @@ export default function FolderMenu({ onAdd, onRename, onMove, onDelete }) {
     e.stopPropagation();
     if (!open && btnRef.current) {
       const r = btnRef.current.getBoundingClientRect();
-      setPos({ top: r.bottom + 4, left: r.right - 176 });
+      setPos({ top: r.bottom + 4, left: Math.max(8, Math.min(window.innerWidth - 176 - 8, r.right - 176)) });
     }
     setOpen(o => !o);
   };
@@ -34,7 +34,7 @@ export default function FolderMenu({ onAdd, onRename, onMove, onDelete }) {
       <button
         ref={btnRef}
         onClick={toggle}
-        className="p-1.5 rounded-lg hover:bg-black/8 transition-colors opacity-0 group-hover:opacity-100 shrink-0"
+        className="p-1.5 rounded-lg hover:bg-black/8 transition-colors opacity-100 md:opacity-0 md:group-hover:opacity-100 shrink-0"
         aria-label="Folder actions"
       >
         <MoreVertical size={14} className="text-on-surface-variant" />
