@@ -18,6 +18,8 @@ const app         = express();
 const PORT        = process.env.PORT        || 3000;
 const JWT_SECRET  = process.env.JWT_SECRET  || 'dev-secret-change-in-production';
 const CORS_ORIGIN = process.env.CORS_ORIGIN || 'http://localhost:5173';
+// capacitor://localhost is the origin of the iOS app's WKWebView shell
+const CORS_ORIGINS = [CORS_ORIGIN, 'capacitor://localhost', 'http://localhost:5174'];
 const DB_PATH     = process.env.DB_PATH     || path.join(__dirname, 'dms.db');
 const UPLOAD_DIR  = process.env.UPLOAD_DIR  || path.join(__dirname, 'uploads');
 
@@ -117,7 +119,7 @@ async function postToSlack(projectId, text) {
 /* ── Middleware ─────────────────────────────────────────────────── */
 app.set('trust proxy', 1); // Railway / Vercel sit behind a reverse proxy
 app.use(helmet());
-app.use(cors({ origin: CORS_ORIGIN, credentials: true, exposedHeaders: ['X-Total-Count'] }));
+app.use(cors({ origin: CORS_ORIGINS, credentials: true, exposedHeaders: ['X-Total-Count'] }));
 app.use(express.json());
 
 /* ── Uploads folder ─────────────────────────────────────────────── */
