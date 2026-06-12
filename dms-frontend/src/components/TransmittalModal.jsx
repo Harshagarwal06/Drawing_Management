@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { X, Search, Send, Loader2, Plus, UserPlus } from "lucide-react";
 import FieldLabel from "./FieldLabel";
-import { TRANSMITTAL_PURPOSES, STATUS_META } from "../constants";
+import { TRANSMITTAL_PURPOSES } from "../constants";
 
 const STATUS_PILL = {
   S3:   { bg: "bg-status-emerald-bg", text: "text-status-emerald-text" },

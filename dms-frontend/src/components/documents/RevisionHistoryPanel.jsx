@@ -4,13 +4,13 @@ import { History, X, Loader2, Eye, Download } from "lucide-react";
 import { API, resolveUrl, STATUS_PILL, STATUS_LABEL } from "./constants";
 import { anchorClick } from "../../utils/native";
 
-const SLIDE_STYLE = document.getElementById("dms-slide-right") || (() => {
+/* Inject the slide-in keyframes once per document */
+if (!document.getElementById("dms-slide-right")) {
   const s = document.createElement("style");
   s.id = "dms-slide-right";
   s.textContent = `@keyframes slideInRight { from { transform: translateX(100%); } to { transform: translateX(0); } }`;
   document.head.appendChild(s);
-  return s;
-})();
+}
 
 export default function RevisionHistoryPanel({ drawing, token, onClose }) {
   const [revisions, setRevisions] = useState([]);
@@ -95,7 +95,7 @@ export default function RevisionHistoryPanel({ drawing, token, onClose }) {
               <div className="relative">
                 <div className="absolute left-[15px] top-3 bottom-3 w-px bg-border-slate" />
 
-                {[...revisions].reverse().map((rev, i) => {
+                {[...revisions].reverse().map((rev) => {
                   const isCurrent = rev.current;
                   const filename  = rev.path?.split("/").pop() ?? "";
                   const ext       = filename.split(".").pop().toUpperCase();

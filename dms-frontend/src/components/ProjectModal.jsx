@@ -22,7 +22,7 @@ export default function ProjectModal({ onClose, onSubmit }) {
     setSubmitting(true);
     try {
       await onSubmit({ name, code });
-    } catch (err) {
+    } catch {
       setError("Failed to create project.");
     } finally {
       setSubmitting(false);

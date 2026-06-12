@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useLayoutEffect, useRef, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { MoreVertical, KeyRound, UserX, Trash2, X, RotateCcw } from "lucide-react";
 
@@ -19,10 +19,13 @@ const MENU_W = 200;
 const MENU_H = 132; // approximate max height (3 items)
 
 function PortalDropdown({ anchorEl, onClose, children }) {
-  const [pos, setPos] = useState(null);
+  const menuRef = useRef(null);
 
-  useEffect(() => {
-    if (!anchorEl) return;
+  /* Measure the anchor before paint and position the menu by mutating its
+     style directly, so it never flashes at a wrong position */
+  useLayoutEffect(() => {
+    const el = menuRef.current;
+    if (!anchorEl || !el) return;
     const rect      = anchorEl.getBoundingClientRect();
     const spaceBelow = window.innerHeight - rect.bottom;
     const flipUp     = spaceBelow < MENU_H + 8;
@@ -30,15 +33,17 @@ function PortalDropdown({ anchorEl, onClose, children }) {
     const rawLeft = rect.right - MENU_W;
     const left    = Math.max(8, Math.min(window.innerWidth - MENU_W - 8, rawLeft));
 
-    setPos({
-      left,
-      ...(flipUp
-        ? { bottom: window.innerHeight - rect.top + 4 }
-        : { top:    rect.bottom + 4 }),
-    });
+    el.style.left = `${left}px`;
+    if (flipUp) {
+      el.style.bottom = `${window.innerHeight - rect.top + 4}px`;
+      el.style.removeProperty('top');
+    } else {
+      el.style.top = `${rect.bottom + 4}px`;
+      el.style.removeProperty('bottom');
+    }
   }, [anchorEl]);
 
-  if (!pos) return null;
+  if (!anchorEl) return null;
 
   return createPortal(
     <>
@@ -47,7 +52,8 @@ function PortalDropdown({ anchorEl, onClose, children }) {
         onClick={onClose}
       />
       <div
-        style={{ position: 'fixed', zIndex: 9999, width: MENU_W, ...pos }}
+        ref={menuRef}
+        style={{ position: 'fixed', zIndex: 9999, width: MENU_W }}
         className="bg-white border border-border-slate rounded-xl shadow-xl overflow-hidden py-1"
       >
         {children}
@@ -85,7 +91,7 @@ function MenuDivider() {
   return <div className="my-1 border-t border-border-slate" />;
 }
 
-export default function SettingsView({ currentUser, onUserUpdate, token }) {
+export default function SettingsView({ currentUser, token }) {
   const isAdmin = currentUser?.role === 'Director';
 
   const [pwForm,      setPwForm]      = useState({ currentPassword: '', newPassword: '', confirm: '' });
@@ -169,13 +175,13 @@ export default function SettingsView({ currentUser, onUserUpdate, token }) {
     finally    { setPwLoading(false); }
   };
 
-  const loadUsers = () => {
+  const loadUsers = useCallback(() => {
     if (!isAdmin) return;
     fetch(`${API}/api/users`, { headers: { Authorization: `Bearer ${token}` } })
       .then(r => r.ok ? r.json() : []).then(setUsers).catch(() => {});
-  };
+  }, [isAdmin, token]);
 
-  const loadProjects = () => {
+  const loadProjects = useCallback(() => {
     if (!isAdmin) return;
     fetch(`${API}/api/projects`, { headers: { Authorization: `Bearer ${token}` } })
       .then(r => r.ok ? r.json() : [])
@@ -184,9 +190,9 @@ export default function SettingsView({ currentUser, onUserUpdate, token }) {
         setProjects(ps.map(p => ({ ...p, slackConfigured: !!p.slackConfigured })));
       })
       .catch(() => {});
-  };
+  }, [isAdmin, token]);
 
-  useEffect(() => { loadUsers(); loadProjects(); }, []);
+  useEffect(() => { loadUsers(); loadProjects(); }, [loadUsers, loadProjects]);
 
   const handleRenameProject = async (e) => {
     e.preventDefault();
