@@ -19,8 +19,9 @@ const app         = express();
 const PORT        = process.env.PORT        || 3000;
 const JWT_SECRET  = process.env.JWT_SECRET  || 'dev-secret-change-in-production';
 const CORS_ORIGIN = process.env.CORS_ORIGIN || 'http://localhost:5173';
-// capacitor://localhost is the origin of the iOS app's WKWebView shell
-const CORS_ORIGINS = [CORS_ORIGIN, 'capacitor://localhost', 'http://localhost:5174'];
+// capacitor://localhost is the origin of the iOS app's WKWebView shell,
+// https://localhost is the Android app's WebView origin
+const CORS_ORIGINS = [CORS_ORIGIN, 'capacitor://localhost', 'https://localhost', 'http://localhost:5174'];
 const DB_PATH     = process.env.DB_PATH     || path.join(__dirname, 'dms.db');
 const UPLOAD_DIR  = process.env.UPLOAD_DIR  || path.join(__dirname, 'uploads');
 
