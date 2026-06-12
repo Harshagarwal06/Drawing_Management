@@ -1,4 +1,4 @@
-import { NavLink, useNavigate } from "react-router-dom";
+import { NavLink } from "react-router-dom";
 
 const DIRECTOR_NAV = [
   { path: "/dashboard",    icon: "dashboard",     label: "Dashboard"        },
@@ -17,7 +17,6 @@ export default function Sidebar({
   mobileOpen    = false,
   onMobileClose = () => {},
 }) {
-  const navigate = useNavigate();
   const navItems = isDirector ? DIRECTOR_NAV : RESTRICTED_NAV;
 
   return (

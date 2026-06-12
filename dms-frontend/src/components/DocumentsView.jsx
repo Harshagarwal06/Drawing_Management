@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useMemo, memo } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import { createPortal } from "react-dom";
 import {
   Folder, FolderOpen, ChevronRight, ChevronDown, Home, LayoutGrid, List,
@@ -165,7 +165,6 @@ function SwitchProjectDropdown({ projects, activeProject, onProjectChange }) {
 function ProjectWorkspaceBar({
   activeProject, projects, onProjectChange,
   totalFolders, totalDrawings, totalTransmittals, pendingApprovals,
-  isProjectTeam,
 }) {
   const shortName = activeProject?.name?.split("—")[1]?.trim() ?? activeProject?.name ?? "No project selected";
   const activeIdx = Math.max(0, projects.findIndex(p => p.id === activeProject?.id));
@@ -222,7 +221,7 @@ export default function DocumentsView({
   onDrawingUpdate,
 }) {
   const [tree,          setTree]          = useState(DEFAULT_TREE);
-  const [treeLoading,   setTreeLoading]   = useState(true);
+  const [treeProjectId, setTreeProjectId] = useState(null); // project whose tree has loaded
   const [segments,      setSegments]      = useState([]);
   const [viewMode,      setViewMode]      = useState("grid");
   const [renamingIdx,   setRenamingIdx]   = useState(null);
@@ -253,13 +252,14 @@ export default function DocumentsView({
 
   useEffect(() => {
     if (!activeProject?.id || !token) return;
-    setTreeLoading(true);
-    setSegments([]);
     fetchTree(activeProject.id, token)
       .then(saved => { setTree(saved ?? DEFAULT_TREE()); })
       .catch(() => { setTree(DEFAULT_TREE()); })
-      .finally(() => setTreeLoading(false));
-  }, [activeProject?.id]);
+      .finally(() => { setSegments([]); setTreeProjectId(activeProject.id); });
+  }, [activeProject?.id, token]);
+
+  /* Loading is derived: true until the active project's tree has landed */
+  const treeLoading = !activeProject?.id || !token || treeProjectId !== activeProject.id;
 
   useEffect(() => { if (addingFolder)         addInputRef.current?.focus();    }, [addingFolder]);
   useEffect(() => { if (renamingIdx !== null)  renameInputRef.current?.focus(); }, [renamingIdx]);
@@ -502,7 +502,6 @@ export default function DocumentsView({
         totalDrawings={drawings.length}
         totalTransmittals={transmittals.length}
         pendingApprovals={pendingApprovals}
-        isProjectTeam={isProjectTeam}
       />
 
       <div>

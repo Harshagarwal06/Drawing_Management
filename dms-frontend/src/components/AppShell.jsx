@@ -10,10 +10,8 @@ export default function AppShell({
   projects,
   isDirector,
   isProjectTeam,
-  isRestricted,
   mobileNavOpen,
   setMobileNavOpen,
-  onNewDrawing,
   onProjectChange,
   onNewProject,
 }) {

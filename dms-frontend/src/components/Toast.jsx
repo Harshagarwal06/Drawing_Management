@@ -1,9 +1,10 @@
-import { useEffect } from "react";
+import { useEffect, useEffectEvent } from "react";
 import { Check, AlertTriangle } from "lucide-react";
 
 export default function Toast({ msg, type = "success", onDone }) {
+  const handleDone = useEffectEvent(() => onDone());
   useEffect(() => {
-    const t = setTimeout(onDone, 4000);
+    const t = setTimeout(() => handleDone(), 4000);
     return () => clearTimeout(t);
   }, []);
 

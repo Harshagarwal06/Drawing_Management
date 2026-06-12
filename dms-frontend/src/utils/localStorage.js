@@ -10,5 +10,7 @@ export function lsLoad(key, fallback) {
 export function lsSave(key, value) {
   try {
     localStorage.setItem(key, JSON.stringify(value));
-  } catch {}
+  } catch {
+    /* best-effort persistence — ignore quota/availability errors */
+  }
 }

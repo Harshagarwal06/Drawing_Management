@@ -40,18 +40,19 @@ export default function Dashboard({
   drawings, activeProjectId, token,
 }) {
   const navigate = useNavigate();
-  const [activity, setActivity]           = useState([]);
-  const [activityError, setActivityError] = useState(false);
+  const [activity, setActivity] = useState([]);
+  /* Project whose activity fetch failed — derived flag clears as soon as the project changes */
+  const [activityErrorId, setActivityErrorId] = useState(null);
+  const activityError = activityErrorId !== null && activityErrorId === activeProjectId;
 
   useEffect(() => {
     if (!activeProjectId || !token) return;
-    setActivityError(false);
     fetch(`${API}/api/activity?projectId=${activeProjectId}`, {
       headers: { Authorization: `Bearer ${token}` },
     })
       .then(r => r.ok ? r.json() : Promise.reject())
-      .then(setActivity)
-      .catch(() => setActivityError(true));
+      .then(data => { setActivity(data); setActivityErrorId(null); })
+      .catch(() => setActivityErrorId(activeProjectId));
   }, [activeProjectId, token]);
 
   /* Discipline breakdown */

@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useEffectEvent } from "react";
 import { useLocation } from "react-router-dom";
 import { createPortal } from "react-dom";
 import { MoreVertical, Eye, Download, Ban } from "lucide-react";
@@ -68,9 +68,10 @@ export default function MasterRegisterTable({
   const location = useLocation();
 
   /* Apply status filter passed from Dashboard metric card click */
+  const applyNavFilterStat = useEffectEvent(stat => onFilterStat?.(stat));
   useEffect(() => {
     if (location.state?.filterStat) {
-      onFilterStat?.(location.state.filterStat);
+      applyNavFilterStat(location.state.filterStat);
       // Clear the state so it doesn't re-apply on subsequent renders
       window.history.replaceState({}, "");
     }

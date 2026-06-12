@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useEffectEvent } from "react";
 import { Routes, Route, Navigate, useNavigate } from "react-router-dom";
 
 import AppShell          from "./components/AppShell";
@@ -45,6 +45,30 @@ async function fetchTransmittals(projectId, token) {
   return res.json();
 }
 
+/* ── Session restore + token expiry check (runs once as useState initializer) ── */
+function loadStoredUser() {
+  try {
+    const saved = localStorage.getItem("dms_user");
+    if (!saved) return null;
+    const user = JSON.parse(saved);
+    // Decode JWT payload (base64url) and check exp
+    const payload = JSON.parse(atob(user.token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/")));
+    if (payload.exp * 1000 < Date.now()) {
+      localStorage.removeItem("dms_user");
+      return null;
+    }
+    return user;
+  } catch {
+    localStorage.removeItem("dms_user");
+    return null;
+  }
+}
+
+function isTransmittalOverdue(t) {
+  return OVERDUE_PURPOSES.has(t.purpose) &&
+    (Date.now() - new Date(t.issuedAt).getTime()) > MS_30_DAYS;
+}
+
 export default function App() {
   const navigate = useNavigate();
 
@@ -53,13 +77,12 @@ export default function App() {
   const [showProjectModal, setShowProjectModal] = useState(false);
   const [drawings,         setDrawings]         = useState([]);
   const [transmittals,     setTransmittals]     = useState([]);
-  const [drawingsLoading,  setDrawingsLoading]  = useState(false);
+  const [loadedProjectId,  setLoadedProjectId]  = useState(null);
   const [showModal,        setShowModal]        = useState(false);
   const [modalFolder,      setModalFolder]      = useState("");
   const [showTransmittal,  setShowTransmittal]  = useState(false);
   const [toast,            setToast]            = useState(null);
-  const [currentUser,      setCurrentUser]      = useState(null);
-  const [sessionLoading,   setSessionLoading]   = useState(true); // true until localStorage checked
+  const [currentUser,      setCurrentUser]      = useState(loadStoredUser);
   const [mobileNavOpen,    setMobileNavOpen]    = useState(false);
   const [search,           setSearch]           = useState("");
   const [filterDisc,       setFilterDisc]       = useState("All");
@@ -72,27 +95,6 @@ export default function App() {
   const isRestricted  = activeRole === "Project Team";
   const isDirector    = activeRole === "Director";
   const isProjectTeam = activeRole === "Project Team";
-
-  /* ── Session restore + token expiry check ── */
-  useEffect(() => {
-    try {
-      const saved = localStorage.getItem("dms_user");
-      if (saved) {
-        const user = JSON.parse(saved);
-        // Decode JWT payload (base64url) and check exp
-        const payload = JSON.parse(atob(user.token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/")));
-        if (payload.exp * 1000 < Date.now()) {
-          localStorage.removeItem("dms_user");
-        } else {
-          setCurrentUser(user);
-        }
-      }
-    } catch {
-      localStorage.removeItem("dms_user");
-    } finally {
-      setSessionLoading(false); // always unblock rendering
-    }
-  }, []);
 
   /* ── Persist session ── */
   useEffect(() => {
@@ -108,44 +110,49 @@ export default function App() {
 
   const handleLogout = () => {
     setCurrentUser(null);
+    setLoadedProjectId(null);
     navigate("/login", { replace: true });
   };
 
   const handleUnauthorized = () => {
     setCurrentUser(null);
+    setLoadedProjectId(null);
     setToast({ msg: "Session expired — please log in again.", type: "error" });
     navigate("/login", { replace: true });
   };
+
+  /* Effect-event wrapper so data-fetch effects always see the latest handler
+     without re-running when it changes identity. */
+  const onAuthError = useEffectEvent(handleUnauthorized);
 
   /* ── Bootstrap projects ── */
   useEffect(() => {
     if (!currentUser) return;
     fetchProjects(currentUser.token)
       .then(data => { setProjects(data); if (data.length > 0) setActiveProject(data[0]); })
-      .catch(err => { if (err.status === 401) handleUnauthorized(); });
+      .catch(err => { if (err.status === 401) onAuthError(); });
   }, [currentUser]);
 
   /* ── Load drawings + transmittals when project changes ── */
   useEffect(() => {
     if (!activeProject || !currentUser) return;
-    setDrawingsLoading(true);
     Promise.all([
       fetchDrawings(activeProject.id, currentUser.token),
       fetchTransmittals(activeProject.id, currentUser.token),
     ])
       .then(([d, t]) => { setDrawings(d); setTransmittals(t); })
-      .catch(err => { if (err.status === 401) handleUnauthorized(); })
-      .finally(() => setDrawingsLoading(false));
-  }, [activeProject]);
+      .catch(err => { if (err.status === 401) onAuthError(); })
+      .finally(() => setLoadedProjectId(activeProject.id));
+  }, [activeProject, currentUser]);
+
+  /* Loading is derived: true while the active project's data hasn't landed yet */
+  const drawingsLoading = !!activeProject && !!currentUser && loadedProjectId !== activeProject.id;
 
   /* ── Derived metrics ── */
   const totalDrawings     = drawings.length;
   const pendingReviews    = drawings.filter(d => d.status === "S2").length;
   const totalTransmittals = transmittals.length;
-  const overdueTransmit   = transmittals.filter(t =>
-    OVERDUE_PURPOSES.has(t.purpose) &&
-    (Date.now() - new Date(t.issuedAt).getTime()) > MS_30_DAYS
-  ).length;
+  const overdueTransmit   = transmittals.filter(isTransmittalOverdue).length;
 
   /* ── Filter + sort ── */
   const filtered = useMemo(() => {
@@ -278,15 +285,6 @@ export default function App() {
     onProjectChange: setActiveProject,
     onNewProject: () => setShowProjectModal(true),
   };
-
-  /* ── Block render until we know if user is logged in ── */
-  if (sessionLoading) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="w-8 h-8 rounded-full border-4 border-primary/20 border-t-primary animate-spin" />
-      </div>
-    );
-  }
 
   return (
     <>
