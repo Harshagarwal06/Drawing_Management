@@ -4,5 +4,8 @@
   "webDir": "dist",
   "ios": {
     "contentInset": "never"
+  },
+  "android": {
+    "allowMixedContent": true
   }
 }
