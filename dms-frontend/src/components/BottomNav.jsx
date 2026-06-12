@@ -1,11 +1,11 @@
 import { NavLink } from "react-router-dom";
 
 const DIRECTOR_TABS = [
-  { path: "/dashboard",    icon: "dashboard",     label: "Dashboard"    },
-  { path: "/documents",    icon: "description",   label: "Documents"    },
-  { path: "/register",     icon: "architecture",  label: "Register"     },
-  { path: "/transmittals", icon: "move_to_inbox", label: "Transmittals" },
-  { path: "/analytics",    icon: "analytics",     label: "Analytics"    },
+  { path: "/dashboard",    icon: "dashboard",     label: "Home"     },
+  { path: "/documents",    icon: "description",   label: "Docs"     },
+  { path: "/register",     icon: "architecture",  label: "Register" },
+  { path: "/transmittals", icon: "move_to_inbox", label: "Issue"    },
+  { path: "/analytics",    icon: "analytics",     label: "Stats"    },
 ];
 
 const RESTRICTED_TABS = [

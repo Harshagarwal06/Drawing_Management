@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 
 import { countDescendants, projectDot } from "./documents/constants";
+import { MS_30_DAYS } from "../constants";
 import FileCard from "./documents/FileCard";
 import FolderCard from "./documents/FolderCard";
 import EditMetadataModal from "./documents/EditMetadataModal";
@@ -73,6 +74,13 @@ function getNode(tree, segments) {
     node = child;
   }
   return node;
+}
+
+// True when a drawing's issueDate falls within the last 30 days (mobile "Recent" chip).
+// Defined at module scope so the impure Date.now() isn't called inside the component render.
+function isRecentDrawing(d) {
+  const t = d.issueDate ? new Date(d.issueDate).getTime() : NaN;
+  return Number.isFinite(t) && (Date.now() - t) <= MS_30_DAYS;
 }
 
 /* ──────────────────────────── StatChip ─────────────────────────────── */
@@ -171,7 +179,49 @@ function ProjectWorkspaceBar({
   const activeIdx = Math.max(0, projects.findIndex(p => p.id === activeProject?.id));
 
   return (
-    <div className="bg-white border border-border-slate rounded-xl px-5 py-3.5 shadow-sm">
+    <>
+    {/* ── Mobile: compact dark-indigo card ── */}
+    <div className="md:hidden bg-[#312e81] rounded-xl px-4 py-3 shadow-sm">
+      <div className="flex items-center gap-2 min-w-0">
+        <span className="font-mono font-bold text-white text-[14px] leading-none shrink-0">
+          {activeProject?.code ?? "—"}
+        </span>
+        <span className="text-[#c7d2fe]/60 shrink-0">·</span>
+        <span className="text-[14px] font-semibold text-white leading-none truncate">
+          {shortName}
+        </span>
+        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-white/12 text-[#c7d2fe] shrink-0">
+          Active
+        </span>
+      </div>
+
+      <div className="flex items-center gap-3 mt-2 text-[11px] font-medium text-[#c7d2fe]">
+        <span className="flex items-center gap-1">
+          <Layers size={12} /> {totalFolders} folders
+        </span>
+        <span className="text-[#c7d2fe]/40">·</span>
+        <span className="flex items-center gap-1">
+          <FileText size={12} /> {totalDrawings} drawings
+        </span>
+        <span className="text-[#c7d2fe]/40">·</span>
+        <span className="flex items-center gap-1">
+          <Send size={12} /> {totalTransmittals} sent
+        </span>
+      </div>
+
+      {projects.length > 1 && (
+        <div className="mt-2.5">
+          <SwitchProjectDropdown
+            projects={projects}
+            activeProject={activeProject}
+            onProjectChange={onProjectChange}
+          />
+        </div>
+      )}
+    </div>
+
+    {/* ── Desktop: original white StatChip bar (unchanged) ── */}
+    <div className="hidden md:block bg-white border border-border-slate rounded-xl px-5 py-3.5 shadow-sm">
       <div className="flex items-center gap-4 flex-wrap xl:flex-nowrap">
         <div className="flex items-center gap-2.5 flex-1 min-w-0">
           <span
@@ -205,6 +255,7 @@ function ProjectWorkspaceBar({
         )}
       </div>
     </div>
+    </>
   );
 }
 
@@ -233,6 +284,7 @@ export default function DocumentsView({
   const [newSubVal,     setNewSubVal]     = useState("");
   const [confirmDelIdx, setConfirmDelIdx] = useState(null);
   const [localSearch,   setLocalSearch]   = useState("");
+  const [mobileFilter,  setMobileFilter]  = useState("all"); // mobile-only file filter chips
 
   const [confirmDeleteDrawing, setConfirmDeleteDrawing] = useState(null);
   const [deleteLoading,        setDeleteLoading]        = useState(false);
@@ -307,6 +359,14 @@ export default function DocumentsView({
       count += countFilesUnder(child, `${basePath}/${child.name}`);
     return count;
   };
+
+  // Recursive drawing count for a folder: drawings whose folderPath equals the
+  // folder's full path, or sits anywhere beneath it (path + "/" prefix).
+  const countDrawingsUnder = basePath =>
+    drawings.filter(d => {
+      const fp = d.folderPath || "";
+      return fp === basePath || fp.startsWith(`${basePath}/`);
+    }).length;
 
   const totalFolders     = countDescendants(tree);
   const pendingApprovals = drawings.filter(d => d.status === "S2").length;
@@ -469,6 +529,13 @@ export default function DocumentsView({
         d.status?.toLowerCase().includes(q) ||
         filename.includes(q)
       );
+    })
+    // Mobile filter chips — composes with search. Only settable on mobile, so on
+    // md+ this is always "all" (no-op) and desktop rendering stays unchanged.
+    .filter(d => {
+      if (mobileFilter === "construction") return d.status === "S3";
+      if (mobileFilter === "recent") return isRecentDrawing(d);
+      return true; // "all"
     })
     .sort((a, b) => _naturalSort.compare(a.number ?? "", b.number ?? ""));
 
@@ -634,6 +701,27 @@ export default function DocumentsView({
           </p>
         </div>
 
+        {/* Filter chips — mobile only; filter the file cards in this folder */}
+        <div className="md:hidden flex items-center gap-2 px-4 py-2.5 border-b border-border-slate overflow-x-auto scrollbar-hide">
+          {[
+            { key: "all",          label: "All" },
+            { key: "recent",       label: "Recent" },
+            { key: "construction", label: "For construction" },
+          ].map(({ key, label }) => (
+            <button
+              key={key}
+              onClick={() => setMobileFilter(key)}
+              className={`shrink-0 px-3 py-1.5 rounded-full text-[12px] transition-colors ${
+                mobileFilter === key
+                  ? "bg-primary/10 text-primary font-medium"
+                  : "bg-surface-container-low text-on-surface-variant"
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+
         {/* Empty / no-results states */}
         {(actualEmpty || noResults) ? (
           <div className="flex flex-col items-center justify-center h-64 gap-3 text-on-surface-variant">
@@ -676,8 +764,9 @@ export default function DocumentsView({
                   : "space-y-0.5"
                 }>
                   {filteredSubfolderEntries.map(({ child, originalIdx }) => {
-                    const childPath = `${currentFolderPath}/${child.name}`;
-                    const fileCount = countFilesUnder(child, childPath);
+                    const childPath    = `${currentFolderPath}/${child.name}`;
+                    const fileCount    = countFilesUnder(child, childPath);
+                    const drawingCount = countDrawingsUnder(childPath);
 
                     if (confirmDelIdx === originalIdx) {
                       return (
@@ -744,6 +833,7 @@ export default function DocumentsView({
                         key={originalIdx}
                         node={child}
                         fileCount={fileCount}
+                        drawingCount={drawingCount}
                         viewMode={viewMode}
                         onClick={() => navigateInto(child.name)}
                         onAdd={!isProjectTeam ? () => { setAddingSubIdx(originalIdx); setNewSubVal(""); } : undefined}

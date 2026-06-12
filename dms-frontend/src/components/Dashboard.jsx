@@ -35,9 +35,16 @@ function timeAgo(iso) {
   return `${Math.floor(h / 24)}d ago`;
 }
 
+function greeting(name) {
+  const h = new Date().getHours();
+  const tod = h < 12 ? "morning" : h < 17 ? "afternoon" : "evening";
+  const firstName = (name || "").split(" ")[0] || "there";
+  return `Good ${tod}, ${firstName}`;
+}
+
 export default function Dashboard({
   totalDrawings, totalTransmittals, latestRevisions, overdueItems,
-  drawings, activeProjectId, token,
+  drawings, activeProjectId, token, userName,
 }) {
   const navigate = useNavigate();
   const [activity, setActivity]           = useState([]);
@@ -77,8 +84,9 @@ export default function Dashboard({
     <div className="space-y-6 md:space-y-8">
       {/* Page Header */}
       <div>
+        <p className="md:hidden text-[11px] text-on-surface-variant mb-0.5">{greeting(userName)}</p>
         <h2 className="font-semibold text-[22px] md:text-headline-lg text-on-surface">Project Dashboard</h2>
-        <p className="font-body-md text-on-surface-variant mt-1">Real-time status overview of project documentation and delivery.</p>
+        <p className="hidden md:block font-body-md text-on-surface-variant mt-1">Real-time status overview of project documentation and delivery.</p>
       </div>
 
       {/* Metric Cards */}
@@ -90,6 +98,11 @@ export default function Dashboard({
           sub={`${drawings.filter(d => d.status === "S3").length} for construction`}
           iconBg="bg-primary/5"
           iconColor="text-primary"
+          mobileTileBg="bg-primary/10"
+          mobileIconBg="bg-primary/20"
+          mobileIconColor="text-primary"
+          mobileValueColor="text-primary"
+          mobileLabelColor="text-primary/70"
           onClick={() => navigate("/register")}
         />
         <MetricCard
@@ -99,6 +112,11 @@ export default function Dashboard({
           sub="Sent to recipients"
           iconBg="bg-primary/5"
           iconColor="text-primary"
+          mobileTileBg="bg-status-emerald-bg"
+          mobileIconBg="bg-status-emerald-text/10"
+          mobileIconColor="text-status-emerald-text"
+          mobileValueColor="text-status-emerald-text"
+          mobileLabelColor="text-status-emerald-text/70"
           onClick={() => navigate("/transmittals")}
         />
         <MetricCard
@@ -108,6 +126,11 @@ export default function Dashboard({
           sub="Awaiting review"
           iconBg="bg-primary/5"
           iconColor="text-primary"
+          mobileTileBg="bg-status-amber-bg"
+          mobileIconBg="bg-status-amber-text/10"
+          mobileIconColor="text-status-amber-text"
+          mobileValueColor="text-status-amber-text"
+          mobileLabelColor="text-status-amber-text/70"
           onClick={() => navigate("/register", { state: { filterStat: "S2" } })}
         />
         <MetricCard
@@ -118,6 +141,11 @@ export default function Dashboard({
           badge={overdueItems > 0 ? { label: "Critical", cls: "text-status-rose-text bg-status-rose-bg" } : undefined}
           iconBg={overdueItems > 0 ? "bg-status-rose-bg" : "bg-status-emerald-bg"}
           iconColor={overdueItems > 0 ? "text-status-rose-text" : "text-status-emerald-text"}
+          mobileTileBg="bg-status-rose-bg"
+          mobileIconBg="bg-status-rose-text/10"
+          mobileIconColor="text-status-rose-text"
+          mobileValueColor="text-status-rose-text"
+          mobileLabelColor="text-status-rose-text/70"
           onClick={() => navigate("/transmittals")}
         />
       </div>
@@ -171,49 +199,82 @@ export default function Dashboard({
           )}
         </div>
 
-        {/* Activity Feed — timeline style */}
+        {/* Activity Feed — timeline style (desktop) / compact list (mobile) */}
         <div className="lg:col-span-4 bg-white border border-border-slate rounded-xl flex flex-col lg:h-[460px]">
-          <div className="p-6 border-b border-border-slate">
+          <div className="p-4 md:p-6 border-b border-border-slate">
             <h4 className="font-headline-md text-headline-md text-on-surface">Activity Feed</h4>
-            <p className="font-body-sm text-on-surface-variant">Recent project events and updates.</p>
+            <p className="hidden md:block font-body-sm text-on-surface-variant">Recent project events and updates.</p>
           </div>
-          <div className="flex-1 min-h-0 overflow-y-auto p-6 space-y-6 custom-scrollbar">
+
+          {/* Mobile compact list (hidden on md+) */}
+          <div className="md:hidden flex-1 min-h-0 divide-y divide-border-slate">
             {activityError ? (
-              <div className="flex flex-col items-center justify-center h-40 gap-3 text-on-surface-variant">
-                <span className="material-symbols-outlined text-[36px] opacity-30">wifi_off</span>
-                <p className="font-body-sm text-body-sm text-center text-status-rose-text">Could not load activity — check your connection.</p>
+              <div className="flex items-center gap-3 px-4 py-3 text-on-surface-variant">
+                <span className="material-symbols-outlined text-[18px] opacity-40">wifi_off</span>
+                <p className="text-[12px] text-status-rose-text">Could not load activity.</p>
               </div>
             ) : activity.length === 0 ? (
-              <div className="flex flex-col items-center justify-center h-40 gap-3 text-on-surface-variant">
-                <span className="material-symbols-outlined text-[36px] opacity-30">notifications_none</span>
-                <p className="font-body-sm text-body-sm text-center">Activity will appear here as you upload drawings and issue transmittals.</p>
+              <div className="flex items-center gap-3 px-4 py-3 text-on-surface-variant">
+                <span className="material-symbols-outlined text-[18px] opacity-40">notifications_none</span>
+                <p className="text-[12px]">No activity yet.</p>
               </div>
             ) : (
-              activity.map((item, i) => {
+              activity.slice(0, 4).map((item) => {
                 const meta = ACTIVITY_ICONS[item.type] || ACTIVITY_ICONS.upload;
-                const isLast = i === activity.length - 1;
                 return (
-                  <div key={item.id} className="flex gap-4 relative">
-                    {!isLast && (
-                      <div className="absolute left-4 top-8 bottom-0 w-px bg-border-slate -mb-6" />
-                    )}
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 z-10 ${meta.bgCls}`}>
-                      <span className={`material-symbols-outlined text-[18px] ${meta.textCls}`}>{meta.icon}</span>
+                  <div key={item.id} className="flex items-center gap-3 px-4 py-2.5">
+                    <div className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 ${meta.bgCls}`}>
+                      <span className={`material-symbols-outlined text-[14px] ${meta.textCls}`}>{meta.icon}</span>
                     </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="font-body-md text-on-surface text-[13px] leading-snug break-words">{item.title}</p>
-                      {item.detail && (
-                        <p className="font-label-sm text-[11px] text-on-surface-variant mt-1 break-words">{item.detail} · {timeAgo(item.created_at)}</p>
-                      )}
-                      {!item.detail && (
-                        <p className="font-label-sm text-[11px] text-on-surface-variant mt-1">{timeAgo(item.created_at)}</p>
-                      )}
-                    </div>
+                    <p className="flex-1 text-[12px] text-on-surface truncate">{item.title}</p>
+                    <span className="text-[11px] text-on-surface-variant shrink-0">{timeAgo(item.created_at)}</span>
                   </div>
                 );
               })
             )}
           </div>
+
+          {/* Desktop timeline list (hidden below md) */}
+          <div className="hidden md:flex flex-col flex-1 min-h-0">
+            <div className="flex-1 min-h-0 overflow-y-auto p-6 space-y-6 custom-scrollbar">
+              {activityError ? (
+                <div className="flex flex-col items-center justify-center h-40 gap-3 text-on-surface-variant">
+                  <span className="material-symbols-outlined text-[36px] opacity-30">wifi_off</span>
+                  <p className="font-body-sm text-body-sm text-center text-status-rose-text">Could not load activity — check your connection.</p>
+                </div>
+              ) : activity.length === 0 ? (
+                <div className="flex flex-col items-center justify-center h-40 gap-3 text-on-surface-variant">
+                  <span className="material-symbols-outlined text-[36px] opacity-30">notifications_none</span>
+                  <p className="font-body-sm text-body-sm text-center">Activity will appear here as you upload drawings and issue transmittals.</p>
+                </div>
+              ) : (
+                activity.map((item, i) => {
+                  const meta = ACTIVITY_ICONS[item.type] || ACTIVITY_ICONS.upload;
+                  const isLast = i === activity.length - 1;
+                  return (
+                    <div key={item.id} className="flex gap-4 relative">
+                      {!isLast && (
+                        <div className="absolute left-4 top-8 bottom-0 w-px bg-border-slate -mb-6" />
+                      )}
+                      <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 z-10 ${meta.bgCls}`}>
+                        <span className={`material-symbols-outlined text-[18px] ${meta.textCls}`}>{meta.icon}</span>
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="font-body-md text-on-surface text-[13px] leading-snug break-words">{item.title}</p>
+                        {item.detail && (
+                          <p className="font-label-sm text-[11px] text-on-surface-variant mt-1 break-words">{item.detail} · {timeAgo(item.created_at)}</p>
+                        )}
+                        {!item.detail && (
+                          <p className="font-label-sm text-[11px] text-on-surface-variant mt-1">{timeAgo(item.created_at)}</p>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </div>
+
           <div className="px-6 py-3 border-t border-border-slate shrink-0">
             <button
               onClick={() => navigate("/register")}
@@ -275,27 +336,30 @@ export default function Dashboard({
   );
 }
 
-function MetricCard({ icon, badge, title, value, sub, iconBg, iconColor, onClick }) {
+function MetricCard({
+  icon, badge, title, value, sub, iconBg, iconColor, onClick,
+  mobileTileBg, mobileIconBg, mobileIconColor, mobileValueColor, mobileLabelColor,
+}) {
   return (
     <div
-      className={`bg-white border border-border-slate p-3.5 md:p-5 rounded-xl hover:shadow-md transition-shadow flex flex-col md:flex-row items-start gap-2.5 md:gap-4 ${onClick ? "cursor-pointer" : ""}`}
+      className={`${mobileTileBg || "bg-white"} md:bg-white border border-border-slate p-3.5 md:p-5 rounded-xl hover:shadow-md transition-shadow flex flex-col md:flex-row items-start gap-2.5 md:gap-4 ${onClick ? "cursor-pointer" : ""}`}
       onClick={onClick}
       role={onClick ? "button" : undefined}
       tabIndex={onClick ? 0 : undefined}
       onKeyDown={onClick ? (e) => { if (e.key === "Enter" || e.key === " ") onClick(); } : undefined}
     >
-      <div className={`p-2 md:p-2.5 rounded-lg shrink-0 ${iconBg} ${iconColor}`}>
+      <div className={`p-2 md:p-2.5 rounded-lg shrink-0 ${mobileIconBg || iconBg} md:${iconBg} ${mobileIconColor || iconColor} md:${iconColor}`}>
         <span className="material-symbols-outlined text-[18px] md:text-[22px]" style={{ fontVariationSettings: "'FILL' 0" }}>{icon}</span>
       </div>
       <div className="min-w-0">
-        <p className="font-label-sm text-[10px] md:text-[11px] text-on-surface-variant uppercase tracking-wider truncate">{title}</p>
+        <p className={`font-label-sm text-[10px] md:text-[11px] ${mobileLabelColor || "text-on-surface-variant"} md:text-on-surface-variant uppercase tracking-wider truncate`}>{title}</p>
         <div className="flex items-center gap-2 mt-0.5">
-          <h3 className="font-headline-md text-headline-md text-on-surface font-bold">{value}</h3>
+          <h3 className={`font-headline-md text-headline-md ${mobileValueColor || "text-on-surface"} md:text-on-surface font-bold`}>{value}</h3>
           {badge && (
             <span className={`px-2 py-0.5 rounded-full font-label-sm text-[10px] ${badge.cls}`}>{badge.label}</span>
           )}
         </div>
-        {sub && <p className="font-body-sm text-[11px] text-on-surface-variant mt-0.5 truncate">{sub}</p>}
+        {sub && <p className={`font-body-sm text-[11px] ${mobileLabelColor || "text-on-surface-variant"} md:text-on-surface-variant mt-0.5 truncate`}>{sub}</p>}
       </div>
     </div>
   );

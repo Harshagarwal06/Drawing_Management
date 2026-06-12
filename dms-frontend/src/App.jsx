@@ -332,6 +332,7 @@ export default function App() {
                   drawings={drawings}
                   activeProjectId={activeProject?.id}
                   token={currentUser?.token}
+                  userName={currentUser?.name}
                 />
               ) : <Navigate to="/documents" replace />
             } />
