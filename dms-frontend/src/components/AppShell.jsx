@@ -1,6 +1,8 @@
 import { Outlet, useLocation } from "react-router-dom";
 import ErrorBoundary from "./ErrorBoundary";
 import Sidebar from "./Sidebar";
+import BottomNav from "./BottomNav";
+import PullToRefresh from "./PullToRefresh";
 import ProjectSelector from "./ProjectSelector";
 
 export default function AppShell({
@@ -16,6 +18,7 @@ export default function AppShell({
   onNewDrawing,
   onProjectChange,
   onNewProject,
+  onRefresh,
 }) {
   const { pathname } = useLocation();
   const isDocuments  = pathname === "/documents";
@@ -109,12 +112,17 @@ export default function AppShell({
         </header>
 
         {/* ── Page content rendered by child route ── */}
-        <main className="flex-1 p-4 md:p-[40px] overflow-x-hidden">
-          <ErrorBoundary>
-            <Outlet />
-          </ErrorBoundary>
+        {/* pb-24 clears the mobile bottom nav; desktop resets to 40px */}
+        <main className="flex-1 p-4 pb-24 md:p-[40px] md:pb-[40px] overflow-x-hidden">
+          <PullToRefresh onRefresh={onRefresh}>
+            <ErrorBoundary>
+              <Outlet />
+            </ErrorBoundary>
+          </PullToRefresh>
         </main>
       </div>
+
+      <BottomNav isDirector={isDirector} />
     </div>
   );
 }

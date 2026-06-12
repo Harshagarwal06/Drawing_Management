@@ -571,7 +571,7 @@ export default function DocumentsView({
             <div className="flex items-center bg-surface-container-low border border-border-slate rounded-lg p-0.5 shrink-0">
               <button
                 onClick={() => setViewMode("grid")}
-                className={`p-1.5 rounded-md transition-colors ${viewMode === "grid" ? "bg-white shadow-sm text-primary" : "text-on-surface-variant hover:text-on-surface"}`}
+                className={`p-2 md:p-1.5 rounded-md transition-colors ${viewMode === "grid" ? "bg-white shadow-sm text-primary" : "text-on-surface-variant hover:text-on-surface"}`}
                 title="Grid view"
                 aria-label="Grid view"
               >
@@ -579,7 +579,7 @@ export default function DocumentsView({
               </button>
               <button
                 onClick={() => setViewMode("list")}
-                className={`p-1.5 rounded-md transition-colors ${viewMode === "list" ? "bg-white shadow-sm text-primary" : "text-on-surface-variant hover:text-on-surface"}`}
+                className={`p-2 md:p-1.5 rounded-md transition-colors ${viewMode === "list" ? "bg-white shadow-sm text-primary" : "text-on-surface-variant hover:text-on-surface"}`}
                 title="List view"
                 aria-label="List view"
               >
@@ -610,6 +610,17 @@ export default function DocumentsView({
             )}
           </div>
         </div>
+
+        {/* Floating upload button — mobile only, uploads into the open folder */}
+        {onUpload && (
+          <button
+            onClick={() => onUpload(currentFolderPath)}
+            className="md:hidden fixed bottom-20 right-5 z-40 w-14 h-14 rounded-full bg-primary text-white shadow-lg shadow-primary/30 flex items-center justify-center active:scale-95 transition-transform"
+            aria-label="Upload here"
+          >
+            <Upload size={22} />
+          </button>
+        )}
 
         {/* Folder summary line */}
         <div className="px-5 py-2 border-b border-border-slate bg-surface-container-low">

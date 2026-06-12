@@ -263,6 +263,25 @@ export default function App() {
     setDrawings(await fetchDrawings(activeProject.id, currentUser.token));
   };
 
+  /* ── Pull-to-refresh (mobile) — re-fetch everything for the active project ── */
+  const handleRefresh = async () => {
+    if (!currentUser) return;
+    try {
+      const [p, d, t] = await Promise.all([
+        fetchProjects(currentUser.token),
+        activeProject ? fetchDrawings(activeProject.id, currentUser.token) : [],
+        activeProject ? fetchTransmittals(activeProject.id, currentUser.token) : [],
+      ]);
+      setProjects(p);
+      // Recover from a failed bootstrap (e.g. fetch during Wi-Fi wake-up):
+      // adopting a project triggers the drawings/transmittals effect.
+      if (!activeProject && p.length > 0) { setActiveProject(p[0]); return; }
+      if (activeProject) { setDrawings(d); setTransmittals(t); }
+    } catch (err) {
+      if (err.status === 401) handleUnauthorized();
+    }
+  };
+
   /* ── Shared shell props ── */
   const shellProps = {
     currentUser,
@@ -277,6 +296,7 @@ export default function App() {
     onNewDrawing: () => { setModalFolder(""); setShowModal(true); },
     onProjectChange: setActiveProject,
     onNewProject: () => setShowProjectModal(true),
+    onRefresh: handleRefresh,
   };
 
   /* ── Block render until we know if user is logged in ── */
