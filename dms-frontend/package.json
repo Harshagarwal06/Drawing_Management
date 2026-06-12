@@ -11,7 +11,9 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "ios:sync": "vite build && cap sync ios",
-    "ios:open": "cap open ios"
+    "ios:open": "cap open ios",
+    "android:sync": "vite build && cap sync android",
+    "android:open": "cap open android"
   },
   "dependencies": {
     "@capacitor/browser": "^6.0.6",
@@ -24,6 +26,7 @@
     "react-router-dom": "^7.15.1"
   },
   "devDependencies": {
+    "@capacitor/android": "^6.2.1",
     "@capacitor/cli": "^6.2.1",
     "@capacitor/ios": "^6.2.1",
     "@eslint/js": "^10.0.1",
