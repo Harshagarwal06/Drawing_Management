@@ -152,9 +152,11 @@ const isProjectTeam = activeRole === "Project Team";
 ### Transmittals
 | Method | Endpoint | Auth | Description |
 |--------|----------|------|-------------|
-| `GET`  | `/api/transmittals` | Project access | All transmittals for project |
-| `POST` | `/api/transmittals` | Write access | Create transmittal (auto-numbers TRN-NNN, sends email async) |
+| `GET`  | `/api/transmittals` | Project access | All transmittals for project (each includes `acks: [{name, email, ackedAt, ackUrl}]`) |
+| `POST` | `/api/transmittals` | Write access | Create transmittal (auto-numbers TRN-NNN, creates ack tokens per recipient, sends email async) |
 | `GET`  | `/api/transmittals/:id/pdf` | Token (query param) | Stream PDF cover sheet |
+| `GET`  | `/ack/:token` | Public | Branded acknowledgment page (render only — no side effects, scanner-safe) |
+| `POST` | `/ack/:token` | Public | Mark recipient acknowledgment (idempotent; fires Slack + activity_log on first ack) |
 
 ### Users
 | Method | Endpoint | Auth | Description |
@@ -180,6 +182,8 @@ drawing_revisions   (id, drawing_id, rev, title, discipline, status, originator,
                      path, uploaded_by, created_at)
 transmittals        (id, number, drawing_ids, recipients, purpose, remarks,
                      issued_at, project_id)
+transmittal_acks    (id, transmittal_id, recipient_name, recipient_email,
+                     token UNIQUE, acked_at, created_at)
 project_folder_trees (project_id PK, tree_json, updated_at)
 activity_log        (id, project_id, type, title, detail, created_at)
 ```
@@ -237,6 +241,7 @@ Each project can have its own Slack channel via an **Incoming Webhook**. Events 
 | Event | Trigger | Example message |
 |-------|---------|-----------------|
 | Transmittal issued | `POST /api/transmittals` | `📋 *TRN-014* issued — 3 drawing(s), "For Construction" · QUE-154` |
+| Transmittal acknowledged | `POST /ack/:token` | `✅ John Smith acknowledged *TRN-014*` |
 | New revision | `POST /api/upload` (existing drawing) | `⚠️ *A-101* updated to Rev C · QUE-154` |
 | New drawing | `POST /api/upload` (new drawing) | `📄 *A-205* registered (Rev A) · QUE-154` |
 
@@ -338,6 +343,7 @@ SMTP_PORT
 SMTP_USER
 SMTP_PASS
 SMTP_FROM
+PUBLIC_BASE_URL      # Optional — Railway URL used in transmittal ack links (falls back to request host)
 ```
 
 ### Vercel (frontend)
