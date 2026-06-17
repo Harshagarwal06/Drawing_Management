@@ -61,6 +61,15 @@ export default function AppShell({
           {/* Spacer — page-level views provide their own scoped search */}
           <div className="flex-1" />
 
+          {/* Project chip — mobile only (desktop shows it in the utility row;
+              /documents has its own workspace bar so skip it there) */}
+          {!isDocuments && activeProject && (
+            <span className="md:hidden inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-full bg-surface-container-low border border-outline-variant shrink-0">
+              <span className="w-[7px] h-[7px] rounded-full bg-primary shrink-0" />
+              <span className="font-mono text-[11px] font-bold text-primary leading-none">{activeProject?.code ?? "—"}</span>
+            </span>
+          )}
+
           {/* Utility icons */}
           <div className="flex items-center gap-1 shrink-0">
 
