@@ -18,7 +18,6 @@ export default function AppShell({
   setMobileNavOpen,
   onProjectChange,
   onNewProject,
-  onNewDrawing,
   onNewTransmittal,
   onRefresh,
 }) {
@@ -35,11 +34,10 @@ export default function AppShell({
   };
   const mobileTitle = MOBILE_TITLES[pathname] ?? "";
 
-  /* Contextual extended FAB per route (Documents has its own in-view FAB). */
+  /* Contextual extended FAB — only "New Transmittal" on the Issue screen.
+     (Upload is reached from the Documents toolbar; no floating upload button.) */
   const FAB_BY_ROUTE = {
-    "/dashboard":    { icon: "upload", label: "Upload",          onClick: onNewDrawing },
-    "/register":     { icon: "upload", label: "Upload",          onClick: onNewDrawing },
-    "/transmittals": { icon: "add",    label: "New Transmittal", onClick: onNewTransmittal },
+    "/transmittals": { icon: "add", label: "New Transmittal", onClick: onNewTransmittal },
   };
   const fab = !isRestricted ? FAB_BY_ROUTE[pathname] : undefined;
 
@@ -208,12 +206,6 @@ function MobileTopBar({ title, activeProject, projects, onProjectChange, onMenu,
         {/* Search (visual) */}
         <button aria-label="Search" className="w-11 h-11 grid place-items-center rounded-full text-on-surface-variant active:bg-black/5 shrink-0">
           <span className="material-symbols-outlined text-[24px]">search</span>
-        </button>
-
-        {/* Notifications (visual) */}
-        <button aria-label="Notifications" className="relative w-11 h-11 grid place-items-center rounded-full text-on-surface-variant active:bg-black/5 shrink-0">
-          <span className="material-symbols-outlined text-[23px]">notifications</span>
-          <span className="absolute top-[9px] right-[10px] w-2 h-2 rounded-full border-[1.5px] border-surface" style={{ background: "#f43f5e" }} />
         </button>
 
         {/* Avatar / account */}

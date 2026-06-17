@@ -677,17 +677,6 @@ export default function DocumentsView({
           </div>
         </div>
 
-        {/* Floating upload button — mobile only, uploads into the open folder */}
-        {onUpload && (
-          <button
-            onClick={() => onUpload(currentFolderPath)}
-            className="md:hidden fixed bottom-20 right-5 z-40 w-14 h-14 rounded-full bg-primary text-white shadow-lg shadow-primary/30 flex items-center justify-center active:scale-95 transition-transform"
-            aria-label="Upload here"
-          >
-            <Upload size={22} />
-          </button>
-        )}
-
         {/* Folder summary line */}
         <div className="px-5 py-2 border-b border-border-slate bg-surface-container-low">
           <p className="text-[11px] text-on-surface-variant">
