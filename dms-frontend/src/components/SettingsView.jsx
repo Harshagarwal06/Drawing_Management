@@ -517,13 +517,13 @@ export default function SettingsView({ currentUser, token }) {
 
                         {/* Name + username */}
                         <div className="flex-1 min-w-0">
-                          <p className="text-[13px] font-medium text-on-surface leading-tight flex items-center gap-2">
-                            {u.name}
+                          <p className="text-[13px] font-medium text-on-surface leading-tight flex items-center gap-2 min-w-0">
+                            <span className="truncate">{u.name}</span>
                             {isDeactivated && (
-                              <span className="px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-status-rose-bg text-status-rose-text uppercase tracking-wide">Deactivated</span>
+                              <span className="shrink-0 px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-status-rose-bg text-status-rose-text uppercase tracking-wide">Deactivated</span>
                             )}
                           </p>
-                          <p className="text-[11px] text-on-surface-variant">@{u.username}</p>
+                          <p className="text-[11px] text-on-surface-variant truncate">@{u.username}</p>
                         </div>
 
                         {/* Role dropdown */}
@@ -567,8 +567,8 @@ export default function SettingsView({ currentUser, token }) {
                             </button>
                           )
                         )}
-                        {/* Spacer keeps columns aligned for Director / self rows */}
-                        {(!isNonDirector || isSelf) && <div className="w-[80px] shrink-0" />}
+                        {/* Spacer keeps columns aligned for Director / self rows — desktop only */}
+                        {(!isNonDirector || isSelf) && <div className="hidden sm:block w-[80px] shrink-0" />}
 
                         {/* ⋮ button */}
                         <button
