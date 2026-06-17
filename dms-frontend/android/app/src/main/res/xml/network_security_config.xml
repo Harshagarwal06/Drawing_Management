@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Production is HTTPS-only. Cleartext http is permitted ONLY for local
+  development backends (emulator host 10.0.2.2, localhost, and the common
+  private-LAN ranges for physical-device testing). Everything else — including
+  the Railway production API — must use HTTPS.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="false" />
+
+    <domain-config cleartextTrafficPermitted="true">
+        <!-- Android matches exact hosts here, not CIDR ranges. 10.0.2.2 is how
+             the emulator reaches the host machine. For physical-device testing
+             against a LAN backend, add your machine's IP, e.g.
+             <domain includeSubdomains="true">192.168.1.42</domain> -->
+        <domain includeSubdomains="true">10.0.2.2</domain>
+        <domain includeSubdomains="true">localhost</domain>
+        <domain includeSubdomains="true">127.0.0.1</domain>
+    </domain-config>
+</network-security-config>

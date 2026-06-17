@@ -1,9 +1,40 @@
 import { Capacitor } from "@capacitor/core";
+import { App } from "@capacitor/app";
 import { Browser } from "@capacitor/browser";
 import { Filesystem, Directory } from "@capacitor/filesystem";
 import { Share } from "@capacitor/share";
 
 export const isNative = () => Capacitor.isNativePlatform();
+
+/* Register Android/iOS lifecycle listeners. No-op on web.
+   - back button: navigate back through history, exit the app at the root
+   - resume: let the caller re-validate the session (token may have expired
+     while the app was backgrounded)
+   Returns an async cleanup function that removes the listeners. */
+export function registerAppListeners({ onResume } = {}) {
+  if (!isNative()) return () => {};
+
+  const handles = [];
+
+  handles.push(
+    App.addListener("backButton", ({ canGoBack }) => {
+      if (canGoBack && window.history.length > 1) window.history.back();
+      else App.exitApp();
+    }),
+  );
+
+  if (onResume) {
+    handles.push(
+      App.addListener("appStateChange", ({ isActive }) => {
+        if (isActive) onResume();
+      }),
+    );
+  }
+
+  return async () => {
+    for (const h of handles) (await h).remove();
+  };
+}
 
 /* Open a file/URL — new tab on web, SFSafariViewController on iOS */
 export function openExternal(url) {

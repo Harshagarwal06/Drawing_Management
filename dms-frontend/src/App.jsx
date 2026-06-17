@@ -15,6 +15,8 @@ import TransmittalModal  from "./components/TransmittalModal";
 import ProjectModal      from "./components/ProjectModal";
 import Toast             from "./components/Toast";
 
+import { registerAppListeners } from "./utils/native";
+
 import { OVERDUE_PURPOSES, MS_30_DAYS, MEP_SUBTYPES } from "./constants";
 
 const API      = import.meta.env.VITE_API_URL;
@@ -124,6 +126,28 @@ export default function App() {
   /* Effect-event wrapper so data-fetch effects always see the latest handler
      without re-running when it changes identity. */
   const onAuthError = useEffectEvent(handleUnauthorized);
+
+  /* ── Native (Capacitor) lifecycle ──
+     Re-validate the stored session when the app returns to the foreground;
+     loadStoredUser() returns null once the JWT has expired. */
+  const onResume = useEffectEvent(() => {
+    if (currentUser && !loadStoredUser()) handleUnauthorized();
+  });
+
+  /* Hardware back button + app-resume token check (native) and an
+     online/offline toast (all platforms). Registered once. */
+  useEffect(() => {
+    const cleanup  = registerAppListeners({ onResume });
+    const goOffline = () => setToast({ msg: "You're offline — changes may not save.", type: "error" });
+    const goOnline  = () => setToast({ msg: "Back online.", type: "success" });
+    window.addEventListener("offline", goOffline);
+    window.addEventListener("online",  goOnline);
+    return () => {
+      cleanup();
+      window.removeEventListener("offline", goOffline);
+      window.removeEventListener("online",  goOnline);
+    };
+  }, []);
 
   /* ── Bootstrap projects ── */
   useEffect(() => {
