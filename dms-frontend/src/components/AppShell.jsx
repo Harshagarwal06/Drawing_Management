@@ -1,3 +1,4 @@
+import { useState, useRef, useEffect } from "react";
 import { Outlet, useLocation } from "react-router-dom";
 import ErrorBoundary from "./ErrorBoundary";
 import Sidebar from "./Sidebar";
@@ -62,12 +63,15 @@ export default function AppShell({
           <div className="flex-1" />
 
           {/* Project chip — mobile only (desktop shows it in the utility row;
-              /documents has its own workspace bar so skip it there) */}
+              /documents has its own workspace bar so skip it there). Tappable
+              to switch projects when the user has more than one. */}
           {!isDocuments && activeProject && (
-            <span className="md:hidden inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-full bg-surface-container-low border border-outline-variant shrink-0">
-              <span className="w-[7px] h-[7px] rounded-full bg-primary shrink-0" />
-              <span className="font-mono text-[11px] font-bold text-primary leading-none">{activeProject?.code ?? "—"}</span>
-            </span>
+            <MobileProjectChip
+              projects={projects}
+              activeProject={activeProject}
+              onProjectChange={onProjectChange}
+              canSwitch={!isProjectTeam && projects.length > 1}
+            />
           )}
 
           {/* Utility icons */}
@@ -130,6 +134,76 @@ export default function AppShell({
       </div>
 
       <BottomNav isDirector={isDirector} />
+    </div>
+  );
+}
+
+/* Mobile top-bar project chip. Static when there's nothing to switch to;
+   tappable (opens a project dropdown) when the user has more than one project.
+   Gives project switching on the dashboard and every other mobile screen,
+   mirroring the desktop ProjectSelector and the Documents workspace bar. */
+const PROJECT_DOTS = ["#3525cd", "#2563eb", "#059669", "#d97706", "#9333ea"];
+
+function MobileProjectChip({ projects, activeProject, onProjectChange, canSwitch }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+
+  useEffect(() => {
+    const close = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    document.addEventListener("mousedown", close);
+    return () => document.removeEventListener("mousedown", close);
+  }, []);
+
+  const chip = (
+    <span className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-full bg-surface-container-low border border-outline-variant shrink-0">
+      <span className="w-[7px] h-[7px] rounded-full bg-primary shrink-0" />
+      <span className="font-mono text-[11px] font-bold text-primary leading-none">{activeProject?.code ?? "—"}</span>
+      {canSwitch && (
+        <span className={`material-symbols-outlined text-[14px] text-on-surface-variant transition-transform duration-200 ${open ? "rotate-180" : ""}`}>
+          expand_more
+        </span>
+      )}
+    </span>
+  );
+
+  if (!canSwitch) return <div className="md:hidden">{chip}</div>;
+
+  return (
+    <div className="relative md:hidden shrink-0" ref={ref}>
+      <button onClick={() => setOpen(o => !o)} aria-label="Switch project" className="focus:outline-none">
+        {chip}
+      </button>
+
+      {open && (
+        <div className="absolute right-0 top-full mt-2 w-[min(16rem,calc(100vw-2rem))] bg-surface border border-outline-variant rounded-xl shadow-card-lg z-[60] overflow-hidden">
+          <div className="px-4 pt-3 pb-2 border-b border-border-slate">
+            <p className="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest">Switch Project</p>
+          </div>
+          <div className="py-1 max-h-60 overflow-y-auto custom-scrollbar">
+            {projects.map((p, idx) => {
+              const isActive = p.id === activeProject?.id;
+              return (
+                <button
+                  key={p.id}
+                  onClick={() => { onProjectChange(p); setOpen(false); }}
+                  className={`w-full flex items-center gap-3 px-4 py-3 text-left transition-colors ${
+                    isActive ? "bg-primary/10" : "hover:bg-surface-container-low"
+                  }`}
+                >
+                  <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: PROJECT_DOTS[idx % PROJECT_DOTS.length] }} />
+                  <div className="flex-1 min-w-0">
+                    <p className={`font-mono text-[12px] font-bold leading-tight ${isActive ? "text-primary" : "text-on-surface"}`}>{p.code}</p>
+                    <p className="text-[11px] text-on-surface-variant truncate mt-0.5">{p.name?.split("—")[1]?.trim() ?? p.name}</p>
+                  </div>
+                  {isActive && (
+                    <span className="material-symbols-outlined text-[16px] text-primary shrink-0">check_circle</span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
