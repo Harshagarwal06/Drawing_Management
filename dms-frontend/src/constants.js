@@ -60,10 +60,10 @@ export const MOCK_TRANSMITTALS = [
 ];
 
 export const STATUS_META = {
-  S1:   { label: "S1 – For Information",  bg: "bg-blue-100",    text: "text-blue-700",   dot: "bg-blue-400"    },
-  S2:   { label: "S2 – For Approval",     bg: "bg-amber-100",   text: "text-amber-700",  dot: "bg-amber-400"   },
-  S3:   { label: "S3 – For Construction", bg: "bg-emerald-100", text: "text-emerald-700",dot: "bg-emerald-500" },
-  VOID: { label: "Void",                  bg: "bg-red-100",     text: "text-red-600",    dot: "bg-red-400"     },
+  S1:   { label: "S1 – For Information",  bg: "bg-[#eff6ff]",          text: "text-[#2563eb]",            dot: "bg-[#3b82f6]" },
+  S2:   { label: "S2 – For Approval",     bg: "bg-status-amber-bg",    text: "text-status-amber-text",    dot: "bg-[#f59e0b]" },
+  S3:   { label: "S3 – For Construction", bg: "bg-status-emerald-bg",  text: "text-status-emerald-text",  dot: "bg-[#10b981]" },
+  VOID: { label: "Void",                  bg: "bg-status-rose-bg",     text: "text-status-rose-text",     dot: "bg-[#f43f5e]" },
 };
 
 export const DISCIPLINE_COLORS = {

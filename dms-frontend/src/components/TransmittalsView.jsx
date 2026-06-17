@@ -62,8 +62,8 @@ export default function TransmittalsView({ transmittals = [], drawings = [], loa
 
   return (
     <div className="flex flex-col gap-6 max-w-full mx-auto w-full">
-      {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+      {/* Header — desktop only (mobile shows the title in the app bar) */}
+      <div className="hidden md:flex flex-col md:flex-row md:items-end justify-between gap-4">
         <div>
           <h2 className="font-headline-lg text-headline-lg font-bold text-on-surface tracking-tight mb-1">Transmittals</h2>
           <p className="font-body-md text-body-md text-on-surface-variant max-w-2xl">All issued document transmittals for this project.</p>
@@ -88,7 +88,12 @@ export default function TransmittalsView({ transmittals = [], drawings = [], loa
           <p className="font-body-md text-body-md text-on-surface-variant">No transmittals issued yet.</p>
         </div>
       ) : (
-        <div className="flex flex-col gap-3">
+        <>
+        {/* ── Mobile (Material 3) transmittals ── */}
+        <MobileTransmittals transmittals={transmittals} drawingMap={drawingMap} token={token} />
+
+        {/* ── Desktop transmittals ── */}
+        <div className="hidden md:flex flex-col gap-3">
           {transmittals.map(t => {
             const colors = PURPOSE_COLOR[t.purpose] || { dot: "bg-outline", text: "text-on-surface-variant", bg: "bg-surface-container border-outline-variant" };
             const allDrawings  = (t.drawingIds || []).map(id => drawingMap[id]).filter(Boolean);
@@ -215,7 +220,77 @@ export default function TransmittalsView({ transmittals = [], drawings = [], loa
             );
           })}
         </div>
+        </>
       )}
+    </div>
+  );
+}
+
+/* ── Mobile (Material 3) transmittals list ── */
+function MobileTransmittals({ transmittals, drawingMap, token }) {
+  return (
+    <div className="md:hidden flex flex-col gap-3">
+      {transmittals.map(t => {
+        const dr = (t.drawingIds || []).map(id => drawingMap[id]).filter(Boolean);
+        const acks = t.acks || [];
+        const ackedCount = acks.filter(a => a.ackedAt).length;
+        const total = acks.length;
+        const allAcked = total > 0 && ackedCount === total;
+        const recipients = t.recipients || [];
+        const dot = PURPOSE_COLOR[t.purpose]?.dot || "bg-outline";
+        return (
+          <div key={t.id} className="bg-surface rounded-[20px] shadow-card overflow-hidden">
+            {/* Header */}
+            <div className="flex items-center gap-2.5 p-[14px] border-b border-surface-container">
+              <span className="w-10 h-10 rounded-xl bg-primary-fixed text-primary grid place-items-center shrink-0">
+                <span className="material-symbols-outlined text-[20px]" style={{ fontVariationSettings: "'FILL' 1" }}>outgoing_mail</span>
+              </span>
+              <div className="flex-1 min-w-0">
+                <div className="font-mono font-bold text-[14px] text-on-surface">{t.number}</div>
+                <div className="inline-flex items-center gap-1.5 text-[11px] text-on-surface-variant mt-px">
+                  <span className={`w-1.5 h-1.5 rounded-full ${dot}`} />{t.purpose}
+                </div>
+              </div>
+              {total > 0 ? (
+                <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold shrink-0 ${allAcked ? "bg-status-emerald-bg text-status-emerald-text" : "bg-status-amber-bg text-status-amber-text"}`}>
+                  <span className={`w-1.5 h-1.5 rounded-full ${allAcked ? "bg-[#10b981]" : "bg-[#f59e0b]"}`} />{ackedCount}/{total}
+                </span>
+              ) : (
+                <span className="px-2.5 py-1 rounded-full text-[11px] font-semibold bg-surface-container text-on-surface-variant shrink-0">{recipients.length} rec.</span>
+              )}
+            </div>
+            {/* Body */}
+            <div className="p-[14px] flex flex-col gap-3">
+              <div className="flex flex-wrap gap-1.5">
+                {dr.length > 0
+                  ? dr.map(d => <span key={d.id} className="px-2 py-1 rounded-lg bg-surface-container font-mono text-[10.5px] text-on-surface-variant">{d.number} Rev {d.rev}</span>)
+                  : <span className="text-[11px] text-on-surface-variant">No drawings linked</span>}
+              </div>
+              <div className="flex items-center gap-2.5 pt-2.5 border-t border-surface-container">
+                <div className="flex">
+                  {recipients.slice(0, 4).map((r, i) => {
+                    const name = typeof r === "string" ? r : (r.name || "");
+                    return (
+                      <span key={i} className={`w-7 h-7 rounded-full bg-primary text-white text-[10px] font-bold grid place-items-center border-2 border-surface ${i ? "-ml-2" : ""}`}>
+                        {name.charAt(0).toUpperCase()}
+                      </span>
+                    );
+                  })}
+                </div>
+                <span className="flex-1 text-[11.5px] text-on-surface-variant truncate">
+                  {recipients.map(r => (typeof r === "string" ? r : r.name)).join(", ")}
+                </span>
+                <button
+                  onClick={() => openExternal(`${API}/api/transmittals/${t.id}/pdf?token=${token}`)}
+                  className="inline-flex items-center gap-1 text-[12px] font-semibold text-primary shrink-0"
+                >
+                  <span className="material-symbols-outlined text-[16px]">picture_as_pdf</span>PDF
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }

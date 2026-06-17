@@ -35,13 +35,6 @@ function timeAgo(iso) {
   return `${Math.floor(h / 24)}d ago`;
 }
 
-function greeting(name) {
-  const h = new Date().getHours();
-  const tod = h < 12 ? "morning" : h < 17 ? "afternoon" : "evening";
-  const firstName = (name || "").split(" ")[0] || "there";
-  return `Good ${tod}, ${firstName}`;
-}
-
 export default function Dashboard({
   totalDrawings, totalTransmittals, latestRevisions, overdueItems,
   drawings, activeProjectId, token, userName,
@@ -82,12 +75,26 @@ export default function Dashboard({
     .slice(0, 5);
 
   return (
-    <div className="space-y-6 md:space-y-8">
+    <>
+      {/* ── Mobile (Material 3) dashboard ── */}
+      <MobileDashboard
+        drawings={drawings}
+        totalDrawings={totalDrawings}
+        totalTransmittals={totalTransmittals}
+        pending={latestRevisions}
+        overdue={overdueItems}
+        activity={activity}
+        activityError={activityError}
+        userName={userName}
+        onNavigate={navigate}
+      />
+
+      {/* ── Desktop dashboard ── */}
+      <div className="hidden md:block space-y-8">
       {/* Page Header */}
       <div>
-        <p className="md:hidden text-[11px] text-on-surface-variant mb-0.5">{greeting(userName)}</p>
-        <h2 className="font-semibold text-[22px] md:text-headline-lg text-on-surface">Project Dashboard</h2>
-        <p className="hidden md:block font-body-md text-on-surface-variant mt-1">Real-time status overview of project documentation and delivery.</p>
+        <h2 className="font-semibold text-headline-lg text-on-surface">Project Dashboard</h2>
+        <p className="font-body-md text-on-surface-variant mt-1">Real-time status overview of project documentation and delivery.</p>
       </div>
 
       {/* Metric Cards */}
@@ -334,6 +341,7 @@ export default function Dashboard({
         </div>
       </div>
     </div>
+    </>
   );
 }
 
@@ -361,6 +369,119 @@ function MetricCard({
           )}
         </div>
         {sub && <p className={`font-body-sm text-[11px] ${mobileLabelColor || "text-on-surface-variant"} md:text-on-surface-variant mt-0.5 truncate`}>{sub}</p>}
+      </div>
+    </div>
+  );
+}
+
+/* ── Material 3 mobile dashboard ─────────────────────────────────────────── */
+const STATUS_DOT = {
+  S3: { color: "#10b981", label: "For Construction" },
+  S2: { color: "#f59e0b", label: "For Approval" },
+  S1: { color: "#3b82f6", label: "For Information" },
+  VOID: { color: "#f43f5e", label: "Void" },
+};
+
+function MobileKpi({ icon, label, value, sub, fg, soft, onClick }) {
+  return (
+    <button
+      onClick={onClick}
+      className="bg-surface rounded-[20px] p-4 shadow-card flex flex-col gap-3 text-left active:scale-[0.98] transition-transform"
+    >
+      <div className="flex items-center justify-between">
+        <span className="w-[38px] h-[38px] rounded-xl grid place-items-center" style={{ background: soft, color: fg }}>
+          <span className="material-symbols-outlined text-[21px]">{icon}</span>
+        </span>
+        {sub && <span className="text-[11px] font-semibold text-on-surface-variant">{sub}</span>}
+      </div>
+      <div>
+        <div className="text-[28px] font-bold text-on-surface leading-none tracking-[-0.02em]">{value}</div>
+        <div className="text-[12.5px] text-on-surface-variant mt-[3px]">{label}</div>
+      </div>
+    </button>
+  );
+}
+
+function MobileDashboard({ drawings, totalDrawings, totalTransmittals, pending, overdue, activity, activityError, userName, onNavigate }) {
+  const h = new Date().getHours();
+  const tod = h < 12 ? "morning" : h < 17 ? "afternoon" : "evening";
+  const firstName = (userName || "").split(" ")[0] || "there";
+
+  const counts = { S1: 0, S2: 0, S3: 0, VOID: 0 };
+  drawings.forEach((d) => { if (counts[d.status] !== undefined) counts[d.status]++; });
+  const s3 = counts.S3;
+
+  return (
+    <div className="md:hidden flex flex-col gap-5">
+      {/* Greeting */}
+      <div>
+        <div className="text-[13px] text-on-surface-variant">Good {tod},</div>
+        <div className="text-[24px] font-bold text-on-surface tracking-[-0.01em]">{firstName}</div>
+      </div>
+
+      {/* KPI grid */}
+      <div className="grid grid-cols-2 gap-3">
+        <MobileKpi icon="architecture"    label="Total Drawings"   value={totalDrawings}    sub={`${s3} S3`}            fg="#3525cd" soft="rgba(53,37,205,0.10)" onClick={() => onNavigate("/register")} />
+        <MobileKpi icon="move_to_inbox"   label="Transmittals"     value={totalTransmittals} sub="issued"               fg="#059669" soft="#ecfdf5"               onClick={() => onNavigate("/transmittals")} />
+        <MobileKpi icon="pending_actions" label="Pending Approval" value={pending}          sub="awaiting"             fg="#d97706" soft="#fffbeb"               onClick={() => onNavigate("/register", { state: { filterStat: "S2" } })} />
+        <MobileKpi icon="warning"         label="Overdue Items"    value={overdue}           sub={overdue > 0 ? "critical" : "clear"} fg="#e11d48" soft="#fff1f2" onClick={() => onNavigate("/transmittals")} />
+      </div>
+
+      {/* Drawing Status */}
+      <div className="bg-surface rounded-[20px] p-[18px] shadow-card flex flex-col gap-3.5">
+        <h3 className="text-[15px] font-semibold text-on-surface">Drawing Status</h3>
+        <div className="flex h-3 rounded-full overflow-hidden bg-surface-container">
+          {["S3", "S2", "S1", "VOID"].map((k) =>
+            counts[k] > 0 ? (
+              <div key={k} style={{ flexGrow: counts[k], backgroundColor: STATUS_DOT[k].color }} />
+            ) : null
+          )}
+        </div>
+        <div className="grid grid-cols-2 gap-x-3 gap-y-2">
+          {["S3", "S2", "S1", "VOID"].map((k) => (
+            <div key={k} className="flex items-center gap-2">
+              <span className="w-[9px] h-[9px] rounded-full shrink-0" style={{ backgroundColor: STATUS_DOT[k].color }} />
+              <span className="text-[12px] text-on-surface-variant flex-1 whitespace-nowrap">{STATUS_DOT[k].label}</span>
+              <span className="font-mono text-[12px] font-bold text-on-surface">{counts[k]}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Recent Activity */}
+      <div className="flex flex-col gap-3">
+        <div className="flex items-center justify-between px-0.5">
+          <h3 className="text-[15px] font-semibold text-on-surface">Recent Activity</h3>
+          <button onClick={() => onNavigate("/register")} className="text-[13px] font-semibold text-primary">See all</button>
+        </div>
+        <div className="bg-surface rounded-[20px] shadow-card overflow-hidden">
+          {activityError ? (
+            <div className="flex items-center gap-3 px-4 py-3.5 text-on-surface-variant">
+              <span className="material-symbols-outlined text-[18px] opacity-40">wifi_off</span>
+              <p className="text-[12px] text-status-rose-text">Could not load activity.</p>
+            </div>
+          ) : activity.length === 0 ? (
+            <div className="flex items-center gap-3 px-4 py-3.5 text-on-surface-variant">
+              <span className="material-symbols-outlined text-[18px] opacity-40">notifications_none</span>
+              <p className="text-[12px]">No activity yet.</p>
+            </div>
+          ) : (
+            activity.slice(0, 5).map((item, i) => {
+              const meta = ACTIVITY_ICONS[item.type] || ACTIVITY_ICONS.upload;
+              return (
+                <div key={item.id} className={`flex items-center gap-3 px-4 py-[13px] ${i < Math.min(activity.length, 5) - 1 ? "border-b border-surface-container" : ""}`}>
+                  <span className={`w-9 h-9 rounded-xl grid place-items-center shrink-0 ${meta.bgCls}`}>
+                    <span className={`material-symbols-outlined text-[19px] ${meta.textCls}`}>{meta.icon}</span>
+                  </span>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-[12.5px] text-on-surface leading-snug truncate">{item.title}</div>
+                    <div className="text-[11px] text-on-surface-variant mt-0.5 truncate">{item.detail ? `${item.detail} · ` : ""}{timeAgo(item.created_at)}</div>
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
       </div>
     </div>
   );

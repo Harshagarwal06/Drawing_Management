@@ -13,10 +13,13 @@ export default function AppShell({
   projects,
   isDirector,
   isProjectTeam,
+  isRestricted,
   mobileNavOpen,
   setMobileNavOpen,
   onProjectChange,
   onNewProject,
+  onNewDrawing,
+  onNewTransmittal,
   onRefresh,
 }) {
   const { pathname } = useLocation();
@@ -32,6 +35,14 @@ export default function AppShell({
   };
   const mobileTitle = MOBILE_TITLES[pathname] ?? "";
 
+  /* Contextual extended FAB per route (Documents has its own in-view FAB). */
+  const FAB_BY_ROUTE = {
+    "/dashboard":    { icon: "upload", label: "Upload",          onClick: onNewDrawing },
+    "/register":     { icon: "upload", label: "Upload",          onClick: onNewDrawing },
+    "/transmittals": { icon: "add",    label: "New Transmittal", onClick: onNewTransmittal },
+  };
+  const fab = !isRestricted ? FAB_BY_ROUTE[pathname] : undefined;
+
   return (
     <div className="bg-background text-on-surface font-outfit min-h-screen flex">
 
@@ -44,42 +55,30 @@ export default function AppShell({
       {/* ── Right column ── */}
       <div className="flex flex-col flex-1 min-w-0 md:ml-[280px]">
 
-        {/* ── Top App Bar ── */}
-        <header className="bg-glass-surface/80 backdrop-blur-md border-b border-border-slate sticky top-0 z-40 h-topbar-safe pt-safe flex items-center justify-between px-4 md:px-10 gap-4 md:gap-6">
+        {/* ── Mobile M3 Top App Bar ── */}
+        <MobileTopBar
+          title={mobileTitle}
+          activeProject={activeProject}
+          projects={projects}
+          onProjectChange={onProjectChange}
+          onMenu={() => setMobileNavOpen(true)}
+          onLogout={onLogout}
+          currentUser={currentUser}
+          canSwitch={!isProjectTeam && projects.length > 1}
+        />
 
-          {/* Hamburger — mobile only */}
-          <button
-            onClick={() => setMobileNavOpen(true)}
-            className="md:hidden p-2 -ml-1 text-on-surface-variant hover:bg-surface-container rounded-lg transition-colors shrink-0"
-            aria-label="Open navigation"
-          >
-            <span className="material-symbols-outlined text-[24px]">menu</span>
-          </button>
-
-          {/* Page title — mobile only; desktop views render their own headers */}
-          <h1 className="md:hidden text-[15px] font-semibold text-on-surface truncate">{mobileTitle}</h1>
+        {/* ── Desktop Top App Bar ── */}
+        <header className="hidden md:flex bg-glass-surface/80 backdrop-blur-md border-b border-border-slate sticky top-0 z-40 h-topbar-safe pt-safe items-center justify-between px-10 gap-6">
 
           {/* Spacer — page-level views provide their own scoped search */}
           <div className="flex-1" />
-
-          {/* Project chip — mobile only (desktop shows it in the utility row;
-              /documents has its own workspace bar so skip it there). Tappable
-              to switch projects when the user has more than one. */}
-          {!isDocuments && activeProject && (
-            <MobileProjectChip
-              projects={projects}
-              activeProject={activeProject}
-              onProjectChange={onProjectChange}
-              canSwitch={!isProjectTeam && projects.length > 1}
-            />
-          )}
 
           {/* Utility icons */}
           <div className="flex items-center gap-1 shrink-0">
 
             {/* Project selector — hidden on /documents (workspace bar handles it there) */}
             {!isDocuments && (
-              <div className="hidden md:flex">
+              <div className="flex">
               {(isProjectTeam || projects.length <= 1) ? (
                 <div className="flex items-center gap-3 bg-surface-container-low border border-outline-variant rounded-xl px-4 py-2.5 min-w-[200px]">
                   <span className="w-3 h-3 rounded-full shrink-0 bg-primary" />
@@ -124,7 +123,7 @@ export default function AppShell({
 
         {/* ── Page content rendered by child route ── */}
         {/* pb-24 clears the mobile bottom nav; desktop resets to 40px */}
-        <main className="flex-1 p-4 pb-24 md:p-[40px] md:pb-[40px] overflow-x-hidden">
+        <main className="flex-1 p-4 pb-24 md:p-[40px] md:pb-[40px] overflow-x-hidden bg-surface-container-low md:bg-transparent">
           <PullToRefresh onRefresh={onRefresh}>
             <ErrorBoundary>
               <Outlet />
@@ -133,49 +132,103 @@ export default function AppShell({
         </main>
       </div>
 
+      {/* Contextual extended FAB (mobile) */}
+      {fab && fab.onClick && (
+        <button
+          onClick={fab.onClick}
+          className="md:hidden fixed right-4 bottom-20 z-40 inline-flex items-center gap-2 h-[52px] px-[18px] rounded-2xl bg-primary text-white text-[14px] font-semibold shadow-[0_6px_16px_rgba(53,37,205,0.34),0_2px_4px_rgba(16,24,40,0.10)] active:scale-[0.97] active:shadow-card transition-transform"
+        >
+          <span className="material-symbols-outlined text-[20px]">{fab.icon}</span>
+          {fab.label}
+        </button>
+      )}
+
       <BottomNav isDirector={isDirector} />
     </div>
   );
 }
 
-/* Mobile top-bar project chip. Static when there's nothing to switch to;
-   tappable (opens a project dropdown) when the user has more than one project.
-   Gives project switching on the dashboard and every other mobile screen,
-   mirroring the desktop ProjectSelector and the Documents workspace bar. */
+/* Material 3 mobile top app bar: menu · two-line title (with tappable project
+   switcher) · search · notifications · avatar (account menu with Sign out).
+   Search & notifications are visual per the M3 spec — no backing feature yet. */
 const PROJECT_DOTS = ["#3525cd", "#2563eb", "#059669", "#d97706", "#9333ea"];
 
-function MobileProjectChip({ projects, activeProject, onProjectChange, canSwitch }) {
-  const [open, setOpen] = useState(false);
+function MobileTopBar({ title, activeProject, projects, onProjectChange, onMenu, onLogout, currentUser, canSwitch }) {
+  const [menu, setMenu] = useState(null); // 'project' | 'account' | null
   const ref = useRef(null);
 
   useEffect(() => {
-    const close = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    const close = (e) => { if (ref.current && !ref.current.contains(e.target)) setMenu(null); };
     document.addEventListener("mousedown", close);
     return () => document.removeEventListener("mousedown", close);
   }, []);
 
-  const chip = (
-    <span className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-full bg-surface-container-low border border-outline-variant shrink-0">
-      <span className="w-[7px] h-[7px] rounded-full bg-primary shrink-0" />
-      <span className="font-mono text-[11px] font-bold text-primary leading-none">{activeProject?.code ?? "—"}</span>
-      {canSwitch && (
-        <span className={`material-symbols-outlined text-[14px] text-on-surface-variant transition-transform duration-200 ${open ? "rotate-180" : ""}`}>
-          expand_more
-        </span>
-      )}
-    </span>
+  const shortName = activeProject?.name?.split("—")[1]?.trim() ?? activeProject?.name ?? "";
+
+  const projectLine = activeProject && (
+    <>
+      <span className="w-1.5 h-1.5 rounded-full bg-primary shrink-0" />
+      <span className="text-[11px] text-on-surface-variant truncate">
+        <span className="font-mono font-bold text-primary">{activeProject.code}</span>
+        {shortName ? ` · ${shortName}` : ""}
+      </span>
+    </>
   );
 
-  if (!canSwitch) return <div className="md:hidden">{chip}</div>;
-
   return (
-    <div className="relative md:hidden shrink-0" ref={ref}>
-      <button onClick={() => setOpen(o => !o)} aria-label="Switch project" className="focus:outline-none">
-        {chip}
-      </button>
+    <header ref={ref} className="md:hidden bg-surface border-b border-outline-variant sticky top-0 z-40 pt-safe">
+      <div className="flex items-center gap-1.5 pl-1.5 pr-2 py-2 min-h-[60px]">
+        {/* Menu */}
+        <button onClick={onMenu} aria-label="Open navigation"
+          className="w-11 h-11 grid place-items-center rounded-full text-on-surface-variant active:bg-black/5 shrink-0">
+          <span className="material-symbols-outlined text-[24px]">menu</span>
+        </button>
 
-      {open && (
-        <div className="absolute right-0 top-full mt-2 w-[min(16rem,calc(100vw-2rem))] bg-surface border border-outline-variant rounded-xl shadow-card-lg z-[60] overflow-hidden">
+        {/* Title block */}
+        <div className="flex-1 min-w-0">
+          <div className="text-[19px] font-semibold text-on-surface tracking-[-0.01em] leading-tight truncate">{title}</div>
+          {activeProject && (
+            canSwitch ? (
+              <button
+                onClick={() => setMenu(m => m === "project" ? null : "project")}
+                aria-label="Switch project"
+                className="flex items-center gap-1.5 mt-px max-w-full"
+              >
+                {projectLine}
+                <span className={`material-symbols-outlined text-[14px] text-on-surface-variant transition-transform duration-200 ${menu === "project" ? "rotate-180" : ""}`}>
+                  expand_more
+                </span>
+              </button>
+            ) : (
+              <div className="flex items-center gap-1.5 mt-px">{projectLine}</div>
+            )
+          )}
+        </div>
+
+        {/* Search (visual) */}
+        <button aria-label="Search" className="w-11 h-11 grid place-items-center rounded-full text-on-surface-variant active:bg-black/5 shrink-0">
+          <span className="material-symbols-outlined text-[24px]">search</span>
+        </button>
+
+        {/* Notifications (visual) */}
+        <button aria-label="Notifications" className="relative w-11 h-11 grid place-items-center rounded-full text-on-surface-variant active:bg-black/5 shrink-0">
+          <span className="material-symbols-outlined text-[23px]">notifications</span>
+          <span className="absolute top-[9px] right-[10px] w-2 h-2 rounded-full border-[1.5px] border-surface" style={{ background: "#f43f5e" }} />
+        </button>
+
+        {/* Avatar / account */}
+        <button
+          onClick={() => setMenu(m => m === "account" ? null : "account")}
+          title={currentUser?.name}
+          className="w-8 h-8 rounded-full bg-primary text-white text-[13px] font-bold grid place-items-center shrink-0 ml-0.5"
+        >
+          {(currentUser?.name || "?").charAt(0).toUpperCase()}
+        </button>
+      </div>
+
+      {/* Project switcher dropdown */}
+      {menu === "project" && (
+        <div className="absolute left-3 top-full mt-1 w-[min(18rem,calc(100vw-2rem))] bg-surface border border-outline-variant rounded-xl shadow-card-lg z-[60] overflow-hidden">
           <div className="px-4 pt-3 pb-2 border-b border-border-slate">
             <p className="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest">Switch Project</p>
           </div>
@@ -185,25 +238,38 @@ function MobileProjectChip({ projects, activeProject, onProjectChange, canSwitch
               return (
                 <button
                   key={p.id}
-                  onClick={() => { onProjectChange(p); setOpen(false); }}
-                  className={`w-full flex items-center gap-3 px-4 py-3 text-left transition-colors ${
-                    isActive ? "bg-primary/10" : "hover:bg-surface-container-low"
-                  }`}
+                  onClick={() => { onProjectChange(p); setMenu(null); }}
+                  className={`w-full flex items-center gap-3 px-4 py-3 text-left transition-colors ${isActive ? "bg-primary/10" : "active:bg-surface-container-low"}`}
                 >
                   <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: PROJECT_DOTS[idx % PROJECT_DOTS.length] }} />
                   <div className="flex-1 min-w-0">
                     <p className={`font-mono text-[12px] font-bold leading-tight ${isActive ? "text-primary" : "text-on-surface"}`}>{p.code}</p>
                     <p className="text-[11px] text-on-surface-variant truncate mt-0.5">{p.name?.split("—")[1]?.trim() ?? p.name}</p>
                   </div>
-                  {isActive && (
-                    <span className="material-symbols-outlined text-[16px] text-primary shrink-0">check_circle</span>
-                  )}
+                  {isActive && <span className="material-symbols-outlined text-[16px] text-primary shrink-0">check_circle</span>}
                 </button>
               );
             })}
           </div>
         </div>
       )}
-    </div>
+
+      {/* Account menu */}
+      {menu === "account" && (
+        <div className="absolute right-2 top-full mt-1 w-56 bg-surface border border-outline-variant rounded-xl shadow-card-lg z-[60] overflow-hidden">
+          <div className="px-4 py-3 border-b border-border-slate">
+            <p className="text-[13px] font-semibold text-on-surface truncate">{currentUser?.name}</p>
+            <p className="text-[11px] text-on-surface-variant truncate">{currentUser?.role}</p>
+          </div>
+          <button
+            onClick={() => { setMenu(null); onLogout(); }}
+            className="w-full flex items-center gap-2 px-4 py-3 text-left text-status-rose-text active:bg-status-rose-bg"
+          >
+            <span className="material-symbols-outlined text-[18px]">logout</span>
+            <span className="text-[13px] font-medium">Sign out</span>
+          </button>
+        </div>
+      )}
+    </header>
   );
 }

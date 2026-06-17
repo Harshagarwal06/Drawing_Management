@@ -3,8 +3,26 @@ import { useLocation } from "react-router-dom";
 import { createPortal } from "react-dom";
 import { MoreVertical, Eye, Download, Ban } from "lucide-react";
 import { isNative, openExternal, saveBlob } from "../utils/native";
+import StatusBadge from "./StatusBadge";
 
 const API = import.meta.env.VITE_API_URL;
+
+/* ── Mobile M3 helpers ── */
+const DISC_COLORS = {
+  Architecture: ["#7c3aed", "#f3e8ff"], Structure: ["#ea580c", "#ffedd5"],
+  Electrical: ["#0891b2", "#cffafe"], Plumbing: ["#0891b2", "#cffafe"], Fire: ["#0891b2", "#cffafe"], MEP: ["#0891b2", "#cffafe"],
+  Civil: ["#0d9488", "#ccfbf1"], Interior: ["#db2777", "#fce7f3"],
+};
+const discColors = (d) => DISC_COLORS[d] || ["#464555", "#f1f3f5"];
+
+const EXT_COLORS = { PDF: ["#fff1f2", "#e11d48"], DWG: ["#eff6ff", "#2563eb"], RVT: ["#f3e8ff", "#7c3aed"], IFC: ["#ecfdf5", "#059669"] };
+const extColors = (e) => EXT_COLORS[e] || ["#f1f3f5", "#464555"];
+const fileExt = (path) => { if (!path) return ""; const i = path.lastIndexOf("."); return i >= 0 ? path.slice(i + 1).toUpperCase() : ""; };
+
+const M_FILTERS = [
+  { label: "All", value: "All" }, { label: "Construction", value: "S3" },
+  { label: "Approval", value: "S2" }, { label: "Information", value: "S1" }, { label: "Void", value: "VOID" },
+];
 
 /* ── Status config ── */
 const STATUS_MAP = {
@@ -104,7 +122,19 @@ export default function MasterRegisterTable({
   };
 
   return (
-    <div className="flex flex-col gap-6">
+    <>
+      {/* ── Mobile (Material 3) register ── */}
+      <MobileRegister
+        allDrawings={allDrawings}
+        search={search}
+        filterStat={filterStat}
+        onSearch={onSearch}
+        onFilterStat={onFilterStat}
+        onView={handleView}
+      />
+
+      {/* ── Desktop register ── */}
+      <div className="hidden md:flex flex-col gap-6">
 
       {/* ── Page header ── */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -393,6 +423,92 @@ export default function MasterRegisterTable({
             </div>
           )}
         </div>
+      </div>
+      </div>
+    </>
+  );
+}
+
+/* ── Mobile (Material 3) register: search bar, filter chips, card list ── */
+function MobileRegister({ allDrawings, search, filterStat, onSearch, onFilterStat, onView }) {
+  let rows = allDrawings;
+  if (filterStat !== "All") rows = rows.filter((d) => d.status === filterStat);
+  if (search) {
+    const q = search.toLowerCase();
+    rows = rows.filter((d) => (`${d.number} ${d.title || ""}`).toLowerCase().includes(q));
+  }
+
+  return (
+    <div className="md:hidden flex flex-col gap-3">
+      {/* Sticky search + filter chips */}
+      <div className="sticky top-0 z-10 -mx-4 px-4 pt-1 pb-2 bg-surface-container-low flex flex-col gap-3">
+        <div className="flex items-center gap-2.5 h-[50px] px-4 rounded-full bg-surface-container-high">
+          <span className="material-symbols-outlined text-[22px] text-on-surface-variant">search</span>
+          <input
+            value={search}
+            onChange={(e) => onSearch?.(e.target.value)}
+            placeholder="Search drawings"
+            className="flex-1 bg-transparent outline-none text-[15px] text-on-surface placeholder:text-on-surface-variant"
+          />
+          <span className="material-symbols-outlined text-[22px] text-on-surface-variant">tune</span>
+        </div>
+        <div className="flex gap-2 overflow-x-auto scrollbar-hide -mx-4 px-4">
+          {M_FILTERS.map((f) => {
+            const on = filterStat === f.value;
+            return (
+              <button
+                key={f.value}
+                onClick={() => onFilterStat?.(f.value)}
+                className={`shrink-0 inline-flex items-center gap-1.5 h-[34px] rounded-[9px] text-[13px] font-medium transition-colors ${
+                  on ? "bg-primary-fixed text-primary pl-2.5 pr-3.5" : "border border-outline-variant text-on-surface-variant px-3.5"
+                }`}
+              >
+                {on && <span className="material-symbols-outlined text-[16px]">check</span>}
+                {f.label}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      <div className="text-[12px] text-on-surface-variant px-0.5">{rows.length} drawing{rows.length !== 1 ? "s" : ""}</div>
+
+      <div className="flex flex-col gap-2.5">
+        {rows.map((d) => {
+          const ext = fileExt(d.path);
+          const [eBg, eFg] = extColors(ext);
+          const [dFg, dBg] = discColors(d.discipline);
+          return (
+            <button
+              key={d.id}
+              onClick={() => onView(d)}
+              className="flex items-center gap-3 p-3 bg-surface rounded-2xl shadow-card text-left active:bg-primary/5 transition-colors"
+            >
+              <span className="flex flex-col items-center justify-center w-11 h-11 rounded-xl shrink-0" style={{ background: eBg, color: eFg }}>
+                <span className="material-symbols-outlined text-[18px]" style={{ fontVariationSettings: "'FILL' 1" }}>description</span>
+                {ext && <span className="font-mono text-[8px] font-bold mt-px">{ext}</span>}
+              </span>
+              <div className="flex-1 min-w-0">
+                <div className="font-mono text-[13px] font-bold text-primary truncate">{d.number}</div>
+                <div className="text-[12.5px] text-on-surface truncate mt-px">{d.title || "Untitled"}</div>
+                <div className="flex items-center gap-2 mt-[7px]">
+                  <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10.5px] font-semibold truncate max-w-[120px]" style={{ color: dFg, background: dBg }}>{d.discipline}</span>
+                  <span className="font-mono text-[10px] text-on-surface-variant shrink-0">Rev {d.rev}</span>
+                </div>
+              </div>
+              <div className="flex flex-col items-end gap-2 shrink-0">
+                <StatusBadge code={d.status} />
+                <span className="material-symbols-outlined text-[20px] text-outline">chevron_right</span>
+              </div>
+            </button>
+          );
+        })}
+        {rows.length === 0 && (
+          <div className="flex flex-col items-center gap-3 py-16 text-on-surface-variant">
+            <span className="material-symbols-outlined text-[40px] opacity-25">folder_open</span>
+            <p className="text-[13px]">No drawings match your filters.</p>
+          </div>
+        )}
       </div>
     </div>
   );

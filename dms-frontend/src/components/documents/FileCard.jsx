@@ -61,7 +61,7 @@ export default memo(function FileCard({ d, viewMode, onDelete, onEditMetadata, o
   }
 
   return (
-    <div className="bg-white border border-border-slate rounded-xl overflow-hidden hover:shadow-md transition-all duration-150 cursor-default flex flex-col">
+    <div className="bg-white border border-border-slate rounded-xl overflow-hidden shadow-card hover:shadow-card-md transition-all duration-150 cursor-default flex flex-col">
       <div className={`h-1.5 shrink-0 ${statusBar}`} />
 
       <div className="p-4 flex flex-col flex-1">

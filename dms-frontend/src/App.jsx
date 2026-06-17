@@ -325,6 +325,7 @@ export default function App() {
     mobileNavOpen,
     setMobileNavOpen,
     onNewDrawing: () => { setModalFolder(""); setShowModal(true); },
+    onNewTransmittal: () => setShowTransmittal(true),
     onProjectChange: setActiveProject,
     onNewProject: () => setShowProjectModal(true),
     onRefresh: handleRefresh,
