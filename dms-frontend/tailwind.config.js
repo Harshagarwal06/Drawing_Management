@@ -6,6 +6,7 @@ export default {
       colors: {
         "primary":                "#3525cd",
         "primary-container":      "#4f46e5",
+        "primary-fixed":          "#e0deff",
         "primary-fixed-dim":      "#c3c0ff",
         "surface":                "#ffffff",
         "surface-container-low":  "#f8f9fa",
@@ -15,6 +16,7 @@ export default {
         "on-surface-variant":     "#464555",
         "outline":                "#777587",
         "border-slate":           "#E2E8F0",
+        "outline-variant":        "#d9dce5",
         "status-emerald-bg":      "#ECFDF5",
         "status-emerald-text":    "#059669",
         "status-amber-bg":        "#FFFBEB",
@@ -60,6 +62,12 @@ export default {
       spacing: {
         "sidebar-width":  "280px",
         "margin-desktop": "40px",
+      },
+      boxShadow: {
+        /* 3-step card elevation — referenced across the app but never defined. */
+        "card":    "0 1px 2px rgba(16, 24, 40, 0.04), 0 1px 3px rgba(16, 24, 40, 0.06)",
+        "card-md": "0 4px 12px rgba(16, 24, 40, 0.06), 0 2px 4px rgba(16, 24, 40, 0.04)",
+        "card-lg": "0 8px 30px rgba(16, 24, 40, 0.08), 0 2px 6px rgba(16, 24, 40, 0.04)",
       },
     },
   },
