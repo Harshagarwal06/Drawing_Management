@@ -52,7 +52,12 @@ export default function AnalyticsView({ drawings, transmittals }) {
   const maxCount = Math.max(...months.map(m => m.count), 1);
 
   return (
-    <div className="max-w-[1400px] mx-auto space-y-8">
+    <>
+    {/* ── Mobile (Material 3) analytics ── */}
+    <MobileAnalytics drawings={drawings} transmittals={transmittals} />
+
+    {/* ── Desktop analytics ── */}
+    <div className="hidden md:block max-w-[1400px] mx-auto space-y-8">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -62,7 +67,7 @@ export default function AnalyticsView({ drawings, transmittals }) {
         {drawings.length > 0 && (
           <button
             onClick={() => exportCSV(drawings)}
-            className="flex items-center gap-1.5 px-4 py-2.5 bg-white border border-border-slate rounded-xl text-on-surface font-medium text-[13px] hover:bg-surface-container-low transition-colors shadow-sm"
+            className="flex items-center gap-1.5 px-4 py-2.5 bg-surface border border-border-slate rounded-xl text-on-surface font-medium text-[13px] hover:bg-surface-container-low transition-colors shadow-sm"
           >
             <span className="material-symbols-outlined text-[18px]">download</span>
             Export CSV
@@ -70,10 +75,22 @@ export default function AnalyticsView({ drawings, transmittals }) {
         )}
       </div>
 
-      {/* KPI row */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {Object.entries(STATUS_META).map(([code, { label, color }]) => (
-          <div key={code} className="bg-white border border-border-slate rounded-xl p-5 shadow-sm">
+      {/* KPI row — S3 hero spans 2 cols, secondary stats take 1 each */}
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+        {/* Hero: For Construction */}
+        <div className="col-span-2 lg:col-span-2 bg-surface border border-border-slate rounded-xl p-5">
+          <div className="flex items-center gap-2 mb-3">
+            <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: STATUS_META.S3.color }} />
+            <span className="font-label-sm text-[10px] text-on-surface-variant uppercase tracking-wide">{STATUS_META.S3.label}</span>
+          </div>
+          <p className="font-space-grotesk text-[52px] font-bold leading-none tracking-[-0.02em] text-on-surface">{statusCounts.S3}</p>
+          <p className="text-[12px] text-on-surface-variant mt-2">
+            {drawings.length ? `${Math.round((statusCounts.S3 / total) * 100)}%` : '—'} of total drawings
+          </p>
+        </div>
+        {/* Secondary status cards */}
+        {[['S2', STATUS_META.S2], ['S1', STATUS_META.S1], ['VOID', STATUS_META.VOID]].map(([code, { label, color }]) => (
+          <div key={code} className="bg-surface border border-border-slate rounded-xl p-5">
             <div className="flex items-center gap-2 mb-1">
               <span className="w-2 h-2 rounded-full" style={{ backgroundColor: color }} />
               <span className="font-label-sm text-[10px] text-on-surface-variant uppercase tracking-wide">{label}</span>
@@ -186,12 +203,119 @@ export default function AnalyticsView({ drawings, transmittals }) {
         )}
       </Card>
     </div>
+    </>
+  );
+}
+
+/* ── Mobile (Material 3) analytics: compliance ring, discipline bars, status grid ── */
+const M_DISC = {
+  Architecture: ["#7c3aed", "#f3e8ff"], Structure: ["#ea580c", "#ffedd5"],
+  MEP: ["#0891b2", "#cffafe"], Electrical: ["#0891b2", "#cffafe"], Plumbing: ["#0891b2", "#cffafe"], Fire: ["#0891b2", "#cffafe"],
+  Civil: ["#0d9488", "#ccfbf1"], Interior: ["#db2777", "#fce7f3"],
+};
+const mDisc = (d) => M_DISC[d] || ["#3525cd", "#e0deff"];
+
+const M_STATUS_CARDS = [
+  { key: "S3",   label: "Construction", bgCls: "bg-status-emerald-bg", textCls: "text-status-emerald-text" },
+  { key: "S2",   label: "For Approval", bgCls: "bg-status-amber-bg",   textCls: "text-status-amber-text"   },
+  { key: "S1",   label: "For Info",     bgCls: "bg-blue-50",           textCls: "text-blue-700"            },
+  { key: "VOID", label: "Void",         bgCls: "bg-status-rose-bg",    textCls: "text-status-rose-text"    },
+];
+
+function MobileAnalytics({ drawings, transmittals }) {
+  /* Transmittal compliance from per-recipient acks */
+  let totalRecips = 0, totalAcked = 0;
+  transmittals.forEach((t) => {
+    const acks = t.acks || [];
+    totalRecips += acks.length;
+    totalAcked  += acks.filter((a) => a.ackedAt).length;
+  });
+  const compliance = totalRecips ? Math.round((totalAcked / totalRecips) * 100) : 0;
+  const R = 32, circ = 2 * Math.PI * R;
+
+  /* Drawings by discipline */
+  const byDisc = {};
+  drawings.forEach((d) => { byDisc[d.discipline] = (byDisc[d.discipline] || 0) + 1; });
+  const discEntries = Object.entries(byDisc).sort((a, b) => b[1] - a[1]);
+  const discMax = Math.max(...discEntries.map(([, v]) => v), 1);
+
+  /* Status counts */
+  const counts = { S1: 0, S2: 0, S3: 0, VOID: 0 };
+  drawings.forEach((d) => { if (counts[d.status] !== undefined) counts[d.status]++; });
+
+  return (
+    <div className="md:hidden flex flex-col gap-5">
+      {/* Compliance ring */}
+      <div className="bg-surface rounded-[20px] p-5 shadow-card flex items-center gap-5">
+        <div className="relative w-20 h-20 shrink-0">
+          <svg width="80" height="80" viewBox="0 0 80 80" style={{ transform: "rotate(-90deg)" }}>
+            <circle cx="40" cy="40" r={R} fill="none" stroke="var(--surface-container, #f1f3f5)" strokeWidth="8" />
+            <circle cx="40" cy="40" r={R} fill="none" stroke="#10b981" strokeWidth="8" strokeLinecap="round"
+              strokeDasharray={`${(circ * compliance) / 100} ${circ}`} />
+          </svg>
+          <div className="absolute inset-0 grid place-items-center">
+            <span className="text-[17px] font-bold text-on-surface leading-none">{compliance}%</span>
+          </div>
+        </div>
+        <div>
+          <div className="text-[14px] font-semibold text-on-surface">Transmittal Compliance</div>
+          <div className="text-[12px] text-on-surface-variant mt-1">
+            {totalAcked} of {totalRecips} recipient{totalRecips !== 1 ? "s" : ""} acknowledged
+          </div>
+          <div className={`inline-flex items-center gap-1 mt-2.5 rounded-lg px-2.5 py-1 text-[12px] font-semibold ${compliance >= 80 ? "bg-status-emerald-bg text-status-emerald-text" : "bg-status-amber-bg text-status-amber-text"}`}>
+            <span className="material-symbols-outlined text-[13px]" style={{ fontVariationSettings: "'FILL' 1" }}>
+              {compliance >= 80 ? "check_circle" : "schedule"}
+            </span>
+            {compliance >= 80 ? "On track" : "Needs follow-up"}
+          </div>
+        </div>
+      </div>
+
+      {/* Drawings by discipline */}
+      <div className="bg-surface rounded-[20px] p-[18px] shadow-card flex flex-col gap-4">
+        <h3 className="text-[15px] font-semibold text-on-surface">Drawings by Discipline</h3>
+        {discEntries.length === 0 ? (
+          <p className="text-[13px] text-on-surface-variant">Upload drawings to see the breakdown.</p>
+        ) : discEntries.map(([disc, count]) => {
+          const [fg, bg] = mDisc(disc);
+          return (
+            <div key={disc}>
+              <div className="flex items-center justify-between mb-[7px]">
+                <div className="flex items-center gap-2">
+                  <span className="inline-flex w-[22px] h-[22px] rounded-md items-center justify-center shrink-0" style={{ background: bg }}>
+                    <span className="w-2 h-2 rounded-sm" style={{ background: fg }} />
+                  </span>
+                  <span className="text-[13px] text-on-surface">{disc}</span>
+                </div>
+                <span className="font-mono text-[12px] font-bold text-on-surface-variant">{count}</span>
+              </div>
+              <div className="h-2 rounded bg-surface-container overflow-hidden">
+                <div className="h-full rounded transition-all duration-500" style={{ background: fg, width: `${(count / discMax) * 100}%` }} />
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Status breakdown */}
+      <div className="bg-surface rounded-[20px] p-[18px] shadow-card flex flex-col gap-3">
+        <h3 className="text-[15px] font-semibold text-on-surface">Status Breakdown</h3>
+        <div className="grid grid-cols-2 gap-2.5">
+          {M_STATUS_CARDS.map(({ key, label, bgCls, textCls }) => (
+            <div key={key} className={`rounded-[14px] p-3.5 ${bgCls}`}>
+              <div className={`text-[24px] font-bold leading-none tracking-[-0.01em] ${textCls}`}>{counts[key]}</div>
+              <div className={`text-[11.5px] mt-1 opacity-85 ${textCls}`}>{label}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
   );
 }
 
 function Card({ title, icon, children }) {
   return (
-    <div className="bg-white border border-border-slate rounded-xl p-6 shadow-sm">
+    <div className="bg-surface border border-border-slate rounded-xl p-6 shadow-sm">
       <div className="flex items-center gap-2 mb-5">
         <span className="material-symbols-outlined text-primary text-[20px]">{icon}</span>
         <h2 className="font-headline-sm text-headline-sm text-on-surface font-semibold">{title}</h2>

@@ -93,29 +93,50 @@ export default function Dashboard({
       <div className="hidden md:block space-y-8">
       {/* Page Header */}
       <div>
-        <h2 className="font-semibold text-headline-lg text-on-surface">Project Dashboard</h2>
+        <h2 className="font-space-grotesk font-semibold text-headline-lg text-on-surface">Project Dashboard</h2>
         <p className="font-body-md text-on-surface-variant mt-1">Real-time status overview of project documentation and delivery.</p>
       </div>
 
-      {/* Metric Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
-        <MetricCard
-          icon="architecture"
-          title="TOTAL DRAWINGS"
-          value={totalDrawings}
-          sub={`${drawings.filter(d => d.status === "S3").length} for construction`}
-          iconBg="bg-primary/5"
-          iconColor="text-primary"
-          mobileTileBg="bg-primary/10"
-          mobileIconBg="bg-primary/20"
-          mobileIconColor="text-primary"
-          mobileValueColor="text-primary"
-          mobileLabelColor="text-primary/70"
+      {/* Metric Cards — hero spans left 2×2 block; Transmittals+Pending fill row-1 right; Overdue fills row-2 right */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 lg:grid-rows-2 gap-3 md:gap-4">
+
+        {/* Hero: Total Drawings — spans 2 cols × 2 rows on desktop */}
+        <div
+          className="col-span-2 lg:col-span-2 lg:row-span-2 bg-surface border border-border-slate rounded-xl p-5 hover:shadow-md transition-shadow cursor-pointer group focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 outline-none"
           onClick={() => navigate("/register")}
-        />
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") navigate("/register"); }}
+        >
+          <div className="flex items-start justify-between mb-4">
+            <div className="p-2.5 rounded-lg bg-primary/5">
+              <span className="material-symbols-outlined text-[22px] text-primary" style={{ fontVariationSettings: "'FILL' 0" }}>architecture</span>
+            </div>
+            <span className="material-symbols-outlined text-[16px] text-on-surface-variant group-hover:text-primary transition-colors">arrow_forward</span>
+          </div>
+          <p className="text-[11px] text-on-surface-variant uppercase tracking-wider mb-1">Total Drawings</p>
+          <h3 className="font-space-grotesk text-[52px] font-bold leading-none tracking-[-0.02em] text-on-surface">{totalDrawings}</h3>
+          <p className="text-[12px] text-on-surface-variant mt-2">{drawings.filter(d => d.status === "S3").length} for construction</p>
+          {totalDrawings > 0 && (
+            <div className="mt-4 flex h-1.5 rounded-full overflow-hidden gap-px">
+              {[
+                { code: "S3", color: "#059669" },
+                { code: "S2", color: "#d97706" },
+                { code: "S1", color: "#2563eb" },
+                { code: "VOID", color: "#dc2626" },
+              ].map(({ code, color }) => {
+                const count = drawings.filter(d => d.status === code).length;
+                return count > 0 ? (
+                  <div key={code} className="h-full" style={{ width: `${(count / totalDrawings) * 100}%`, backgroundColor: color }} />
+                ) : null;
+              })}
+            </div>
+          )}
+        </div>
+
         <MetricCard
           icon="move_to_inbox"
-          title="ISSUED TRANSMITTALS"
+          title="TRANSMITTALS"
           value={totalTransmittals}
           sub="Sent to recipients"
           iconBg="bg-primary/5"
@@ -129,7 +150,7 @@ export default function Dashboard({
         />
         <MetricCard
           icon="update"
-          title="PENDING APPROVAL"
+          title="PENDING"
           value={latestRevisions}
           sub="Awaiting review"
           iconBg="bg-primary/5"
@@ -143,7 +164,7 @@ export default function Dashboard({
         />
         <MetricCard
           icon="warning"
-          title="OVERDUE ITEMS"
+          title="OVERDUE"
           value={overdueItems}
           sub={overdueItems > 0 ? "Needs attention" : "Nothing overdue"}
           badge={overdueItems > 0 ? { label: "Critical", cls: "text-status-rose-text bg-status-rose-bg" } : undefined}
@@ -155,6 +176,7 @@ export default function Dashboard({
           mobileValueColor="text-status-rose-text"
           mobileLabelColor="text-status-rose-text/70"
           onClick={() => navigate("/transmittals")}
+          className="col-span-2 lg:col-start-3 lg:col-span-2"
         />
       </div>
 
@@ -162,7 +184,7 @@ export default function Dashboard({
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 md:gap-8">
 
         {/* Chart (Discipline Breakdown) */}
-        <div className="lg:col-span-8 bg-white border border-border-slate rounded-xl p-5 md:p-8 flex flex-col lg:h-[460px]">
+        <div className="lg:col-span-8 bg-surface border border-border-slate rounded-xl p-5 md:p-8 flex flex-col lg:h-[460px]">
           <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-3 mb-6 md:mb-8">
             <div>
               <h4 className="font-headline-md text-headline-md text-on-surface">Drawings by Discipline</h4>
@@ -208,7 +230,7 @@ export default function Dashboard({
         </div>
 
         {/* Activity Feed — timeline style (desktop) / compact list (mobile) */}
-        <div className="lg:col-span-4 bg-white border border-border-slate rounded-xl flex flex-col lg:h-[460px]">
+        <div className="lg:col-span-4 bg-surface border border-border-slate rounded-xl flex flex-col lg:h-[460px]">
           <div className="p-4 md:p-6 border-b border-border-slate">
             <h4 className="font-headline-md text-headline-md text-on-surface">Activity Feed</h4>
             <p className="hidden md:block font-body-sm text-on-surface-variant">Recent project events and updates.</p>
@@ -295,7 +317,7 @@ export default function Dashboard({
       </div>
 
       {/* Latest Drawing Revisions Table */}
-      <div className="bg-white border border-border-slate rounded-xl overflow-hidden">
+      <div className="bg-surface border border-border-slate rounded-xl overflow-hidden">
         <div className="p-5 md:p-6 border-b border-border-slate flex justify-between items-center gap-3">
           <div>
             <h4 className="font-headline-md text-headline-md text-on-surface">Latest Drawing Revisions</h4>
@@ -348,10 +370,11 @@ export default function Dashboard({
 function MetricCard({
   icon, badge, title, value, sub, iconBg, iconColor, onClick,
   mobileTileBg, mobileIconBg, mobileIconColor, mobileValueColor, mobileLabelColor,
+  className = "",
 }) {
   return (
     <div
-      className={`${mobileTileBg || "bg-white"} md:bg-white border border-border-slate p-3.5 md:p-5 rounded-xl hover:shadow-md transition-shadow flex flex-col md:flex-row items-start gap-2.5 md:gap-4 ${onClick ? "cursor-pointer" : ""}`}
+      className={`${mobileTileBg || "bg-surface"} md:bg-surface border border-border-slate p-3.5 md:p-5 rounded-xl hover:shadow-md transition-shadow flex flex-col md:flex-row items-start gap-2.5 md:gap-4 ${onClick ? "cursor-pointer" : ""} ${className}`}
       onClick={onClick}
       role={onClick ? "button" : undefined}
       tabIndex={onClick ? 0 : undefined}
@@ -382,21 +405,28 @@ const STATUS_DOT = {
   VOID: { color: "#f43f5e", label: "Void" },
 };
 
-function MobileKpi({ icon, label, value, sub, fg, soft, onClick }) {
+function MobileKpi({ icon, label, value, sub, fg, soft, onClick, trendUp = false, urgent = false }) {
   return (
     <button
       onClick={onClick}
-      className="bg-surface rounded-[20px] p-4 shadow-card flex flex-col gap-3 text-left active:scale-[0.98] transition-transform"
+      className="bg-surface rounded-2xl p-3 shadow-card flex flex-col gap-2 text-left active:scale-[0.97] transition-transform"
     >
       <div className="flex items-center justify-between">
-        <span className="w-[38px] h-[38px] rounded-xl grid place-items-center" style={{ background: soft, color: fg }}>
-          <span className="material-symbols-outlined text-[21px]">{icon}</span>
+        <span className="w-9 h-9 rounded-xl grid place-items-center shrink-0" style={{ background: soft, color: fg }}>
+          <span className="material-symbols-outlined text-[20px]">{icon}</span>
         </span>
-        {sub && <span className="text-[11px] font-semibold text-on-surface-variant">{sub}</span>}
+        {sub && (
+          <span className={`inline-flex items-center gap-0.5 text-[10px] font-semibold ${trendUp ? "text-status-emerald-text" : "text-on-surface-variant"}`}>
+            {sub}
+          </span>
+        )}
       </div>
       <div>
-        <div className="text-[28px] font-bold text-on-surface leading-none tracking-[-0.02em]">{value}</div>
-        <div className="text-[12.5px] text-on-surface-variant mt-[3px]">{label}</div>
+        <div className={`text-[24px] font-bold leading-none tracking-[-0.02em] ${urgent ? "text-status-rose-text" : "text-on-surface"}`}>{value}</div>
+        <div className="flex items-center justify-between mt-[3px]">
+          <div className="text-[11.5px] text-on-surface-variant leading-tight">{label}</div>
+          {onClick && <span className="material-symbols-outlined text-[13px] text-outline">arrow_forward</span>}
+        </div>
       </div>
     </button>
   );
@@ -412,49 +442,31 @@ function MobileDashboard({ drawings, totalDrawings, totalTransmittals, pending, 
   const s3 = counts.S3;
 
   return (
-    <div className="md:hidden flex flex-col gap-5">
-      {/* Greeting */}
+    <div className="md:hidden flex flex-col gap-3">
+      {/* Greeting — compact */}
       <div>
-        <div className="text-[13px] text-on-surface-variant">Good {tod},</div>
-        <div className="text-[24px] font-bold text-on-surface tracking-[-0.01em]">{firstName}</div>
+        <div className="text-[12px] text-on-surface-variant">Good {tod}, <span className="font-semibold text-on-surface">{firstName}</span></div>
+        <div className="text-[11px] text-on-surface-variant mt-0.5">Here's your project overview</div>
       </div>
 
       {/* KPI grid */}
-      <div className="grid grid-cols-2 gap-3">
-        <MobileKpi icon="architecture"    label="Total Drawings"   value={totalDrawings}    sub={`${s3} S3`}            fg="#3525cd" soft="rgba(53,37,205,0.10)" onClick={() => onNavigate("/register")} />
-        <MobileKpi icon="move_to_inbox"   label="Transmittals"     value={totalTransmittals} sub="issued"               fg="#059669" soft="#ecfdf5"               onClick={() => onNavigate("/transmittals")} />
-        <MobileKpi icon="pending_actions" label="Pending Approval" value={pending}          sub="awaiting"             fg="#d97706" soft="#fffbeb"               onClick={() => onNavigate("/register", { state: { filterStat: "S2" } })} />
-        <MobileKpi icon="warning"         label="Overdue Items"    value={overdue}           sub={overdue > 0 ? "critical" : "clear"} fg="#e11d48" soft="#fff1f2" onClick={() => onNavigate("/transmittals")} />
+      <div className="grid grid-cols-2 gap-2.5">
+        <MobileKpi icon="architecture"    label="Total Drawings"   value={totalDrawings}     sub={s3 > 0 ? `${s3} for construction` : undefined} trendUp fg="#3525cd" soft="rgba(53,37,205,0.10)" onClick={() => onNavigate("/register")} />
+        <MobileKpi icon="move_to_inbox"   label="Transmittals"     value={totalTransmittals} sub={totalTransmittals > 0 ? "total issued" : undefined} trendUp fg="#059669" soft="#ecfdf5"    onClick={() => onNavigate("/transmittals")} />
+        <MobileKpi icon="pending_actions" label="Pending Approval" value={pending}           sub={pending > 0 ? "awaiting review" : undefined}                fg="#d97706" soft="#fffbeb"    onClick={() => onNavigate("/register", { state: { filterStat: "S2" } })} />
+        <MobileKpi icon="warning"         label="Overdue Items"    value={overdue}           sub={overdue > 0 ? "needs attention" : "none overdue"} urgent={overdue > 0} fg="#e11d48" soft="#fff1f2" onClick={() => onNavigate("/transmittals")} />
       </div>
 
-      {/* Drawing Status */}
-      <div className="bg-surface rounded-[20px] p-[18px] shadow-card flex flex-col gap-3.5">
-        <h3 className="text-[15px] font-semibold text-on-surface">Drawing Status</h3>
-        <div className="flex h-3 rounded-full overflow-hidden bg-surface-container">
-          {["S3", "S2", "S1", "VOID"].map((k) =>
-            counts[k] > 0 ? (
-              <div key={k} style={{ flexGrow: counts[k], backgroundColor: STATUS_DOT[k].color }} />
-            ) : null
-          )}
-        </div>
-        <div className="grid grid-cols-2 gap-x-3 gap-y-2">
-          {["S3", "S2", "S1", "VOID"].map((k) => (
-            <div key={k} className="flex items-center gap-2">
-              <span className="w-[9px] h-[9px] rounded-full shrink-0" style={{ backgroundColor: STATUS_DOT[k].color }} />
-              <span className="text-[12px] text-on-surface-variant flex-1 whitespace-nowrap">{STATUS_DOT[k].label}</span>
-              <span className="font-mono text-[12px] font-bold text-on-surface">{counts[k]}</span>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Recent Activity */}
-      <div className="flex flex-col gap-3">
+      {/* Recent Activity — shown before status so it's visible sooner */}
+      <div className="flex flex-col gap-2">
         <div className="flex items-center justify-between px-0.5">
-          <h3 className="text-[15px] font-semibold text-on-surface">Recent Activity</h3>
-          <button onClick={() => onNavigate("/register")} className="text-[13px] font-semibold text-primary">See all</button>
+          <h3 className="text-[14px] font-semibold text-on-surface">Recent Activity</h3>
+          <button onClick={() => onNavigate("/register")} className="inline-flex items-center gap-0.5 min-h-[44px] pl-2.5 pr-1 text-[13px] font-semibold text-primary active:opacity-70">
+            See all
+            <span className="material-symbols-outlined text-[16px]">chevron_right</span>
+          </button>
         </div>
-        <div className="bg-surface rounded-[20px] shadow-card overflow-hidden">
+        <div className="bg-surface rounded-2xl shadow-card overflow-hidden">
           {activityError ? (
             <div className="flex items-center gap-3 px-4 py-3.5 text-on-surface-variant">
               <span className="material-symbols-outlined text-[18px] opacity-40">wifi_off</span>
@@ -469,18 +481,35 @@ function MobileDashboard({ drawings, totalDrawings, totalTransmittals, pending, 
             activity.slice(0, 5).map((item, i) => {
               const meta = ACTIVITY_ICONS[item.type] || ACTIVITY_ICONS.upload;
               return (
-                <div key={item.id} className={`flex items-center gap-3 px-4 py-[13px] ${i < Math.min(activity.length, 5) - 1 ? "border-b border-surface-container" : ""}`}>
-                  <span className={`w-9 h-9 rounded-xl grid place-items-center shrink-0 ${meta.bgCls}`}>
-                    <span className={`material-symbols-outlined text-[19px] ${meta.textCls}`}>{meta.icon}</span>
+                <div key={item.id} className={`flex items-center gap-3 px-4 py-3 ${i < Math.min(activity.length, 5) - 1 ? "border-b border-surface-container" : ""}`}>
+                  <span className={`w-8 h-8 rounded-lg grid place-items-center shrink-0 ${meta.bgCls}`}>
+                    <span className={`material-symbols-outlined text-[17px] ${meta.textCls}`}>{meta.icon}</span>
                   </span>
                   <div className="flex-1 min-w-0">
-                    <div className="text-[12.5px] text-on-surface leading-snug truncate">{item.title}</div>
+                    <div className="text-[12px] text-on-surface leading-snug truncate">{item.title}</div>
                     <div className="text-[11px] text-on-surface-variant mt-0.5 truncate">{item.detail ? `${item.detail} · ` : ""}{timeAgo(item.created_at)}</div>
                   </div>
                 </div>
               );
             })
           )}
+        </div>
+      </div>
+
+      {/* Drawing Status — simple list, no ambiguous bar */}
+      <div className="bg-surface rounded-2xl p-4 shadow-card">
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-[14px] font-semibold text-on-surface">Drawing Status</h3>
+          <span className="text-[11px] text-on-surface-variant">{totalDrawings} total</span>
+        </div>
+        <div className="flex flex-col gap-2">
+          {["S3", "S2", "S1", "VOID"].map((k) => (
+            <div key={k} className="flex items-center gap-2.5">
+              <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: STATUS_DOT[k].color }} />
+              <span className="text-[12px] text-on-surface-variant flex-1">{STATUS_DOT[k].label}</span>
+              <span className={`font-mono text-[12px] font-bold ${counts[k] > 0 ? "text-on-surface" : "text-on-surface-variant/50"}`}>{counts[k]}</span>
+            </div>
+          ))}
         </div>
       </div>
     </div>

@@ -4,7 +4,7 @@
 
 @layer base {
   body {
-    background-color: #ffffff;
+    background-color: #f6f6ff;
     @apply text-on-surface font-outfit antialiased;
     -webkit-tap-highlight-color: transparent;
   }
