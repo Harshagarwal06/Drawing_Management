@@ -19,9 +19,16 @@ const app         = express();
 const PORT        = process.env.PORT        || 3000;
 const JWT_SECRET  = process.env.JWT_SECRET  || 'dev-secret-change-in-production';
 const CORS_ORIGIN = process.env.CORS_ORIGIN || 'http://localhost:5173';
-// capacitor://localhost is the origin of the iOS app's WKWebView shell,
-// https://localhost is the Android app's WebView origin
-const CORS_ORIGINS = [CORS_ORIGIN, 'capacitor://localhost', 'https://localhost', 'http://localhost:5174'];
+// Support comma-separated origins in CORS_ORIGIN env var for multiple deployments.
+// capacitor://localhost is the iOS WKWebView origin; https://localhost is the Android WebView origin.
+const CORS_ORIGINS = [
+  ...CORS_ORIGIN.split(',').map(o => o.trim()),
+  'capacitor://localhost',
+  'https://localhost',
+  'http://localhost:5174',
+];
+// Also allow Vercel preview deployments (any *.vercel.app subdomain).
+const VERCEL_PREVIEW_RE = /^https:\/\/[a-z0-9][a-z0-9-]*\.vercel\.app$/;
 const DB_PATH     = process.env.DB_PATH     || path.join(__dirname, 'dms.db');
 const UPLOAD_DIR  = process.env.UPLOAD_DIR  || path.join(__dirname, 'uploads');
 
@@ -135,7 +142,17 @@ function escapeHtml(s) {
 /* ── Middleware ─────────────────────────────────────────────────── */
 app.set('trust proxy', 1); // Railway / Vercel sit behind a reverse proxy
 app.use(helmet());
-app.use(cors({ origin: CORS_ORIGINS, credentials: true, exposedHeaders: ['X-Total-Count'] }));
+app.use(cors({
+  origin: (origin, cb) => {
+    if (!origin || CORS_ORIGINS.includes(origin) || VERCEL_PREVIEW_RE.test(origin)) {
+      cb(null, true);
+    } else {
+      cb(new Error(`CORS: origin '${origin}' not allowed`));
+    }
+  },
+  credentials: true,
+  exposedHeaders: ['X-Total-Count'],
+}));
 app.use(express.json());
 
 /* ── Uploads folder ─────────────────────────────────────────────── */
