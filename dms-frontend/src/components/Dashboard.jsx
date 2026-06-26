@@ -3,19 +3,16 @@ import { useNavigate } from "react-router-dom";
 
 const API = import.meta.env.VITE_API_URL;
 
-const STATUS_META = {
-  S3:   { label: "For Construction", color: "#059669" },
-  S2:   { label: "For Approval",     color: "#d97706" },
-  S1:   { label: "For Information",  color: "#2563eb" },
-  VOID: { label: "Void",             color: "#dc2626" },
+/* Single source of truth for drawing-status presentation.
+   `color` values match the Tailwind status tokens so chart fills, dots and
+   pills never drift apart (previously S3/VOID had two different greens/reds). */
+const STATUS = {
+  S3:   { label: "For Construction", color: "#059669", textCls: "text-status-emerald-text", bgCls: "bg-status-emerald-bg" },
+  S2:   { label: "For Approval",     color: "#D97706", textCls: "text-status-amber-text",   bgCls: "bg-status-amber-bg"   },
+  S1:   { label: "For Information",  color: "#2563EB", textCls: "text-blue-600",            bgCls: "bg-blue-50"           },
+  VOID: { label: "Void",            color: "#E11D48", textCls: "text-status-rose-text",    bgCls: "bg-status-rose-bg"    },
 };
-
-const STATUS_DISPLAY = {
-  S3:   { label: "For Construction", textCls: "text-status-emerald-text", bgCls: "bg-status-emerald-bg" },
-  S2:   { label: "For Approval",     textCls: "text-status-amber-text",   bgCls: "bg-status-amber-bg"   },
-  S1:   { label: "For Information",  textCls: "text-blue-600",            bgCls: "bg-blue-50"           },
-  VOID: { label: "Void",             textCls: "text-status-rose-text",    bgCls: "bg-status-rose-bg"    },
-};
+const STATUS_ORDER = ["S3", "S2", "S1", "VOID"];
 
 const ACTIVITY_ICONS = {
   upload:      { icon: "upload_file",      bgCls: "bg-primary-fixed/30",     textCls: "text-primary"              },
@@ -41,9 +38,16 @@ export default function Dashboard({
 }) {
   const navigate = useNavigate();
   const [activity, setActivity] = useState([]);
-  /* Project whose activity fetch failed — derived flag clears as soon as the project changes */
+  /* Chart scaling mode — "mix" = each bar fills 100% showing status proportion;
+     "volume" = absolute lengths scaled to the largest discipline (compare counts).
+     TEMP: toggle exists so the two options can be compared side by side. */
+  const [chartMode, setChartMode] = useState("volume");
+  /* Project whose activity fetch settled (ok or fail). Derived flags below stay
+     true only while the *current* project's fetch is still in flight. */
   const [activityErrorId, setActivityErrorId] = useState(null);
+  const [settledId, setSettledId] = useState(null);
   const activityError = activityErrorId !== null && activityErrorId === activeProjectId;
+  const activityLoading = settledId !== activeProjectId && !activityError;
 
   useEffect(() => {
     if (!activeProjectId || !token) return;
@@ -52,7 +56,8 @@ export default function Dashboard({
     })
       .then(r => r.ok ? r.json() : Promise.reject())
       .then(data => { setActivity(data); setActivityErrorId(null); })
-      .catch(() => setActivityErrorId(activeProjectId));
+      .catch(() => setActivityErrorId(activeProjectId))
+      .finally(() => setSettledId(activeProjectId));
   }, [activeProjectId, token]);
 
   /* Discipline breakdown */
@@ -85,6 +90,7 @@ export default function Dashboard({
         overdue={overdueItems}
         activity={activity}
         activityError={activityError}
+        activityLoading={activityLoading}
         userName={userName}
         onNavigate={navigate}
       />
@@ -119,15 +125,10 @@ export default function Dashboard({
           <p className="text-[12px] text-on-surface-variant mt-2">{drawings.filter(d => d.status === "S3").length} for construction</p>
           {totalDrawings > 0 && (
             <div className="mt-4 flex h-1.5 rounded-full overflow-hidden gap-px">
-              {[
-                { code: "S3", color: "#059669" },
-                { code: "S2", color: "#d97706" },
-                { code: "S1", color: "#2563eb" },
-                { code: "VOID", color: "#dc2626" },
-              ].map(({ code, color }) => {
+              {STATUS_ORDER.map((code) => {
                 const count = drawings.filter(d => d.status === code).length;
                 return count > 0 ? (
-                  <div key={code} className="h-full" style={{ width: `${(count / totalDrawings) * 100}%`, backgroundColor: color }} />
+                  <div key={code} title={`${STATUS[code].label}: ${count}`} className="h-full" style={{ width: `${(count / totalDrawings) * 100}%`, backgroundColor: STATUS[code].color }} />
                 ) : null;
               })}
             </div>
@@ -188,15 +189,36 @@ export default function Dashboard({
           <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-3 mb-6 md:mb-8">
             <div>
               <h4 className="font-headline-md text-headline-md text-on-surface">Drawings by Discipline</h4>
-              <p className="font-body-sm text-on-surface-variant">Status breakdown per drawing type.</p>
+              <p className="font-body-sm text-on-surface-variant">
+                {chartMode === "mix" ? "Status proportion within each drawing type." : "Drawing volume per type, by status."}
+              </p>
             </div>
-            <div className="flex gap-x-3 gap-y-1.5 flex-wrap md:justify-end">
-              {Object.entries(STATUS_META).map(([code, { label, color }]) => (
-                <div key={code} className="flex items-center gap-2">
-                  <div className="w-3 h-3 rounded-full" style={{ backgroundColor: color }} />
-                  <span className="font-label-sm text-on-surface-variant text-[11px]">{label}</span>
-                </div>
-              ))}
+            <div className="flex flex-col items-end gap-2">
+              {/* TEMP toggle — pick Mix % or Volume, then this will be removed */}
+              <div className="inline-flex rounded-lg border border-border-slate p-0.5 bg-surface-container-low">
+                {[
+                  { key: "volume", label: "Volume" },
+                  { key: "mix", label: "Mix %" },
+                ].map(({ key, label }) => (
+                  <button
+                    key={key}
+                    onClick={() => setChartMode(key)}
+                    className={`px-3 py-1 rounded-md text-[11px] font-medium transition-colors ${
+                      chartMode === key ? "bg-surface text-primary shadow-sm" : "text-on-surface-variant hover:text-on-surface"
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+              <div className="flex gap-x-3 gap-y-1.5 flex-wrap md:justify-end">
+                {STATUS_ORDER.map((code) => (
+                  <div key={code} className="flex items-center gap-2">
+                    <div className="w-3 h-3 rounded-full" style={{ backgroundColor: STATUS[code].color }} />
+                    <span className="font-label-sm text-on-surface-variant text-[12px]">{STATUS[code].label}</span>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
 
@@ -206,25 +228,55 @@ export default function Dashboard({
               <p className="font-body-sm text-body-sm">Upload drawings to see the breakdown</p>
             </div>
           ) : (
-            <div className="flex-1 min-h-0 overflow-y-auto custom-scrollbar space-y-4">
-              {discEntries.map(([disc, counts]) => (
-                <div key={disc} className="flex items-center gap-4">
+            <div className="flex-1 min-h-0 overflow-y-auto custom-scrollbar space-y-4 relative">
+              {/* Volume mode: light gridlines behind the bars for scale reference.
+                  Track area starts after the w-20/w-32 label + gap-4 (1rem). */}
+              {chartMode === "volume" && (
+                <div className="hidden md:block pointer-events-none absolute inset-y-0 left-[calc(8rem+1rem)] right-[calc(2rem+1rem)]">
+                  {[0, 0.25, 0.5, 0.75, 1].map((f) => (
+                    <div key={f} className="absolute top-0 bottom-0 border-l border-border-slate/60" style={{ left: `${f * 100}%` }}>
+                      <span className="absolute -top-0 -translate-x-1/2 text-[9px] font-mono text-on-surface-variant/60 -mt-0.5">{Math.round(f * maxTotal)}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {discEntries.map(([disc, counts]) => {
+                const summary = STATUS_ORDER
+                  .filter((code) => counts[code] > 0)
+                  .map((code) => `${counts[code]} ${STATUS[code].label}`)
+                  .join(", ");
+                /* In "mix" mode segments are a share of this discipline's total
+                   (bar always fills); in "volume" mode they're scaled to maxTotal. */
+                const denom = chartMode === "mix" ? counts.total : maxTotal;
+                return (
+                <div key={disc} className="flex items-center gap-4 relative">
                   <span className="font-label-sm text-[12px] text-on-surface-variant w-20 md:w-32 shrink-0 truncate" title={disc}>{disc}</span>
-                  <div className="flex-1 flex h-6 rounded-md overflow-hidden bg-surface-container">
-                    {Object.entries(STATUS_META).map(([code, { color }]) =>
+                  <div
+                    className="flex-1 flex h-6 rounded-md overflow-hidden bg-surface-container"
+                    role="img"
+                    aria-label={`${disc}: ${summary}`}
+                  >
+                    {STATUS_ORDER.map((code) =>
                       counts[code] > 0 ? (
                         <div
                           key={code}
-                          title={`${STATUS_META[code].label}: ${counts[code]}`}
-                          className="h-full transition-all"
-                          style={{ width: `${(counts[code] / maxTotal) * 100}%`, backgroundColor: color, opacity: 0.85 }}
-                        />
+                          title={`${STATUS[code].label}: ${counts[code]}${chartMode === "mix" ? ` (${Math.round((counts[code] / counts.total) * 100)}%)` : ""}`}
+                          className="h-full transition-all flex items-center justify-center"
+                          style={{ width: `${(counts[code] / denom) * 100}%`, backgroundColor: STATUS[code].color, opacity: 0.85 }}
+                        >
+                          {(counts[code] / denom) > 0.12 && (
+                            <span className="font-mono text-[10px] font-semibold text-white/95 leading-none">
+                              {chartMode === "mix" ? `${Math.round((counts[code] / counts.total) * 100)}%` : counts[code]}
+                            </span>
+                          )}
+                        </div>
                       ) : null
                     )}
                   </div>
                   <span className="font-mono text-[12px] text-on-surface w-8 text-right shrink-0">{counts.total}</span>
                 </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
@@ -238,7 +290,14 @@ export default function Dashboard({
 
           {/* Mobile compact list (hidden on md+) */}
           <div className="md:hidden flex-1 min-h-0 divide-y divide-border-slate">
-            {activityError ? (
+            {activityLoading ? (
+              Array.from({ length: 3 }).map((_, i) => (
+                <div key={i} className="flex items-center gap-3 px-4 py-3">
+                  <div className="skeleton w-6 h-6 rounded-full shrink-0" />
+                  <div className="skeleton h-3 flex-1" />
+                </div>
+              ))
+            ) : activityError ? (
               <div className="flex items-center gap-3 px-4 py-3 text-on-surface-variant">
                 <span className="material-symbols-outlined text-[18px] opacity-40">wifi_off</span>
                 <p className="text-[12px] text-status-rose-text">Could not load activity.</p>
@@ -267,7 +326,17 @@ export default function Dashboard({
           {/* Desktop timeline list (hidden below md) */}
           <div className="hidden md:flex flex-col flex-1 min-h-0">
             <div className="flex-1 min-h-0 overflow-y-auto p-6 space-y-6 custom-scrollbar">
-              {activityError ? (
+              {activityLoading ? (
+                Array.from({ length: 4 }).map((_, i) => (
+                  <div key={i} className="flex gap-4">
+                    <div className="skeleton w-8 h-8 rounded-full shrink-0" />
+                    <div className="flex-1 space-y-2 pt-1">
+                      <div className="skeleton h-3 w-3/4" />
+                      <div className="skeleton h-2.5 w-1/3" />
+                    </div>
+                  </div>
+                ))
+              ) : activityError ? (
                 <div className="flex flex-col items-center justify-center h-40 gap-3 text-on-surface-variant">
                   <span className="material-symbols-outlined text-[36px] opacity-30">wifi_off</span>
                   <p className="font-body-sm text-body-sm text-center text-status-rose-text">Could not load activity — check your connection.</p>
@@ -344,7 +413,7 @@ export default function Dashboard({
               </thead>
               <tbody className="divide-y divide-border-slate">
                 {latestDrawings.map(d => {
-                  const s = STATUS_DISPLAY[d.status] || { label: d.status, textCls: "text-on-surface-variant", bgCls: "bg-surface-container" };
+                  const s = STATUS[d.status] || { label: d.status, textCls: "text-on-surface-variant", bgCls: "bg-surface-container" };
                   return (
                     <tr key={d.id} className="hover:bg-surface-container-low transition-colors">
                       <td className="px-4 md:px-6 py-3 md:py-4 font-body-md font-bold text-primary text-[13px] max-w-[160px] truncate" title={d.number}>{d.number}</td>
@@ -398,12 +467,8 @@ function MetricCard({
 }
 
 /* ── Material 3 mobile dashboard ─────────────────────────────────────────── */
-const STATUS_DOT = {
-  S3: { color: "#10b981", label: "For Construction" },
-  S2: { color: "#f59e0b", label: "For Approval" },
-  S1: { color: "#3b82f6", label: "For Information" },
-  VOID: { color: "#f43f5e", label: "Void" },
-};
+/* Mobile reuses the shared STATUS map so dots match desktop chart/pills. */
+const STATUS_DOT = STATUS;
 
 function MobileKpi({ icon, label, value, sub, fg, soft, onClick, trendUp = false, urgent = false }) {
   return (
@@ -432,7 +497,7 @@ function MobileKpi({ icon, label, value, sub, fg, soft, onClick, trendUp = false
   );
 }
 
-function MobileDashboard({ drawings, totalDrawings, totalTransmittals, pending, overdue, activity, activityError, userName, onNavigate }) {
+function MobileDashboard({ drawings, totalDrawings, totalTransmittals, pending, overdue, activity, activityError, activityLoading, userName, onNavigate }) {
   const h = new Date().getHours();
   const tod = h < 12 ? "morning" : h < 17 ? "afternoon" : "evening";
   const firstName = (userName || "").split(" ")[0] || "there";
@@ -467,7 +532,17 @@ function MobileDashboard({ drawings, totalDrawings, totalTransmittals, pending, 
           </button>
         </div>
         <div className="bg-surface rounded-2xl shadow-card overflow-hidden">
-          {activityError ? (
+          {activityLoading ? (
+            Array.from({ length: 3 }).map((_, i) => (
+              <div key={i} className={`flex items-center gap-3 px-4 py-3 ${i < 2 ? "border-b border-surface-container" : ""}`}>
+                <div className="skeleton w-8 h-8 rounded-lg shrink-0" />
+                <div className="flex-1 space-y-1.5">
+                  <div className="skeleton h-3 w-3/4" />
+                  <div className="skeleton h-2.5 w-1/3" />
+                </div>
+              </div>
+            ))
+          ) : activityError ? (
             <div className="flex items-center gap-3 px-4 py-3.5 text-on-surface-variant">
               <span className="material-symbols-outlined text-[18px] opacity-40">wifi_off</span>
               <p className="text-[12px] text-status-rose-text">Could not load activity.</p>

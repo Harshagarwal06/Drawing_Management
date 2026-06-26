@@ -38,6 +38,28 @@
 .scrollbar-hide::-webkit-scrollbar {
     display: none;
 }
+
+/* Skeleton shimmer for loading states */
+@keyframes skeleton-pulse {
+    0%, 100% { opacity: 1; }
+    50%      { opacity: 0.4; }
+}
+.skeleton {
+    background-color: theme('colors.surface-container');
+    border-radius: 0.5rem;
+    animation: skeleton-pulse 1.5s ease-in-out infinite;
+}
+
+/* Respect users who request reduced motion — disable transitions/animations
+   globally so hover lifts, press scales, chart tweens and shimmer stop. */
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+    }
+}
 .scrollbar-hide {
     -ms-overflow-style: none;
     scrollbar-width: none;
