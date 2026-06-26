@@ -332,6 +332,19 @@ export default function SettingsView({ currentUser, token }) {
   // Confirmation state for deactivate / remove
   const [confirmAction, setConfirmAction] = useState(null); // { type: 'deactivate'|'remove', user }
 
+  /* Escape closes whichever modal is open (innermost first). Gives keyboard
+     users a predictable exit — escape-routes / modal-escape. */
+  useEffect(() => {
+    const onKey = (e) => {
+      if (e.key !== 'Escape') return;
+      if (confirmAction)        setConfirmAction(null);
+      else if (slackProject)    setSlackProject(null);
+      else if (renamingProject) setRenamingProject(null);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [confirmAction, slackProject, renamingProject]);
+
   const handleDeactivate = async (u) => {
     try {
       const res = await fetch(`${API}/api/users/${u.id}/deactivate`, {
@@ -778,7 +791,7 @@ export default function SettingsView({ currentUser, token }) {
                 <span className="font-mono text-[12px] font-bold text-primary bg-primary/10 px-2 py-0.5 rounded shrink-0">{p.code}</span>
                 <span className="flex-1 text-[13px] text-on-surface truncate">{p.name}</span>
                 {!!p.slackConfigured && (
-                  <span className="hidden sm:inline-flex items-center gap-1 text-[11px] font-medium text-status-emerald-600 bg-status-emerald-50 px-2 py-0.5 rounded-full shrink-0">
+                  <span className="hidden sm:inline-flex items-center gap-1 text-[11px] font-medium text-status-emerald-text bg-status-emerald-bg px-2 py-0.5 rounded-full shrink-0">
                     <span className="material-symbols-outlined text-[12px]">check_circle</span>
                     Slack
                   </span>
@@ -806,8 +819,8 @@ export default function SettingsView({ currentUser, token }) {
 
       {/* ── Rename project modal ─────────────────────────────────────── */}
       {renamingProject && createPortal(
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4" style={{ background: 'rgba(15,23,42,0.4)' }}>
-          <div className="bg-white rounded-2xl shadow-xl border border-border-slate w-full max-w-sm overflow-hidden">
+        <div className="modal-scrim fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-[rgba(15,23,42,0.45)] backdrop-blur-sm" onClick={() => setRenamingProject(null)}>
+          <div onClick={(e) => e.stopPropagation()} className="modal-card bg-white rounded-2xl shadow-xl border border-border-slate w-full max-w-sm overflow-hidden">
             <div className="px-6 py-4 border-b border-border-slate flex items-center justify-between">
               <h2 className="text-[15px] font-semibold text-on-surface">Rename Project</h2>
               <button onClick={() => setRenamingProject(null)} className="text-on-surface-variant hover:text-on-surface transition p-1 rounded-lg hover:bg-surface-container">
@@ -855,8 +868,8 @@ export default function SettingsView({ currentUser, token }) {
 
       {/* ── Slack webhook modal ──────────────────────────────────────── */}
       {slackProject && createPortal(
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4" style={{ background: 'rgba(15,23,42,0.4)' }}>
-          <div className="bg-white rounded-2xl shadow-xl border border-border-slate w-full max-w-md overflow-hidden">
+        <div className="modal-scrim fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-[rgba(15,23,42,0.45)] backdrop-blur-sm" onClick={() => setSlackProject(null)}>
+          <div onClick={(e) => e.stopPropagation()} className="modal-card bg-white rounded-2xl shadow-xl border border-border-slate w-full max-w-md overflow-hidden">
             <div className="px-6 py-4 border-b border-border-slate flex items-center justify-between">
               <h2 className="text-[15px] font-semibold text-on-surface">
                 Slack Notifications — <span className="font-mono text-primary">{slackProject.code}</span>
@@ -873,7 +886,7 @@ export default function SettingsView({ currentUser, token }) {
                 Post transmittal, new-drawing, and revision events to a Slack channel. Create an{' '}
                 <span className="font-medium text-on-surface">Incoming Webhook</span> in Slack and paste the URL below.
                 {slackProject.slackConfigured && (
-                  <span className="block mt-1.5 text-status-emerald-600 font-medium">
+                  <span className="block mt-1.5 text-status-emerald-text font-medium">
                     ✓ A webhook is currently configured. Leave blank to keep it, or paste a new one to replace it.
                   </span>
                 )}
@@ -897,7 +910,7 @@ export default function SettingsView({ currentUser, token }) {
                   )}
                   {slackProject.slackConfigured && (
                     <button type="button" onClick={() => { setSlackUrl(''); handleSaveSlack({ preventDefault: () => {} }); }} disabled={slackLoading}
-                      className="px-3 py-2 rounded-lg border border-status-rose-200 text-status-rose-600 hover:bg-status-rose-50 font-medium text-[13px] transition-colors disabled:opacity-60">
+                      className="px-3 py-2 rounded-lg border border-status-rose-text/30 text-status-rose-text hover:bg-status-rose-bg font-medium text-[13px] transition-colors disabled:opacity-60">
                       Disconnect
                     </button>
                   )}
@@ -921,9 +934,9 @@ export default function SettingsView({ currentUser, token }) {
 
       {/* ── Confirmation modal for deactivate / remove ── */}
       {confirmAction && createPortal(
-        <div className="fixed inset-0 z-[10000] flex items-center justify-center">
-          <div className="absolute inset-0 bg-black/40" onClick={() => setConfirmAction(null)} />
-          <div className="relative bg-white rounded-2xl shadow-2xl border border-border-slate p-6 w-full max-w-sm mx-4">
+        <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4">
+          <div className="modal-scrim absolute inset-0 bg-[rgba(15,23,42,0.45)] backdrop-blur-sm" onClick={() => setConfirmAction(null)} />
+          <div className="modal-card relative bg-white rounded-2xl shadow-2xl border border-border-slate p-6 w-full max-w-sm">
             <div className="flex items-center gap-3 mb-4">
               <div className={`w-10 h-10 rounded-full flex items-center justify-center ${confirmAction.type === 'remove' ? 'bg-red-100' : 'bg-amber-100'}`}>
                 {confirmAction.type === 'remove'
