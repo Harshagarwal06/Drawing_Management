@@ -38,10 +38,6 @@ export default function Dashboard({
 }) {
   const navigate = useNavigate();
   const [activity, setActivity] = useState([]);
-  /* Chart scaling mode — "mix" = each bar fills 100% showing status proportion;
-     "volume" = absolute lengths scaled to the largest discipline (compare counts).
-     TEMP: toggle exists so the two options can be compared side by side. */
-  const [chartMode, setChartMode] = useState("volume");
   /* Project whose activity fetch settled (ok or fail). Derived flags below stay
      true only while the *current* project's fetch is still in flight. */
   const [activityErrorId, setActivityErrorId] = useState(null);
@@ -189,36 +185,15 @@ export default function Dashboard({
           <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-3 mb-6 md:mb-8">
             <div>
               <h4 className="font-headline-md text-headline-md text-on-surface">Drawings by Discipline</h4>
-              <p className="font-body-sm text-on-surface-variant">
-                {chartMode === "mix" ? "Status proportion within each drawing type." : "Drawing volume per type, by status."}
-              </p>
+              <p className="font-body-sm text-on-surface-variant">Drawing volume per type, by status.</p>
             </div>
-            <div className="flex flex-col items-end gap-2">
-              {/* TEMP toggle — pick Mix % or Volume, then this will be removed */}
-              <div className="inline-flex rounded-lg border border-border-slate p-0.5 bg-surface-container-low">
-                {[
-                  { key: "volume", label: "Volume" },
-                  { key: "mix", label: "Mix %" },
-                ].map(({ key, label }) => (
-                  <button
-                    key={key}
-                    onClick={() => setChartMode(key)}
-                    className={`px-3 py-1 rounded-md text-[11px] font-medium transition-colors ${
-                      chartMode === key ? "bg-surface text-primary shadow-sm" : "text-on-surface-variant hover:text-on-surface"
-                    }`}
-                  >
-                    {label}
-                  </button>
-                ))}
-              </div>
-              <div className="flex gap-x-3 gap-y-1.5 flex-wrap md:justify-end">
-                {STATUS_ORDER.map((code) => (
-                  <div key={code} className="flex items-center gap-2">
-                    <div className="w-3 h-3 rounded-full" style={{ backgroundColor: STATUS[code].color }} />
-                    <span className="font-label-sm text-on-surface-variant text-[12px]">{STATUS[code].label}</span>
-                  </div>
-                ))}
-              </div>
+            <div className="flex gap-x-3 gap-y-1.5 flex-wrap md:justify-end">
+              {STATUS_ORDER.map((code) => (
+                <div key={code} className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full" style={{ backgroundColor: STATUS[code].color }} />
+                  <span className="font-label-sm text-on-surface-variant text-[12px]">{STATUS[code].label}</span>
+                </div>
+              ))}
             </div>
           </div>
 
@@ -229,25 +204,20 @@ export default function Dashboard({
             </div>
           ) : (
             <div className="flex-1 min-h-0 overflow-y-auto custom-scrollbar space-y-4 relative">
-              {/* Volume mode: light gridlines behind the bars for scale reference.
+              {/* Light gridlines behind the bars for scale reference.
                   Track area starts after the w-20/w-32 label + gap-4 (1rem). */}
-              {chartMode === "volume" && (
-                <div className="hidden md:block pointer-events-none absolute inset-y-0 left-[calc(8rem+1rem)] right-[calc(2rem+1rem)]">
-                  {[0, 0.25, 0.5, 0.75, 1].map((f) => (
-                    <div key={f} className="absolute top-0 bottom-0 border-l border-border-slate/60" style={{ left: `${f * 100}%` }}>
-                      <span className="absolute -top-0 -translate-x-1/2 text-[9px] font-mono text-on-surface-variant/60 -mt-0.5">{Math.round(f * maxTotal)}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
+              <div className="hidden md:block pointer-events-none absolute inset-y-0 left-[calc(8rem+1rem)] right-[calc(2rem+1rem)]">
+                {[0, 0.25, 0.5, 0.75, 1].map((f) => (
+                  <div key={f} className="absolute top-0 bottom-0 border-l border-border-slate/60" style={{ left: `${f * 100}%` }}>
+                    <span className="absolute -top-0 -translate-x-1/2 text-[9px] font-mono text-on-surface-variant/60 -mt-0.5">{Math.round(f * maxTotal)}</span>
+                  </div>
+                ))}
+              </div>
               {discEntries.map(([disc, counts]) => {
                 const summary = STATUS_ORDER
                   .filter((code) => counts[code] > 0)
                   .map((code) => `${counts[code]} ${STATUS[code].label}`)
                   .join(", ");
-                /* In "mix" mode segments are a share of this discipline's total
-                   (bar always fills); in "volume" mode they're scaled to maxTotal. */
-                const denom = chartMode === "mix" ? counts.total : maxTotal;
                 return (
                 <div key={disc} className="flex items-center gap-4 relative">
                   <span className="font-label-sm text-[12px] text-on-surface-variant w-20 md:w-32 shrink-0 truncate" title={disc}>{disc}</span>
@@ -260,14 +230,12 @@ export default function Dashboard({
                       counts[code] > 0 ? (
                         <div
                           key={code}
-                          title={`${STATUS[code].label}: ${counts[code]}${chartMode === "mix" ? ` (${Math.round((counts[code] / counts.total) * 100)}%)` : ""}`}
+                          title={`${STATUS[code].label}: ${counts[code]}`}
                           className="h-full transition-all flex items-center justify-center"
-                          style={{ width: `${(counts[code] / denom) * 100}%`, backgroundColor: STATUS[code].color, opacity: 0.85 }}
+                          style={{ width: `${(counts[code] / maxTotal) * 100}%`, backgroundColor: STATUS[code].color, opacity: 0.85 }}
                         >
-                          {(counts[code] / denom) > 0.12 && (
-                            <span className="font-mono text-[10px] font-semibold text-white/95 leading-none">
-                              {chartMode === "mix" ? `${Math.round((counts[code] / counts.total) * 100)}%` : counts[code]}
-                            </span>
+                          {(counts[code] / maxTotal) > 0.12 && (
+                            <span className="font-mono text-[10px] font-semibold text-white/95 leading-none">{counts[code]}</span>
                           )}
                         </div>
                       ) : null
