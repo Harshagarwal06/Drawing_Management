@@ -23,6 +23,8 @@ export default {
         "status-amber-text":      "#D97706",
         "status-rose-bg":         "#FFF1F2",
         "status-rose-text":       "#E11D48",
+        "status-blue-bg":         "#EFF6FF",
+        "status-blue-text":       "#2563EB",
         "glass-surface":          "rgba(255,255,255,0.8)",
         "background":             "#f6f6ff",
         /* extras used by modals / toast / transmittals */

@@ -1,7 +1,10 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 
 const API = import.meta.env.VITE_API_URL;
+
+/* Locale-aware number formatting for KPI figures (thousands separators). */
+const fmt = (n) => (typeof n === "number" ? n.toLocaleString() : n);
 
 /* Single source of truth for drawing-status presentation.
    `color` values match the Tailwind status tokens so chart fills, dots and
@@ -9,7 +12,7 @@ const API = import.meta.env.VITE_API_URL;
 const STATUS = {
   S3:   { label: "For Construction", color: "#059669", textCls: "text-status-emerald-text", bgCls: "bg-status-emerald-bg" },
   S2:   { label: "For Approval",     color: "#D97706", textCls: "text-status-amber-text",   bgCls: "bg-status-amber-bg"   },
-  S1:   { label: "For Information",  color: "#2563EB", textCls: "text-blue-600",            bgCls: "bg-blue-50"           },
+  S1:   { label: "For Information",  color: "#2563EB", textCls: "text-status-blue-text",    bgCls: "bg-status-blue-bg"    },
   VOID: { label: "Void",            color: "#E11D48", textCls: "text-status-rose-text",    bgCls: "bg-status-rose-bg"    },
 };
 const STATUS_ORDER = ["S3", "S2", "S1", "VOID"];
@@ -45,16 +48,35 @@ export default function Dashboard({
   const activityError = activityErrorId !== null && activityErrorId === activeProjectId;
   const activityLoading = settledId !== activeProjectId && !activityError;
 
-  useEffect(() => {
-    if (!activeProjectId || !token) return;
+  /* Returns the AbortController so the effect can cancel an in-flight request
+     when the project switches — prevents a slow response for the previous
+     project overwriting the current one's activity. Also reusable for Retry. */
+  const loadActivity = useCallback(() => {
+    if (!activeProjectId || !token) return undefined;
+    const controller = new AbortController();
     fetch(`${API}/api/activity?projectId=${activeProjectId}`, {
       headers: { Authorization: `Bearer ${token}` },
+      signal: controller.signal,
     })
       .then(r => r.ok ? r.json() : Promise.reject())
       .then(data => { setActivity(data); setActivityErrorId(null); })
-      .catch(() => setActivityErrorId(activeProjectId))
-      .finally(() => setSettledId(activeProjectId));
+      .catch((e) => { if (e?.name !== "AbortError") setActivityErrorId(activeProjectId); })
+      .finally(() => { if (!controller.signal.aborted) setSettledId(activeProjectId); });
+    return controller;
   }, [activeProjectId, token]);
+
+  useEffect(() => {
+    const controller = loadActivity();
+    return () => controller?.abort();
+  }, [loadActivity]);
+
+  /* Retry from an error state — reset to loading (event context, not the
+     effect body), then refetch. */
+  const retryActivity = useCallback(() => {
+    setActivityErrorId(null);
+    setSettledId(null);
+    loadActivity();
+  }, [loadActivity]);
 
   /* Discipline breakdown */
   const byDisc = {};
@@ -87,6 +109,7 @@ export default function Dashboard({
         activity={activity}
         activityError={activityError}
         activityLoading={activityLoading}
+        onRetry={retryActivity}
         userName={userName}
         onNavigate={navigate}
       />
@@ -108,16 +131,16 @@ export default function Dashboard({
           onClick={() => navigate("/register")}
           role="button"
           tabIndex={0}
-          onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") navigate("/register"); }}
+          onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); navigate("/register"); } }}
         >
           <div className="flex items-start justify-between mb-4">
             <div className="p-2.5 rounded-lg bg-primary/5">
-              <span className="material-symbols-outlined text-[22px] text-primary" style={{ fontVariationSettings: "'FILL' 0" }}>architecture</span>
+              <span aria-hidden="true" className="material-symbols-outlined text-[22px] text-primary" style={{ fontVariationSettings: "'FILL' 0" }}>architecture</span>
             </div>
-            <span className="material-symbols-outlined text-[16px] text-on-surface-variant group-hover:text-primary transition-colors">arrow_forward</span>
+            <span aria-hidden="true" className="material-symbols-outlined text-[16px] text-on-surface-variant group-hover:text-primary transition-colors">arrow_forward</span>
           </div>
           <p className="text-[11px] text-on-surface-variant uppercase tracking-wider mb-1">Total Drawings</p>
-          <h3 className="font-space-grotesk text-[52px] font-bold leading-none tracking-[-0.02em] text-on-surface">{totalDrawings}</h3>
+          <h3 className="font-space-grotesk text-[52px] font-bold leading-none tracking-[-0.02em] text-on-surface">{fmt(totalDrawings)}</h3>
           <p className="text-[12px] text-on-surface-variant mt-2">{drawings.filter(d => d.status === "S3").length} for construction</p>
           {totalDrawings > 0 && (
             <div className="mt-4 flex h-1.5 rounded-full overflow-hidden gap-px">
@@ -136,11 +159,9 @@ export default function Dashboard({
           title="TRANSMITTALS"
           value={totalTransmittals}
           sub="Sent to recipients"
-          iconBg="bg-primary/5"
-          iconColor="text-primary"
+          iconWrapCls="bg-status-emerald-text/10 md:bg-primary/5"
+          iconTextCls="text-status-emerald-text md:text-primary"
           mobileTileBg="bg-status-emerald-bg"
-          mobileIconBg="bg-status-emerald-text/10"
-          mobileIconColor="text-status-emerald-text"
           mobileValueColor="text-status-emerald-text"
           mobileLabelColor="text-status-emerald-text/70"
           onClick={() => navigate("/transmittals")}
@@ -150,11 +171,9 @@ export default function Dashboard({
           title="PENDING"
           value={latestRevisions}
           sub="Awaiting review"
-          iconBg="bg-primary/5"
-          iconColor="text-primary"
+          iconWrapCls="bg-status-amber-text/10 md:bg-primary/5"
+          iconTextCls="text-status-amber-text md:text-primary"
           mobileTileBg="bg-status-amber-bg"
-          mobileIconBg="bg-status-amber-text/10"
-          mobileIconColor="text-status-amber-text"
           mobileValueColor="text-status-amber-text"
           mobileLabelColor="text-status-amber-text/70"
           onClick={() => navigate("/register", { state: { filterStat: "S2" } })}
@@ -165,11 +184,9 @@ export default function Dashboard({
           value={overdueItems}
           sub={overdueItems > 0 ? "Needs attention" : "Nothing overdue"}
           badge={overdueItems > 0 ? { label: "Critical", cls: "text-status-rose-text bg-status-rose-bg" } : undefined}
-          iconBg={overdueItems > 0 ? "bg-status-rose-bg" : "bg-status-emerald-bg"}
-          iconColor={overdueItems > 0 ? "text-status-rose-text" : "text-status-emerald-text"}
+          iconWrapCls={overdueItems > 0 ? "bg-status-rose-text/10 md:bg-status-rose-bg" : "bg-status-emerald-text/10 md:bg-status-emerald-bg"}
+          iconTextCls={overdueItems > 0 ? "text-status-rose-text" : "text-status-emerald-text"}
           mobileTileBg="bg-status-rose-bg"
-          mobileIconBg="bg-status-rose-text/10"
-          mobileIconColor="text-status-rose-text"
           mobileValueColor="text-status-rose-text"
           mobileLabelColor="text-status-rose-text/70"
           onClick={() => navigate("/transmittals")}
@@ -184,7 +201,7 @@ export default function Dashboard({
         <div className="lg:col-span-8 bg-surface border border-border-slate rounded-xl p-5 md:p-8 flex flex-col lg:h-[460px]">
           <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-3 mb-6 md:mb-8">
             <div>
-              <h4 className="font-headline-md text-headline-md text-on-surface">Drawings by Discipline</h4>
+              <h3 className="font-headline-md text-headline-md text-on-surface">Drawings by Discipline</h3>
               <p className="font-body-sm text-on-surface-variant">Drawing volume per type, by status.</p>
             </div>
             <div className="flex gap-x-3 gap-y-1.5 flex-wrap md:justify-end">
@@ -199,7 +216,7 @@ export default function Dashboard({
 
           {discEntries.length === 0 ? (
             <div className="flex-1 flex flex-col items-center justify-center h-40 gap-3 text-on-surface-variant">
-              <span className="material-symbols-outlined text-[48px] opacity-25">bar_chart</span>
+              <span aria-hidden="true" className="material-symbols-outlined text-[48px] opacity-25">bar_chart</span>
               <p className="font-body-sm text-body-sm">Upload drawings to see the breakdown</p>
             </div>
           ) : (
@@ -252,7 +269,7 @@ export default function Dashboard({
         {/* Activity Feed — timeline style (desktop) / compact list (mobile) */}
         <div className="lg:col-span-4 bg-surface border border-border-slate rounded-xl flex flex-col lg:h-[460px]">
           <div className="p-4 md:p-6 border-b border-border-slate">
-            <h4 className="font-headline-md text-headline-md text-on-surface">Activity Feed</h4>
+            <h3 className="font-headline-md text-headline-md text-on-surface">Activity Feed</h3>
             <p className="hidden md:block font-body-sm text-on-surface-variant">Recent project events and updates.</p>
           </div>
 
@@ -267,12 +284,13 @@ export default function Dashboard({
               ))
             ) : activityError ? (
               <div className="flex items-center gap-3 px-4 py-3 text-on-surface-variant">
-                <span className="material-symbols-outlined text-[18px] opacity-40">wifi_off</span>
-                <p className="text-[12px] text-status-rose-text">Could not load activity.</p>
+                <span aria-hidden="true" className="material-symbols-outlined text-[18px] opacity-40">wifi_off</span>
+                <p className="text-[12px] text-status-rose-text flex-1">Could not load activity.</p>
+                <button onClick={retryActivity} className="text-[12px] font-semibold text-primary hover:underline shrink-0 outline-none focus-visible:ring-2 focus-visible:ring-primary rounded">Retry</button>
               </div>
             ) : activity.length === 0 ? (
               <div className="flex items-center gap-3 px-4 py-3 text-on-surface-variant">
-                <span className="material-symbols-outlined text-[18px] opacity-40">notifications_none</span>
+                <span aria-hidden="true" className="material-symbols-outlined text-[18px] opacity-40">notifications_none</span>
                 <p className="text-[12px]">No activity yet.</p>
               </div>
             ) : (
@@ -281,7 +299,7 @@ export default function Dashboard({
                 return (
                   <div key={item.id} className="flex items-center gap-3 px-4 py-2.5">
                     <div className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 ${meta.bgCls}`}>
-                      <span className={`material-symbols-outlined text-[14px] ${meta.textCls}`}>{meta.icon}</span>
+                      <span aria-hidden="true" className={`material-symbols-outlined text-[14px] ${meta.textCls}`}>{meta.icon}</span>
                     </div>
                     <p className="flex-1 text-[12px] text-on-surface truncate">{item.title}</p>
                     <span className="text-[11px] text-on-surface-variant shrink-0">{timeAgo(item.created_at)}</span>
@@ -306,12 +324,13 @@ export default function Dashboard({
                 ))
               ) : activityError ? (
                 <div className="flex flex-col items-center justify-center h-40 gap-3 text-on-surface-variant">
-                  <span className="material-symbols-outlined text-[36px] opacity-30">wifi_off</span>
+                  <span aria-hidden="true" className="material-symbols-outlined text-[36px] opacity-30">wifi_off</span>
                   <p className="font-body-sm text-body-sm text-center text-status-rose-text">Could not load activity — check your connection.</p>
+                  <button onClick={retryActivity} className="text-[13px] font-semibold text-primary hover:underline outline-none focus-visible:ring-2 focus-visible:ring-primary rounded px-2 py-1">Retry</button>
                 </div>
               ) : activity.length === 0 ? (
                 <div className="flex flex-col items-center justify-center h-40 gap-3 text-on-surface-variant">
-                  <span className="material-symbols-outlined text-[36px] opacity-30">notifications_none</span>
+                  <span aria-hidden="true" className="material-symbols-outlined text-[36px] opacity-30">notifications_none</span>
                   <p className="font-body-sm text-body-sm text-center">Activity will appear here as you upload drawings and issue transmittals.</p>
                 </div>
               ) : (
@@ -324,7 +343,7 @@ export default function Dashboard({
                         <div className="absolute left-4 top-8 bottom-0 w-px bg-border-slate -mb-6" />
                       )}
                       <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 z-10 ${meta.bgCls}`}>
-                        <span className={`material-symbols-outlined text-[18px] ${meta.textCls}`}>{meta.icon}</span>
+                        <span aria-hidden="true" className={`material-symbols-outlined text-[18px] ${meta.textCls}`}>{meta.icon}</span>
                       </div>
                       <div className="min-w-0 flex-1">
                         <p className="font-body-md text-on-surface text-[13px] leading-snug break-words">{item.title}</p>
@@ -357,7 +376,7 @@ export default function Dashboard({
       <div className="bg-surface border border-border-slate rounded-xl overflow-hidden">
         <div className="p-5 md:p-6 border-b border-border-slate flex justify-between items-center gap-3">
           <div>
-            <h4 className="font-headline-md text-headline-md text-on-surface">Latest Drawing Revisions</h4>
+            <h3 className="font-headline-md text-headline-md text-on-surface">Latest Drawing Revisions</h3>
             <p className="font-body-sm text-on-surface-variant">Recently uploaded and updated drawings.</p>
           </div>
           <button onClick={() => navigate("/register")} className="text-primary font-label-md hover:underline text-[13px]">
@@ -367,7 +386,7 @@ export default function Dashboard({
         <div className="overflow-x-auto">
           {latestDrawings.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-32 gap-3 text-on-surface-variant">
-              <span className="material-symbols-outlined text-[36px] opacity-25">folder_open</span>
+              <span aria-hidden="true" className="material-symbols-outlined text-[36px] opacity-25">folder_open</span>
               <p className="font-body-sm text-body-sm">No drawings uploaded yet.</p>
             </div>
           ) : (
@@ -375,7 +394,7 @@ export default function Dashboard({
               <thead className="bg-surface-container-low border-b border-border-slate">
                 <tr>
                   {["Sheet No.", "Title", "Rev", "Date", "Status"].map((h) => (
-                    <th key={h} className="px-4 md:px-6 py-3 md:py-4 font-label-sm text-on-surface-variant uppercase tracking-wider text-[11px] whitespace-nowrap">{h}</th>
+                    <th key={h} scope="col" className="px-4 md:px-6 py-3 md:py-4 font-label-sm text-on-surface-variant uppercase tracking-wider text-[11px] whitespace-nowrap">{h}</th>
                   ))}
                 </tr>
               </thead>
@@ -405,25 +424,25 @@ export default function Dashboard({
 }
 
 function MetricCard({
-  icon, badge, title, value, sub, iconBg, iconColor, onClick,
-  mobileTileBg, mobileIconBg, mobileIconColor, mobileValueColor, mobileLabelColor,
+  icon, badge, title, value, sub, iconWrapCls, iconTextCls, onClick,
+  mobileTileBg, mobileValueColor, mobileLabelColor,
   className = "",
 }) {
   return (
     <div
-      className={`${mobileTileBg || "bg-surface"} md:bg-surface border border-border-slate p-3.5 md:p-5 rounded-xl hover:shadow-md transition-shadow flex flex-col md:flex-row items-start gap-2.5 md:gap-4 ${onClick ? "cursor-pointer" : ""} ${className}`}
+      className={`${mobileTileBg || "bg-surface"} md:bg-surface border border-border-slate p-3.5 md:p-5 rounded-xl hover:shadow-md transition-shadow flex flex-col md:flex-row items-start gap-2.5 md:gap-4 outline-none ${onClick ? "cursor-pointer focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2" : ""} ${className}`}
       onClick={onClick}
       role={onClick ? "button" : undefined}
       tabIndex={onClick ? 0 : undefined}
-      onKeyDown={onClick ? (e) => { if (e.key === "Enter" || e.key === " ") onClick(); } : undefined}
+      onKeyDown={onClick ? (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onClick(); } } : undefined}
     >
-      <div className={`p-2 md:p-2.5 rounded-lg shrink-0 ${mobileIconBg || iconBg} md:${iconBg} ${mobileIconColor || iconColor} md:${iconColor}`}>
-        <span className="material-symbols-outlined text-[18px] md:text-[22px]" style={{ fontVariationSettings: "'FILL' 0" }}>{icon}</span>
+      <div className={`p-2 md:p-2.5 rounded-lg shrink-0 ${iconWrapCls} ${iconTextCls}`}>
+        <span aria-hidden="true" className="material-symbols-outlined text-[18px] md:text-[22px]" style={{ fontVariationSettings: "'FILL' 0" }}>{icon}</span>
       </div>
       <div className="min-w-0">
         <p className={`font-label-sm text-[10px] md:text-[11px] ${mobileLabelColor || "text-on-surface-variant"} md:text-on-surface-variant uppercase tracking-wider truncate`}>{title}</p>
         <div className="flex items-center gap-2 mt-0.5">
-          <h3 className={`font-headline-md text-headline-md ${mobileValueColor || "text-on-surface"} md:text-on-surface font-bold`}>{value}</h3>
+          <h3 className={`font-headline-md text-headline-md ${mobileValueColor || "text-on-surface"} md:text-on-surface font-bold`}>{fmt(value)}</h3>
           {badge && (
             <span className={`px-2 py-0.5 rounded-full font-label-sm text-[10px] ${badge.cls}`}>{badge.label}</span>
           )}
@@ -438,15 +457,15 @@ function MetricCard({
 /* Mobile reuses the shared STATUS map so dots match desktop chart/pills. */
 const STATUS_DOT = STATUS;
 
-function MobileKpi({ icon, label, value, sub, fg, soft, onClick, trendUp = false, urgent = false }) {
+function MobileKpi({ icon, label, value, sub, softCls, fgCls, onClick, trendUp = false, urgent = false }) {
   return (
     <button
       onClick={onClick}
-      className="bg-surface rounded-2xl p-3 shadow-card flex flex-col gap-2 text-left active:scale-[0.97] transition-transform"
+      className="bg-surface rounded-2xl p-3 shadow-card flex flex-col gap-2 text-left active:scale-[0.97] transition-transform outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
     >
       <div className="flex items-center justify-between">
-        <span className="w-9 h-9 rounded-xl grid place-items-center shrink-0" style={{ background: soft, color: fg }}>
-          <span className="material-symbols-outlined text-[20px]">{icon}</span>
+        <span className={`w-9 h-9 rounded-xl grid place-items-center shrink-0 ${softCls} ${fgCls}`}>
+          <span aria-hidden="true" className="material-symbols-outlined text-[20px]">{icon}</span>
         </span>
         {sub && (
           <span className={`inline-flex items-center gap-0.5 text-[10px] font-semibold ${trendUp ? "text-status-emerald-text" : "text-on-surface-variant"}`}>
@@ -455,17 +474,17 @@ function MobileKpi({ icon, label, value, sub, fg, soft, onClick, trendUp = false
         )}
       </div>
       <div>
-        <div className={`text-[24px] font-bold leading-none tracking-[-0.02em] ${urgent ? "text-status-rose-text" : "text-on-surface"}`}>{value}</div>
+        <div className={`text-[24px] font-bold leading-none tracking-[-0.02em] ${urgent ? "text-status-rose-text" : "text-on-surface"}`}>{fmt(value)}</div>
         <div className="flex items-center justify-between mt-[3px]">
           <div className="text-[11.5px] text-on-surface-variant leading-tight">{label}</div>
-          {onClick && <span className="material-symbols-outlined text-[13px] text-outline">arrow_forward</span>}
+          {onClick && <span aria-hidden="true" className="material-symbols-outlined text-[13px] text-outline">arrow_forward</span>}
         </div>
       </div>
     </button>
   );
 }
 
-function MobileDashboard({ drawings, totalDrawings, totalTransmittals, pending, overdue, activity, activityError, activityLoading, userName, onNavigate }) {
+function MobileDashboard({ drawings, totalDrawings, totalTransmittals, pending, overdue, activity, activityError, activityLoading, onRetry, userName, onNavigate }) {
   const h = new Date().getHours();
   const tod = h < 12 ? "morning" : h < 17 ? "afternoon" : "evening";
   const firstName = (userName || "").split(" ")[0] || "there";
@@ -484,19 +503,19 @@ function MobileDashboard({ drawings, totalDrawings, totalTransmittals, pending, 
 
       {/* KPI grid */}
       <div className="grid grid-cols-2 gap-2.5">
-        <MobileKpi icon="architecture"    label="Total Drawings"   value={totalDrawings}     sub={s3 > 0 ? `${s3} for construction` : undefined} trendUp fg="#3525cd" soft="rgba(53,37,205,0.10)" onClick={() => onNavigate("/register")} />
-        <MobileKpi icon="move_to_inbox"   label="Transmittals"     value={totalTransmittals} sub={totalTransmittals > 0 ? "total issued" : undefined} trendUp fg="#059669" soft="#ecfdf5"    onClick={() => onNavigate("/transmittals")} />
-        <MobileKpi icon="pending_actions" label="Pending Approval" value={pending}           sub={pending > 0 ? "awaiting review" : undefined}                fg="#d97706" soft="#fffbeb"    onClick={() => onNavigate("/register", { state: { filterStat: "S2" } })} />
-        <MobileKpi icon="warning"         label="Overdue Items"    value={overdue}           sub={overdue > 0 ? "needs attention" : "none overdue"} urgent={overdue > 0} fg="#e11d48" soft="#fff1f2" onClick={() => onNavigate("/transmittals")} />
+        <MobileKpi icon="architecture"    label="Total Drawings"   value={totalDrawings}     sub={s3 > 0 ? `${s3} for construction` : undefined} trendUp softCls="bg-primary/10"        fgCls="text-primary"             onClick={() => onNavigate("/register")} />
+        <MobileKpi icon="move_to_inbox"   label="Transmittals"     value={totalTransmittals} sub={totalTransmittals > 0 ? "total issued" : undefined} trendUp softCls="bg-status-emerald-bg" fgCls="text-status-emerald-text" onClick={() => onNavigate("/transmittals")} />
+        <MobileKpi icon="pending_actions" label="Pending Approval" value={pending}           sub={pending > 0 ? "awaiting review" : undefined}                softCls="bg-status-amber-bg"  fgCls="text-status-amber-text"   onClick={() => onNavigate("/register", { state: { filterStat: "S2" } })} />
+        <MobileKpi icon="warning"         label="Overdue Items"    value={overdue}           sub={overdue > 0 ? "needs attention" : "none overdue"} urgent={overdue > 0} softCls="bg-status-rose-bg" fgCls="text-status-rose-text"    onClick={() => onNavigate("/transmittals")} />
       </div>
 
       {/* Recent Activity — shown before status so it's visible sooner */}
       <div className="flex flex-col gap-2">
         <div className="flex items-center justify-between px-0.5">
           <h3 className="text-[14px] font-semibold text-on-surface">Recent Activity</h3>
-          <button onClick={() => onNavigate("/register")} className="inline-flex items-center gap-0.5 min-h-[44px] pl-2.5 pr-1 text-[13px] font-semibold text-primary active:opacity-70">
+          <button onClick={() => onNavigate("/register")} className="inline-flex items-center gap-0.5 min-h-[44px] pl-2.5 pr-1 text-[13px] font-semibold text-primary active:opacity-70 outline-none focus-visible:ring-2 focus-visible:ring-primary rounded">
             See all
-            <span className="material-symbols-outlined text-[16px]">chevron_right</span>
+            <span aria-hidden="true" className="material-symbols-outlined text-[16px]">chevron_right</span>
           </button>
         </div>
         <div className="bg-surface rounded-2xl shadow-card overflow-hidden">
@@ -512,12 +531,13 @@ function MobileDashboard({ drawings, totalDrawings, totalTransmittals, pending, 
             ))
           ) : activityError ? (
             <div className="flex items-center gap-3 px-4 py-3.5 text-on-surface-variant">
-              <span className="material-symbols-outlined text-[18px] opacity-40">wifi_off</span>
-              <p className="text-[12px] text-status-rose-text">Could not load activity.</p>
+              <span aria-hidden="true" className="material-symbols-outlined text-[18px] opacity-40">wifi_off</span>
+              <p className="text-[12px] text-status-rose-text flex-1">Could not load activity.</p>
+              <button onClick={onRetry} className="min-h-[44px] px-2 text-[13px] font-semibold text-primary active:opacity-70 outline-none focus-visible:ring-2 focus-visible:ring-primary rounded">Retry</button>
             </div>
           ) : activity.length === 0 ? (
             <div className="flex items-center gap-3 px-4 py-3.5 text-on-surface-variant">
-              <span className="material-symbols-outlined text-[18px] opacity-40">notifications_none</span>
+              <span aria-hidden="true" className="material-symbols-outlined text-[18px] opacity-40">notifications_none</span>
               <p className="text-[12px]">No activity yet.</p>
             </div>
           ) : (
@@ -526,7 +546,7 @@ function MobileDashboard({ drawings, totalDrawings, totalTransmittals, pending, 
               return (
                 <div key={item.id} className={`flex items-center gap-3 px-4 py-3 ${i < Math.min(activity.length, 5) - 1 ? "border-b border-surface-container" : ""}`}>
                   <span className={`w-8 h-8 rounded-lg grid place-items-center shrink-0 ${meta.bgCls}`}>
-                    <span className={`material-symbols-outlined text-[17px] ${meta.textCls}`}>{meta.icon}</span>
+                    <span aria-hidden="true" className={`material-symbols-outlined text-[17px] ${meta.textCls}`}>{meta.icon}</span>
                   </span>
                   <div className="flex-1 min-w-0">
                     <div className="text-[12px] text-on-surface leading-snug truncate">{item.title}</div>
