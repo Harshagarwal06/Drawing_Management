@@ -1,6 +1,13 @@
-import { useState, useEffect, useLayoutEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useLayoutEffect, useRef, useCallback, useId } from "react";
 import { createPortal } from "react-dom";
-import { MoreVertical, KeyRound, UserX, Trash2, X, RotateCcw } from "lucide-react";
+import {
+  MoreVertical, KeyRound, UserX, Trash2, X, RotateCcw,
+  Eye, EyeOff, UserPlus, Search, Pencil, FolderOpen,
+  MessageSquare, CheckCircle2, Lock, User, Users, Check, Unplug,
+} from "lucide-react";
+
+/* Shared focus-visible ring — keyboard users can see what's focused. */
+const FOCUS_RING = 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40';
 
 const API = import.meta.env.VITE_API_URL;
 
@@ -63,22 +70,57 @@ function PortalDropdown({ anchorEl, onClose, children }) {
   );
 }
 
+/* Traps focus inside an open modal, autofocuses the first field/control,
+   and restores focus to the trigger on close. (focus-management) */
+function useFocusTrap(active) {
+  const ref = useRef(null);
+  useEffect(() => {
+    if (!active) return;
+    const node = ref.current;
+    if (!node) return;
+    const prevFocused = document.activeElement;
+    const selector =
+      'a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])';
+    const focusables = () =>
+      Array.from(node.querySelectorAll(selector)).filter(el => el.offsetParent !== null);
+
+    // Prefer the first editable field; fall back to the first focusable control.
+    (node.querySelector('input,select,textarea') || focusables()[0])?.focus();
+
+    const onKey = (e) => {
+      if (e.key !== 'Tab') return;
+      const items = focusables();
+      if (items.length === 0) return;
+      const first = items[0];
+      const last  = items[items.length - 1];
+      if (e.shiftKey && document.activeElement === first)      { e.preventDefault(); last.focus(); }
+      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+    };
+    node.addEventListener('keydown', onKey);
+    return () => {
+      node.removeEventListener('keydown', onKey);
+      prevFocused?.focus?.();
+    };
+  }, [active]);
+  return ref;
+}
+
 /* ── Dropdown menu item variants ──────────────────────────────────── */
 function MenuItem({ icon: Icon, label, onClick, variant = 'default' }) {
   const styles = {
     default: 'text-on-surface hover:bg-surface-container-low',
-    warning: 'text-amber-600 hover:bg-amber-50',
-    danger:  'text-red-600 hover:bg-red-50',
+    warning: 'text-status-amber-text hover:bg-status-amber-bg',
+    danger:  'text-status-rose-text hover:bg-status-rose-bg',
   };
   const iconStyles = {
     default: 'text-on-surface-variant',
-    warning: 'text-amber-500',
-    danger:  'text-red-500',
+    warning: 'text-status-amber-text',
+    danger:  'text-status-rose-text',
   };
   return (
     <button
       onClick={onClick}
-      className={`w-full flex items-center gap-2.5 px-4 py-2.5 text-[13px] font-medium transition-colors text-left ${styles[variant]}`}
+      className={`w-full flex items-center gap-2.5 px-4 py-2.5 text-[13px] font-medium transition-colors text-left ${FOCUS_RING} ${styles[variant]}`}
     >
       <Icon size={14} className={`shrink-0 ${iconStyles[variant]}`} />
       {label}
@@ -225,19 +267,18 @@ export default function SettingsView({ currentUser, token }) {
     setSlackMsg(null);
   };
 
-  const handleSaveSlack = async (e) => {
-    e.preventDefault();
+  const saveSlackUrl = async (url) => {
     setSlackLoading(true);
     setSlackMsg(null);
     try {
       const res = await fetch(`${API}/api/projects/${slackProject.id}/slack`, {
         method:  'PATCH',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body:    JSON.stringify({ slackWebhookUrl: slackUrl.trim() }),
+        body:    JSON.stringify({ slackWebhookUrl: url }),
       });
       const data = await res.json();
       if (res.ok) {
-        setSlackMsg({ type: 'success', text: slackUrl.trim() ? 'Slack webhook saved.' : 'Slack webhook cleared.' });
+        setSlackMsg({ type: 'success', text: url ? 'Slack webhook saved.' : 'Slack webhook cleared.' });
         loadProjects();
         setSlackProject(p => p ? { ...p, slackConfigured: data.slackConfigured } : p);
       } else {
@@ -248,6 +289,11 @@ export default function SettingsView({ currentUser, token }) {
     } finally {
       setSlackLoading(false);
     }
+  };
+
+  const handleSaveSlack = (e) => {
+    e.preventDefault();
+    return saveSlackUrl(slackUrl.trim());
   };
 
   const handleTestSlack = async () => {
@@ -329,8 +375,13 @@ export default function SettingsView({ currentUser, token }) {
     finally { setResetLoading(false); }
   };
 
-  // Confirmation state for deactivate / remove
-  const [confirmAction, setConfirmAction] = useState(null); // { type: 'deactivate'|'remove', user }
+  // Confirmation state for deactivate / remove / slack-disconnect
+  const [confirmAction, setConfirmAction] = useState(null); // { type, user } | { type:'slack-disconnect', project }
+
+  // Focus traps — autofocus first field, trap Tab, restore focus on close.
+  const renameModalRef  = useFocusTrap(!!renamingProject);
+  const slackModalRef    = useFocusTrap(!!slackProject);
+  const confirmModalRef  = useFocusTrap(!!confirmAction);
 
   /* Escape closes whichever modal is open (innermost first). Gives keyboard
      users a predictable exit — escape-routes / modal-escape. */
@@ -379,6 +430,10 @@ export default function SettingsView({ currentUser, token }) {
 
   const handleAddUser = async e => {
     e.preventDefault();
+    if (!newUser.name.trim() || !newUser.username.trim() || !newUser.password) {
+      flashMsg('error', 'Name, username, and password are required.');
+      return;
+    }
     if (newUser.role !== 'Director' && newUser.selectedProjects.length === 0) {
       flashMsg('error', 'Please select at least one project for this user.');
       return;
@@ -403,10 +458,17 @@ export default function SettingsView({ currentUser, token }) {
     finally { setUserLoading(false); }
   };
 
+  const filteredUsers = users.filter(u => {
+    const q      = userSearch.toLowerCase();
+    const matchQ = !q || u.name.toLowerCase().includes(q) || u.username.toLowerCase().includes(q);
+    const matchR = roleFilter === 'All' || u.role === roleFilter;
+    return matchQ && matchR;
+  });
+
   /* ── Banner colours (handles 'warning' type too) ── */
   const bannerClass = (type) => {
     if (type === 'success') return 'bg-status-emerald-bg text-status-emerald-text border-status-emerald-text/20';
-    if (type === 'warning') return 'bg-amber-50 text-amber-700 border-amber-200';
+    if (type === 'warning') return 'bg-status-amber-bg text-status-amber-text border-status-amber-text/20';
     return 'bg-status-rose-bg text-status-rose-text border-status-rose-text/20';
   };
 
@@ -418,7 +480,7 @@ export default function SettingsView({ currentUser, token }) {
       </div>
 
       {/* ── Profile ─────────────────────────────────────────────────── */}
-      <Section title="Profile" icon="person">
+      <Section title="Profile" icon={User}>
         <div className="flex items-center gap-4">
           <div className="w-14 h-14 rounded-full bg-primary flex items-center justify-center text-white font-bold text-xl shrink-0">
             {currentUser?.avatar || currentUser?.name?.charAt(0)}
@@ -434,18 +496,18 @@ export default function SettingsView({ currentUser, token }) {
       </Section>
 
       {/* ── Change Password ──────────────────────────────────────────── */}
-      <Section title="Change Password" icon="lock">
+      <Section title="Change Password" icon={Lock}>
         <form onSubmit={handlePwChange} className="space-y-4 max-w-sm">
           {pwMsg && (
-            <div className={`text-[13px] p-3 rounded-lg border ${bannerClass(pwMsg.type)}`}>
+            <div role="alert" aria-live="polite" className={`text-[13px] p-3 rounded-lg border ${bannerClass(pwMsg.type)}`}>
               {pwMsg.text}
             </div>
           )}
-          <Field label="Current Password"     type="password" value={pwForm.currentPassword} onChange={v => setPwForm(p => ({ ...p, currentPassword: v }))} />
-          <Field label="New Password"         type="password" value={pwForm.newPassword}     onChange={v => setPwForm(p => ({ ...p, newPassword: v }))} />
-          <Field label="Confirm New Password" type="password" value={pwForm.confirm}         onChange={v => setPwForm(p => ({ ...p, confirm: v }))} />
+          <Field label="Current Password"     type="password" autoComplete="current-password" value={pwForm.currentPassword} onChange={v => setPwForm(p => ({ ...p, currentPassword: v }))} />
+          <Field label="New Password"         type="password" autoComplete="new-password"     value={pwForm.newPassword}     onChange={v => setPwForm(p => ({ ...p, newPassword: v }))} />
+          <Field label="Confirm New Password" type="password" autoComplete="new-password"     value={pwForm.confirm}         onChange={v => setPwForm(p => ({ ...p, confirm: v }))} />
           <button type="submit" disabled={pwLoading}
-            className="bg-primary text-white rounded-lg hover:bg-primary-container px-5 py-2.5 font-medium text-[14px] transition-colors disabled:opacity-60">
+            className={`bg-primary text-white rounded-lg hover:bg-primary-container px-5 py-2.5 font-medium text-[14px] transition-colors disabled:opacity-60 ${FOCUS_RING}`}>
             {pwLoading ? 'Updating…' : 'Update Password'}
           </button>
         </form>
@@ -455,14 +517,14 @@ export default function SettingsView({ currentUser, token }) {
       {isAdmin && (
         <Section
           title="User Management"
-          icon="manage_accounts"
+          icon={Users}
           headerAction={
             !addOpen && (
               <button
                 onClick={() => { setAddOpen(true); setUserMsg(null); }}
-                className="flex items-center gap-1.5 px-4 py-2 bg-primary text-white rounded-lg font-medium text-[13px] hover:bg-primary-container transition-colors"
+                className={`flex items-center gap-1.5 px-4 py-2 bg-primary text-white rounded-lg font-medium text-[13px] hover:bg-primary-container transition-colors ${FOCUS_RING}`}
               >
-                <span className="material-symbols-outlined text-[16px]">person_add</span>
+                <UserPlus size={16} />
                 Add User
               </button>
             )
@@ -470,7 +532,7 @@ export default function SettingsView({ currentUser, token }) {
         >
           {/* Status banner */}
           {userMsg && (
-            <div className={`text-[13px] p-3 rounded-lg border mb-4 ${bannerClass(userMsg.type)}`}>
+            <div role="alert" aria-live="polite" className={`text-[13px] p-3 rounded-lg border mb-4 ${bannerClass(userMsg.type)}`}>
               {userMsg.text}
             </div>
           )}
@@ -479,19 +541,21 @@ export default function SettingsView({ currentUser, token }) {
           {!addOpen && (
             <div className="flex gap-2 mb-4">
               <div className="relative flex-1">
-                <span className="material-symbols-outlined absolute left-2.5 top-1/2 -translate-y-1/2 text-on-surface-variant text-[16px]">search</span>
+                <Search size={16} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-on-surface-variant" />
                 <input
                   type="text"
                   value={userSearch}
                   onChange={e => setUserSearch(e.target.value)}
                   placeholder="Search users..."
-                  className="w-full pl-8 pr-3 py-2 text-[13px] bg-white border border-border-slate rounded-lg text-on-surface placeholder:text-on-surface-variant focus:outline-none focus:ring-1 focus:ring-primary/20 focus:border-primary transition-all"
+                  aria-label="Search users"
+                  className="w-full pl-8 pr-3 py-2 text-[13px] bg-white border border-border-slate rounded-lg text-on-surface placeholder:text-on-surface-variant focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus:border-primary transition-all"
                 />
               </div>
               <select
                 value={roleFilter}
                 onChange={e => setRoleFilter(e.target.value)}
-                className="bg-white border border-border-slate rounded-lg px-3 py-2 text-[13px] text-on-surface focus:outline-none focus:ring-1 focus:ring-primary/20 shrink-0"
+                aria-label="Filter by role"
+                className="bg-white border border-border-slate rounded-lg px-3 py-2 text-[13px] text-on-surface focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 shrink-0"
               >
                 <option value="All">All Roles</option>
                 {ROLES.map(r => <option key={r} value={r}>{r}</option>)}
@@ -502,13 +566,12 @@ export default function SettingsView({ currentUser, token }) {
           {/* User list */}
           {!addOpen && (
             <div className="rounded-xl border border-border-slate overflow-hidden mb-4">
-              {users
-                .filter(u => {
-                  const q      = userSearch.toLowerCase();
-                  const matchQ = !q || u.name.toLowerCase().includes(q) || u.username.toLowerCase().includes(q);
-                  const matchR = roleFilter === 'All' || u.role === roleFilter;
-                  return matchQ && matchR;
-                })
+              {filteredUsers.length === 0 && (
+                <div className="px-4 py-8 text-center text-[13px] text-on-surface-variant">
+                  No users found.
+                </div>
+              )}
+              {filteredUsers
                 .map((u, idx, arr) => {
                   const isNonDirector = u.role !== 'Director';
                   const isSelf        = u.id === currentUser?.id;
@@ -528,67 +591,85 @@ export default function SettingsView({ currentUser, token }) {
                           {u.avatar}
                         </div>
 
-                        {/* Name + username */}
-                        <div className="flex-1 min-w-0">
-                          <p className="text-[13px] font-medium text-on-surface leading-tight flex items-center gap-2 min-w-0">
-                            <span className="truncate">{u.name}</span>
-                            {isDeactivated && (
-                              <span className="shrink-0 px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-status-rose-bg text-status-rose-text uppercase tracking-wide">Deactivated</span>
+                        {/* Middle column — name stacks above the controls on mobile and
+                            sits inline on desktop, so the name is never squeezed to zero. */}
+                        <div className="flex-1 min-w-0 flex flex-col sm:flex-row sm:items-center gap-1.5 sm:gap-2">
+
+                          {/* Name + username */}
+                          <div className="min-w-0 sm:flex-1">
+                            <p className="text-[13px] font-medium text-on-surface leading-tight flex items-center gap-2 min-w-0">
+                              <span className="truncate">{u.name}</span>
+                              {isDeactivated && (
+                                <span className="shrink-0 px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-status-rose-bg text-status-rose-text uppercase tracking-wide">Deactivated</span>
+                              )}
+                            </p>
+                            <p className="text-[11px] text-on-surface-variant truncate">@{u.username}</p>
+                          </div>
+
+                          {/* Controls — role select + project-access pill */}
+                          <div className="flex items-center gap-1.5 shrink-0">
+
+                            {/* Role dropdown */}
+                            <div className="relative flex items-center gap-1.5 shrink-0">
+                              <select
+                                value={u.role}
+                                onChange={e => handleRoleChange(u.id, e.target.value, u.allowed_projects)}
+                                disabled={isSelf}
+                                aria-label={`Role for ${u.name}`}
+                                title={isSelf ? "You can't change your own role" : undefined}
+                                className={`bg-white border border-border-slate rounded-lg px-2 py-1.5 text-[12px] text-on-surface focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 disabled:opacity-50 ${FOCUS_RING}`}
+                              >
+                                {ROLES.map(r => <option key={r} value={r}>{r}</option>)}
+                              </select>
+                              {roleFlash?.userId === u.id && (
+                                <span className={`inline-flex items-center gap-0.5 text-[10px] font-bold px-1.5 py-0.5 rounded-full shrink-0 ${
+                                  roleFlash.ok
+                                    ? 'bg-status-emerald-bg text-status-emerald-text'
+                                    : 'bg-status-rose-bg text-status-rose-text'
+                                }`}>
+                                  {roleFlash.ok ? <Check size={11} /> : <X size={11} />}
+                                  {roleFlash.ok ? 'saved' : 'failed'}
+                                </span>
+                              )}
+                            </div>
+
+                            {/* Project access pill — non-Director, non-self (primary way to edit access).
+                                Shown on mobile too, so access can be edited on a phone. */}
+                            {isNonDirector && !isSelf && (
+                              allowedList === null ? (
+                                <button
+                                  onClick={() => isExpanded ? setEditingProjectsFor(null) : openProjectEditor(u)}
+                                  aria-label={`Edit project access for ${u.name} (all projects)`}
+                                  className={`flex px-2 py-1 rounded-full text-[10px] font-medium bg-surface-container text-on-surface-variant border border-border-slate hover:bg-surface-container-high transition-colors shrink-0 items-center gap-1 ${FOCUS_RING}`}
+                                >
+                                  <span className="hidden sm:inline">All projects</span>
+                                  <Pencil size={11} />
+                                </button>
+                              ) : (
+                                <button
+                                  onClick={() => isExpanded ? setEditingProjectsFor(null) : openProjectEditor(u)}
+                                  aria-label={`Edit project access for ${u.name} (${allowedList.length} project${allowedList.length !== 1 ? 's' : ''})`}
+                                  className={`flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-medium bg-primary/10 text-primary border border-primary/20 hover:bg-primary/20 transition-colors shrink-0 ${FOCUS_RING}`}
+                                >
+                                  <span>{allowedList.length}<span className="hidden sm:inline"> project{allowedList.length !== 1 ? 's' : ''}</span></span>
+                                  <Pencil size={12} />
+                                </button>
+                              )
                             )}
-                          </p>
-                          <p className="text-[11px] text-on-surface-variant truncate">@{u.username}</p>
+                            {/* Spacer keeps columns aligned for Director / self rows — desktop only */}
+                            {(!isNonDirector || isSelf) && <div className="hidden sm:block w-[80px] shrink-0" />}
+                          </div>
                         </div>
-
-                        {/* Role dropdown */}
-                        <div className="relative flex items-center gap-1.5 shrink-0">
-                          <select
-                            value={u.role}
-                            onChange={e => handleRoleChange(u.id, e.target.value, u.allowed_projects)}
-                            disabled={isSelf}
-                            className="bg-white border border-border-slate rounded-lg px-2 py-1.5 text-[12px] text-on-surface focus:outline-none focus:ring-1 focus:ring-primary/20 disabled:opacity-50 max-w-[150px] sm:max-w-none"
-                          >
-                            {ROLES.map(r => <option key={r} value={r}>{r}</option>)}
-                          </select>
-                          {roleFlash?.userId === u.id && (
-                            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full shrink-0 ${
-                              roleFlash.ok
-                                ? 'bg-status-emerald-bg text-status-emerald-text'
-                                : 'bg-status-rose-bg text-status-rose-text'
-                            }`}>
-                              {roleFlash.ok ? '✓ saved' : '✗ failed'}
-                            </span>
-                          )}
-                        </div>
-
-                        {/* Project access pill — non-Director, non-self (primary way to edit access) */}
-                        {isNonDirector && !isSelf && (
-                          allowedList === null ? (
-                            <button
-                              onClick={() => isExpanded ? setEditingProjectsFor(null) : openProjectEditor(u)}
-                              className="hidden sm:flex px-2 py-0.5 rounded-full text-[10px] font-medium bg-surface-container text-on-surface-variant border border-border-slate hover:bg-surface-container-high transition-colors shrink-0 items-center gap-1"
-                            >
-                              All projects
-                              <span className="material-symbols-outlined text-[11px]">edit</span>
-                            </button>
-                          ) : (
-                            <button
-                              onClick={() => isExpanded ? setEditingProjectsFor(null) : openProjectEditor(u)}
-                              className="hidden sm:flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-primary/10 text-primary border border-primary/20 hover:bg-primary/20 transition-colors shrink-0"
-                            >
-                              <span>{allowedList.length} project{allowedList.length !== 1 ? 's' : ''}</span>
-                              <span className="material-symbols-outlined text-[12px]">edit</span>
-                            </button>
-                          )
-                        )}
-                        {/* Spacer keeps columns aligned for Director / self rows — desktop only */}
-                        {(!isNonDirector || isSelf) && <div className="hidden sm:block w-[80px] shrink-0" />}
 
                         {/* ⋮ button */}
                         <button
                           ref={el => setBtnRef(u.id, el)}
                           disabled={isSelf}
                           onClick={() => menuOpenId === u.id ? closeMenu() : openMenu(u.id)}
-                          className="p-1 rounded-md text-on-surface-variant hover:bg-surface-container disabled:opacity-30 transition-colors shrink-0"
+                          className={`p-2 rounded-md text-on-surface-variant hover:bg-surface-container disabled:opacity-30 transition-colors shrink-0 ${FOCUS_RING}`}
+                          aria-label={`More actions for ${u.name}`}
+                          aria-haspopup="menu"
+                          aria-expanded={menuOpenId === u.id}
                           title="More actions"
                         >
                           <MoreVertical size={15} />
@@ -643,13 +724,14 @@ export default function SettingsView({ currentUser, token }) {
                             </p>
                             <button
                               onClick={() => { setResetUserId(null); setResetMsg(null); }}
-                              className="text-on-surface-variant hover:text-on-surface"
+                              aria-label="Close reset password panel"
+                              className={`p-1.5 rounded-md text-on-surface-variant hover:text-on-surface hover:bg-surface-container ${FOCUS_RING}`}
                             >
                               <X size={14} />
                             </button>
                           </div>
                           {resetMsg && (
-                            <div className={`text-[12px] p-2 rounded-lg border mb-2 ${bannerClass(resetMsg.type)}`}>
+                            <div role="alert" aria-live="polite" className={`text-[12px] p-2 rounded-lg border mb-2 ${bannerClass(resetMsg.type)}`}>
                               {resetMsg.text}
                             </div>
                           )}
@@ -660,12 +742,14 @@ export default function SettingsView({ currentUser, token }) {
                               onChange={e => setResetPw(e.target.value)}
                               onKeyDown={e => e.key === 'Enter' && handleResetPassword(u.id)}
                               placeholder="New password (min 6 chars)"
-                              className="flex-1 bg-white border border-border-slate rounded-lg px-3 py-1.5 text-[13px] text-on-surface focus:outline-none focus:ring-1 focus:ring-primary/20 focus:border-primary transition-all"
+                              autoComplete="new-password"
+                              aria-label={`New password for ${u.name}`}
+                              className="flex-1 bg-white border border-border-slate rounded-lg px-3 py-1.5 text-[13px] text-on-surface focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus:border-primary transition-all"
                             />
                             <button
                               onClick={() => handleResetPassword(u.id)}
                               disabled={resetLoading}
-                              className="bg-primary text-white rounded-lg hover:bg-primary-container px-3 py-1.5 font-medium text-[12px] transition-colors disabled:opacity-60 shrink-0"
+                              className={`bg-primary text-white rounded-lg hover:bg-primary-container px-3 py-1.5 font-medium text-[12px] transition-colors disabled:opacity-60 shrink-0 ${FOCUS_RING}`}
                             >
                               {resetLoading ? 'Saving…' : 'Set Password'}
                             </button>
@@ -701,11 +785,11 @@ export default function SettingsView({ currentUser, token }) {
                           )}
                           <div className="flex gap-2">
                             <button onClick={() => handleSaveProjectAccess(u.id)}
-                              className="bg-primary text-white rounded-lg hover:bg-primary-container px-3 py-1.5 font-medium text-[12px] transition-colors">
+                              className={`bg-primary text-white rounded-lg hover:bg-primary-container px-3 py-1.5 font-medium text-[12px] transition-colors ${FOCUS_RING}`}>
                               Save
                             </button>
                             <button onClick={() => setEditingProjectsFor(null)}
-                              className="bg-white border border-border-slate text-on-surface-variant hover:bg-surface-container px-3 py-1.5 rounded-lg font-medium text-[12px] transition-colors">
+                              className={`bg-white border border-border-slate text-on-surface-variant hover:bg-surface-container px-3 py-1.5 rounded-lg font-medium text-[12px] transition-colors ${FOCUS_RING}`}>
                               Cancel
                             </button>
                           </div>
@@ -721,16 +805,17 @@ export default function SettingsView({ currentUser, token }) {
           {addOpen && (
             <form onSubmit={handleAddUser} className="p-4 rounded-lg border border-border-slate bg-surface-container-low space-y-3">
               <p className="text-[14px] font-semibold text-on-surface mb-1">New User</p>
-              <div className="grid grid-cols-2 gap-3">
-                <Field label="Full Name" value={newUser.name}     onChange={v => setNewUser(p => ({ ...p, name: v }))} />
-                <Field label="Username"  value={newUser.username} onChange={v => setNewUser(p => ({ ...p, username: v }))} />
-                <Field label="Password"  type="password" value={newUser.password} onChange={v => setNewUser(p => ({ ...p, password: v }))} />
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <Field label="Full Name" required autoComplete="off" value={newUser.name}     onChange={v => setNewUser(p => ({ ...p, name: v }))} />
+                <Field label="Username"  required autoComplete="off" value={newUser.username} onChange={v => setNewUser(p => ({ ...p, username: v }))} />
+                <Field label="Password"  required autoComplete="new-password" type="password" value={newUser.password} onChange={v => setNewUser(p => ({ ...p, password: v }))} />
                 <div>
-                  <label className="block text-[12px] text-on-surface-variant mb-1.5 font-medium">Role</label>
+                  <label htmlFor="new-user-role" className="block text-[12px] text-on-surface-variant mb-1.5 font-medium">Role</label>
                   <select
+                    id="new-user-role"
                     value={newUser.role}
                     onChange={e => setNewUser(p => ({ ...p, role: e.target.value }))}
-                    className="w-full bg-white border border-border-slate rounded-lg px-3 py-2 text-[14px] text-on-surface focus:outline-none focus:ring-1 focus:ring-primary/20"
+                    className={`w-full bg-white border border-border-slate rounded-lg px-3 py-2 text-[14px] text-on-surface focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 ${FOCUS_RING}`}
                   >
                     {ROLES.map(r => <option key={r} value={r}>{r}</option>)}
                   </select>
@@ -766,11 +851,11 @@ export default function SettingsView({ currentUser, token }) {
               </div>
               <div className="flex gap-2 pt-1">
                 <button type="submit" disabled={userLoading}
-                  className="bg-primary text-white rounded-lg hover:bg-primary-container px-4 py-2 font-medium text-[14px] transition-colors disabled:opacity-60">
+                  className={`bg-primary text-white rounded-lg hover:bg-primary-container px-4 py-2 font-medium text-[14px] transition-colors disabled:opacity-60 ${FOCUS_RING}`}>
                   {userLoading ? 'Creating…' : 'Create User'}
                 </button>
                 <button type="button" onClick={() => setAddOpen(false)}
-                  className="bg-white border border-border-slate text-on-surface-variant hover:bg-surface-container px-4 py-2 rounded-lg font-medium text-[14px] transition-colors">
+                  className={`bg-white border border-border-slate text-on-surface-variant hover:bg-surface-container px-4 py-2 rounded-lg font-medium text-[14px] transition-colors ${FOCUS_RING}`}>
                   Cancel
                 </button>
               </div>
@@ -781,7 +866,7 @@ export default function SettingsView({ currentUser, token }) {
 
       {/* ── Projects ─────────────────────────────────────────────────── */}
       {isAdmin && (
-        <Section title="Projects" icon="folder_open">
+        <Section title="Projects" icon={FolderOpen}>
           <div className="space-y-2">
             {projects.length === 0 && (
               <p className="text-[13px] text-on-surface-variant">No projects yet.</p>
@@ -792,23 +877,25 @@ export default function SettingsView({ currentUser, token }) {
                 <span className="flex-1 text-[13px] text-on-surface truncate">{p.name}</span>
                 {!!p.slackConfigured && (
                   <span className="hidden sm:inline-flex items-center gap-1 text-[11px] font-medium text-status-emerald-text bg-status-emerald-bg px-2 py-0.5 rounded-full shrink-0">
-                    <span className="material-symbols-outlined text-[12px]">check_circle</span>
+                    <CheckCircle2 size={12} />
                     Slack
                   </span>
                 )}
                 <button
                   onClick={() => openSlackEditor(p)}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border-slate text-[12px] font-medium text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-colors shrink-0"
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border-slate text-[12px] font-medium text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-colors shrink-0 ${FOCUS_RING}`}
+                  aria-label={`Configure Slack notifications for ${p.code}`}
                   title="Configure Slack notifications"
                 >
-                  <span className="material-symbols-outlined text-[14px]">chat</span>
+                  <MessageSquare size={14} />
                   <span className="hidden sm:inline">Slack</span>
                 </button>
                 <button
                   onClick={() => { setRenamingProject(p); setRenameForm({ name: p.name, code: p.code }); setRenameMsg(null); }}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border-slate text-[12px] font-medium text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-colors shrink-0"
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border-slate text-[12px] font-medium text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-colors shrink-0 ${FOCUS_RING}`}
+                  aria-label={`Rename project ${p.code}`}
                 >
-                  <span className="material-symbols-outlined text-[14px]">edit</span>
+                  <Pencil size={14} />
                   <span className="hidden sm:inline">Rename</span>
                 </button>
               </div>
@@ -820,43 +907,52 @@ export default function SettingsView({ currentUser, token }) {
       {/* ── Rename project modal ─────────────────────────────────────── */}
       {renamingProject && createPortal(
         <div className="modal-scrim fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-[rgba(15,23,42,0.45)] backdrop-blur-sm" onClick={() => setRenamingProject(null)}>
-          <div onClick={(e) => e.stopPropagation()} className="modal-card bg-white rounded-2xl shadow-xl border border-border-slate w-full max-w-sm overflow-hidden">
+          <div
+            ref={renameModalRef}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="rename-modal-title"
+            onClick={(e) => e.stopPropagation()}
+            className="modal-card bg-white rounded-2xl shadow-xl border border-border-slate w-full max-w-sm overflow-hidden"
+          >
             <div className="px-6 py-4 border-b border-border-slate flex items-center justify-between">
-              <h2 className="text-[15px] font-semibold text-on-surface">Rename Project</h2>
-              <button onClick={() => setRenamingProject(null)} className="text-on-surface-variant hover:text-on-surface transition p-1 rounded-lg hover:bg-surface-container">
+              <h2 id="rename-modal-title" className="text-[15px] font-semibold text-on-surface">Rename Project</h2>
+              <button onClick={() => setRenamingProject(null)} aria-label="Close" className={`text-on-surface-variant hover:text-on-surface transition p-1.5 rounded-lg hover:bg-surface-container ${FOCUS_RING}`}>
                 <X size={16} />
               </button>
             </div>
             <form onSubmit={handleRenameProject} className="px-6 py-5 space-y-4">
               {renameMsg && (
-                <div className={`text-[13px] p-3 rounded-lg border ${bannerClass(renameMsg.type)}`}>{renameMsg.text}</div>
+                <div role="alert" aria-live="polite" className={`text-[13px] p-3 rounded-lg border ${bannerClass(renameMsg.type)}`}>{renameMsg.text}</div>
               )}
               <div>
-                <label className="block text-[12px] text-on-surface-variant mb-1.5 font-medium">Project Code</label>
+                <label htmlFor="rename-code" className="block text-[12px] text-on-surface-variant mb-1.5 font-medium">Project Code</label>
                 <input
+                  id="rename-code"
                   value={renameForm.code}
                   onChange={e => setRenameForm(f => ({ ...f, code: e.target.value.toUpperCase() }))}
                   maxLength={10}
                   required
-                  className="w-full bg-white border border-border-slate rounded-lg px-3 py-2 text-[14px] font-mono text-on-surface focus:outline-none focus:ring-1 focus:ring-primary/20 focus:border-primary"
+                  className="w-full bg-white border border-border-slate rounded-lg px-3 py-2 text-[14px] font-mono text-on-surface focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus:border-primary"
                 />
               </div>
               <div>
-                <label className="block text-[12px] text-on-surface-variant mb-1.5 font-medium">Project Name</label>
+                <label htmlFor="rename-name" className="block text-[12px] text-on-surface-variant mb-1.5 font-medium">Project Name</label>
                 <input
+                  id="rename-name"
                   value={renameForm.name}
                   onChange={e => setRenameForm(f => ({ ...f, name: e.target.value }))}
                   required
-                  className="w-full bg-white border border-border-slate rounded-lg px-3 py-2 text-[14px] text-on-surface focus:outline-none focus:ring-1 focus:ring-primary/20 focus:border-primary"
+                  className="w-full bg-white border border-border-slate rounded-lg px-3 py-2 text-[14px] text-on-surface focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus:border-primary"
                 />
               </div>
               <div className="flex gap-2 justify-end pt-1">
                 <button type="button" onClick={() => setRenamingProject(null)}
-                  className="px-4 py-2 rounded-lg border border-border-slate text-on-surface-variant hover:bg-surface-container font-medium text-[13px] transition-colors">
+                  className={`px-4 py-2 rounded-lg border border-border-slate text-on-surface-variant hover:bg-surface-container font-medium text-[13px] transition-colors ${FOCUS_RING}`}>
                   Cancel
                 </button>
                 <button type="submit" disabled={renameLoading}
-                  className="px-4 py-2 rounded-lg bg-primary text-white hover:bg-primary-container font-medium text-[13px] transition-colors disabled:opacity-60">
+                  className={`px-4 py-2 rounded-lg bg-primary text-white hover:bg-primary-container font-medium text-[13px] transition-colors disabled:opacity-60 ${FOCUS_RING}`}>
                   {renameLoading ? 'Saving…' : 'Save Changes'}
                 </button>
               </div>
@@ -869,59 +965,69 @@ export default function SettingsView({ currentUser, token }) {
       {/* ── Slack webhook modal ──────────────────────────────────────── */}
       {slackProject && createPortal(
         <div className="modal-scrim fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-[rgba(15,23,42,0.45)] backdrop-blur-sm" onClick={() => setSlackProject(null)}>
-          <div onClick={(e) => e.stopPropagation()} className="modal-card bg-white rounded-2xl shadow-xl border border-border-slate w-full max-w-md overflow-hidden">
+          <div
+            ref={slackModalRef}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="slack-modal-title"
+            onClick={(e) => e.stopPropagation()}
+            className="modal-card bg-white rounded-2xl shadow-xl border border-border-slate w-full max-w-md overflow-hidden"
+          >
             <div className="px-6 py-4 border-b border-border-slate flex items-center justify-between">
-              <h2 className="text-[15px] font-semibold text-on-surface">
+              <h2 id="slack-modal-title" className="text-[15px] font-semibold text-on-surface">
                 Slack Notifications — <span className="font-mono text-primary">{slackProject.code}</span>
               </h2>
-              <button onClick={() => setSlackProject(null)} aria-label="Close" className="text-on-surface-variant hover:text-on-surface transition p-1 rounded-lg hover:bg-surface-container">
+              <button onClick={() => setSlackProject(null)} aria-label="Close" className={`text-on-surface-variant hover:text-on-surface transition p-1.5 rounded-lg hover:bg-surface-container ${FOCUS_RING}`}>
                 <X size={16} />
               </button>
             </div>
             <form onSubmit={handleSaveSlack} className="px-6 py-5 space-y-4">
               {slackMsg && (
-                <div className={`text-[13px] p-3 rounded-lg border ${bannerClass(slackMsg.type)}`}>{slackMsg.text}</div>
+                <div role="alert" aria-live="polite" className={`text-[13px] p-3 rounded-lg border ${bannerClass(slackMsg.type)}`}>{slackMsg.text}</div>
               )}
               <p className="text-[12px] text-on-surface-variant leading-relaxed">
                 Post transmittal, new-drawing, and revision events to a Slack channel. Create an{' '}
                 <span className="font-medium text-on-surface">Incoming Webhook</span> in Slack and paste the URL below.
                 {slackProject.slackConfigured && (
-                  <span className="block mt-1.5 text-status-emerald-text font-medium">
-                    ✓ A webhook is currently configured. Leave blank to keep it, or paste a new one to replace it.
+                  <span className="flex items-start gap-1 mt-1.5 text-status-emerald-text font-medium">
+                    <CheckCircle2 size={14} className="shrink-0 mt-px" />
+                    <span>A webhook is currently configured. Leave blank to keep it, or paste a new one to replace it.</span>
                   </span>
                 )}
               </p>
               <div>
-                <label className="block text-[12px] text-on-surface-variant mb-1.5 font-medium">Webhook URL</label>
+                <label htmlFor="slack-webhook-url" className="block text-[12px] text-on-surface-variant mb-1.5 font-medium">Webhook URL</label>
                 <input
+                  id="slack-webhook-url"
                   value={slackUrl}
                   onChange={e => setSlackUrl(e.target.value)}
                   placeholder="https://hooks.slack.com/services/..."
-                  className="w-full bg-white border border-border-slate rounded-lg px-3 py-2 text-[13px] font-mono text-on-surface focus:outline-none focus:ring-1 focus:ring-primary/20 focus:border-primary"
+                  autoComplete="off"
+                  className="w-full bg-white border border-border-slate rounded-lg px-3 py-2 text-[13px] font-mono text-on-surface focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus:border-primary"
                 />
               </div>
               <div className="flex flex-wrap gap-2 justify-between items-center pt-1">
                 <div className="flex gap-2">
                   {slackProject.slackConfigured && (
                     <button type="button" onClick={handleTestSlack} disabled={slackLoading}
-                      className="px-3 py-2 rounded-lg border border-border-slate text-on-surface-variant hover:bg-surface-container font-medium text-[13px] transition-colors disabled:opacity-60">
+                      className={`px-3 py-2 rounded-lg border border-border-slate text-on-surface-variant hover:bg-surface-container font-medium text-[13px] transition-colors disabled:opacity-60 ${FOCUS_RING}`}>
                       Send Test
                     </button>
                   )}
                   {slackProject.slackConfigured && (
-                    <button type="button" onClick={() => { setSlackUrl(''); handleSaveSlack({ preventDefault: () => {} }); }} disabled={slackLoading}
-                      className="px-3 py-2 rounded-lg border border-status-rose-text/30 text-status-rose-text hover:bg-status-rose-bg font-medium text-[13px] transition-colors disabled:opacity-60">
+                    <button type="button" onClick={() => setConfirmAction({ type: 'slack-disconnect', project: slackProject })} disabled={slackLoading}
+                      className={`px-3 py-2 rounded-lg border border-status-rose-text/30 text-status-rose-text hover:bg-status-rose-bg font-medium text-[13px] transition-colors disabled:opacity-60 ${FOCUS_RING}`}>
                       Disconnect
                     </button>
                   )}
                 </div>
                 <div className="flex gap-2">
                   <button type="button" onClick={() => setSlackProject(null)}
-                    className="px-4 py-2 rounded-lg border border-border-slate text-on-surface-variant hover:bg-surface-container font-medium text-[13px] transition-colors">
+                    className={`px-4 py-2 rounded-lg border border-border-slate text-on-surface-variant hover:bg-surface-container font-medium text-[13px] transition-colors ${FOCUS_RING}`}>
                     Cancel
                   </button>
                   <button type="submit" disabled={slackLoading || !slackUrl.trim()}
-                    className="px-4 py-2 rounded-lg bg-primary text-white hover:bg-primary-container font-medium text-[13px] transition-colors disabled:opacity-60">
+                    className={`px-4 py-2 rounded-lg bg-primary text-white hover:bg-primary-container font-medium text-[13px] transition-colors disabled:opacity-60 ${FOCUS_RING}`}>
                     {slackLoading ? 'Saving…' : 'Save'}
                   </button>
                 </div>
@@ -932,69 +1038,86 @@ export default function SettingsView({ currentUser, token }) {
         document.body
       )}
 
-      {/* ── Confirmation modal for deactivate / remove ── */}
-      {confirmAction && createPortal(
-        <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4">
-          <div className="modal-scrim absolute inset-0 bg-[rgba(15,23,42,0.45)] backdrop-blur-sm" onClick={() => setConfirmAction(null)} />
-          <div className="modal-card relative bg-white rounded-2xl shadow-2xl border border-border-slate p-6 w-full max-w-sm">
-            <div className="flex items-center gap-3 mb-4">
-              <div className={`w-10 h-10 rounded-full flex items-center justify-center ${confirmAction.type === 'remove' ? 'bg-red-100' : 'bg-amber-100'}`}>
-                {confirmAction.type === 'remove'
-                  ? <Trash2 size={18} className="text-red-600" />
-                  : <UserX size={18} className="text-amber-600" />
-                }
+      {/* ── Confirmation modal for deactivate / remove / slack-disconnect ── */}
+      {confirmAction && (() => {
+        const isDanger = confirmAction.type === 'remove' || confirmAction.type === 'slack-disconnect';
+        const cfg = {
+          remove: {
+            icon: Trash2, title: 'Remove User',
+            subject: `${confirmAction.user?.name} (@${confirmAction.user?.username})`,
+            body: 'This will permanently delete this user account. This action cannot be undone.',
+            confirmLabel: 'Remove Permanently',
+            onConfirm: () => handleRemove(confirmAction.user),
+          },
+          deactivate: {
+            icon: UserX, title: 'Deactivate User',
+            subject: `${confirmAction.user?.name} (@${confirmAction.user?.username})`,
+            body: 'This user will be unable to log in until reactivated. Their data will be preserved.',
+            confirmLabel: 'Deactivate',
+            onConfirm: () => handleDeactivate(confirmAction.user),
+          },
+          'slack-disconnect': {
+            icon: Unplug, title: 'Disconnect Slack',
+            subject: confirmAction.project?.code,
+            body: 'This removes the saved webhook. Slack notifications will stop until you reconnect.',
+            confirmLabel: 'Disconnect',
+            onConfirm: () => saveSlackUrl(''),
+          },
+        }[confirmAction.type];
+        const Icon = cfg.icon;
+        return createPortal(
+          <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4">
+            <div className="modal-scrim absolute inset-0 bg-[rgba(15,23,42,0.45)] backdrop-blur-sm" onClick={() => setConfirmAction(null)} />
+            <div
+              ref={confirmModalRef}
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="confirm-modal-title"
+              className="modal-card relative bg-white rounded-2xl shadow-2xl border border-border-slate p-6 w-full max-w-sm"
+            >
+              <div className="flex items-center gap-3 mb-4">
+                <div className={`w-10 h-10 rounded-full flex items-center justify-center ${isDanger ? 'bg-status-rose-bg' : 'bg-status-amber-bg'}`}>
+                  <Icon size={18} className={isDanger ? 'text-status-rose-text' : 'text-status-amber-text'} />
+                </div>
+                <div>
+                  <h3 id="confirm-modal-title" className="text-[16px] font-semibold text-on-surface">{cfg.title}</h3>
+                  <p className="text-[12px] text-on-surface-variant">{cfg.subject}</p>
+                </div>
               </div>
-              <div>
-                <h3 className="text-[16px] font-semibold text-on-surface">
-                  {confirmAction.type === 'remove' ? 'Remove User' : 'Deactivate User'}
-                </h3>
-                <p className="text-[12px] text-on-surface-variant">{confirmAction.user.name} (@{confirmAction.user.username})</p>
+              <p className="text-[13px] text-on-surface-variant mb-5">{cfg.body}</p>
+              <div className="flex gap-2 justify-end">
+                <button
+                  onClick={() => setConfirmAction(null)}
+                  className={`px-4 py-2 rounded-lg border border-border-slate text-on-surface-variant hover:bg-surface-container font-medium text-[13px] transition-colors ${FOCUS_RING}`}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => { setConfirmAction(null); cfg.onConfirm(); }}
+                  className={`px-4 py-2 rounded-lg text-white font-medium text-[13px] transition-colors ${FOCUS_RING} ${
+                    isDanger ? 'bg-status-rose-text hover:bg-status-rose-text/90' : 'bg-status-amber-text hover:bg-status-amber-text/90'
+                  }`}
+                >
+                  {cfg.confirmLabel}
+                </button>
               </div>
             </div>
-            <p className="text-[13px] text-on-surface-variant mb-5">
-              {confirmAction.type === 'remove'
-                ? 'This will permanently delete this user account. This action cannot be undone.'
-                : 'This user will be unable to log in until reactivated. Their data will be preserved.'
-              }
-            </p>
-            <div className="flex gap-2 justify-end">
-              <button
-                onClick={() => setConfirmAction(null)}
-                className="px-4 py-2 rounded-lg border border-border-slate text-on-surface-variant hover:bg-surface-container font-medium text-[13px] transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => {
-                  const u = confirmAction.user;
-                  const action = confirmAction.type;
-                  setConfirmAction(null);
-                  if (action === 'remove') handleRemove(u);
-                  else handleDeactivate(u);
-                }}
-                className={`px-4 py-2 rounded-lg text-white font-medium text-[13px] transition-colors ${
-                  confirmAction.type === 'remove' ? 'bg-red-600 hover:bg-red-700' : 'bg-amber-600 hover:bg-amber-700'
-                }`}
-              >
-                {confirmAction.type === 'remove' ? 'Remove Permanently' : 'Deactivate'}
-              </button>
-            </div>
-          </div>
-        </div>,
-        document.body
-      )}
+          </div>,
+          document.body
+        );
+      })()}
     </div>
   );
 }
 
 /* ── Layout helpers ───────────────────────────────────────────────── */
 
-function Section({ title, icon, children, headerAction }) {
+function Section({ title, icon: Icon, children, headerAction }) {
   return (
     <div className="bg-white border border-border-slate rounded-xl p-6">
       <div className="flex items-center justify-between gap-2 mb-5">
         <div className="flex items-center gap-2">
-          <span className="material-symbols-outlined text-primary text-[20px]">{icon}</span>
+          {Icon && <Icon size={20} className="text-primary shrink-0" />}
           <h2 className="text-[18px] font-semibold text-on-surface">{title}</h2>
         </div>
         {headerAction}
@@ -1004,16 +1127,37 @@ function Section({ title, icon, children, headerAction }) {
   );
 }
 
-function Field({ label, type = 'text', value, onChange }) {
+function Field({ label, type = 'text', value, onChange, autoComplete, required }) {
+  const id = useId();
+  const isPassword = type === 'password';
+  const [show, setShow] = useState(false);
+  const inputType = isPassword && show ? 'text' : type;
   return (
     <div>
-      <label className="block text-[12px] text-on-surface-variant mb-1.5 font-medium">{label}</label>
-      <input
-        type={type}
-        value={value}
-        onChange={e => onChange(e.target.value)}
-        className="w-full bg-white border border-border-slate rounded-lg px-3 py-2 text-[14px] text-on-surface focus:outline-none focus:ring-1 focus:ring-primary/20 focus:border-primary transition-all"
-      />
+      <label htmlFor={id} className="block text-[12px] text-on-surface-variant mb-1.5 font-medium">
+        {label}{required && <span className="text-status-rose-text ml-0.5" aria-hidden="true">*</span>}
+      </label>
+      <div className="relative">
+        <input
+          id={id}
+          type={inputType}
+          value={value}
+          onChange={e => onChange(e.target.value)}
+          autoComplete={autoComplete}
+          required={required}
+          className={`w-full bg-white border border-border-slate rounded-lg px-3 py-2 ${isPassword ? 'pr-10' : ''} text-[14px] text-on-surface focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus:border-primary transition-all`}
+        />
+        {isPassword && (
+          <button
+            type="button"
+            onClick={() => setShow(s => !s)}
+            aria-label={show ? 'Hide password' : 'Show password'}
+            className={`absolute right-1.5 top-1/2 -translate-y-1/2 p-1.5 text-on-surface-variant hover:text-on-surface rounded-md ${FOCUS_RING}`}
+          >
+            {show ? <EyeOff size={16} /> : <Eye size={16} />}
+          </button>
+        )}
+      </div>
     </div>
   );
 }
