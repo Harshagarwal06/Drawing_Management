@@ -305,6 +305,10 @@ try {
 } catch (e) { console.warn('Index creation note:', e.message); }
 try { db.exec("ALTER TABLE users ADD COLUMN allowed_projects TEXT DEFAULT '*';");   } catch {}
 try { db.exec("ALTER TABLE users ADD COLUMN active INTEGER DEFAULT 1;");            } catch {}
+// Additive only — every existing user gets token_version 0, matching the implicit
+// version of tokens issued before this column existed (decoded.tv ?? 0). No live
+// session is invalidated on deploy; revocation only kicks in once a version is bumped.
+try { db.exec("ALTER TABLE users ADD COLUMN token_version INTEGER NOT NULL DEFAULT 0;"); } catch {}
 try {
   db.exec(`
     CREATE TABLE IF NOT EXISTS project_folder_trees (
@@ -366,12 +370,27 @@ const upload = multer({
   },
 });
 
+/* ── Token revocation check ──────────────────────────────────────────
+   Compares the token's version claim against the user's current
+   token_version in the DB. Bumping token_version (logout-all, password
+   change/reset, deactivate, role change) instantly invalidates all prior
+   tokens. Legacy tokens issued before this feature have no `tv` claim →
+   treated as 0, which matches the column default so live sessions survive
+   the deploy. Returns false for deleted users. */
+function isTokenCurrent(decoded) {
+  const row = db.prepare('SELECT token_version FROM users WHERE id = ?').get(decoded.id);
+  if (!row) return false;
+  return (decoded.tv ?? 0) === row.token_version;
+}
+
 /* ── JWT auth middleware ─────────────────────────────────────────── */
 function verifyToken(req, res, next) {
   const auth = req.headers.authorization;
   if (!auth?.startsWith('Bearer ')) return res.status(401).json({ error: 'Unauthorized — no token provided' });
   try {
-    req.user = jwt.verify(auth.slice(7), JWT_SECRET);
+    const decoded = jwt.verify(auth.slice(7), JWT_SECRET);
+    if (!isTokenCurrent(decoded)) return res.status(401).json({ error: 'Session ended — please log in again' });
+    req.user = decoded;
     next();
   } catch {
     res.status(401).json({ error: 'Invalid or expired token — please log in again' });
@@ -384,7 +403,9 @@ function verifyTokenForDownload(req, res, next) {
   const tokenStr = auth?.startsWith('Bearer ') ? auth.slice(7) : req.query.token;
   if (!tokenStr) return res.status(401).json({ error: 'Unauthorized — no token provided' });
   try {
-    req.user = jwt.verify(tokenStr, JWT_SECRET);
+    const decoded = jwt.verify(tokenStr, JWT_SECRET);
+    if (!isTokenCurrent(decoded)) return res.status(401).json({ error: 'Session ended — please log in again' });
+    req.user = decoded;
     next();
   } catch {
     res.status(401).json({ error: 'Invalid or expired token — please log in again' });
@@ -1349,7 +1370,9 @@ app.patch('/api/users/:id/role', requireDirector, (req, res) => {
   if (!VALID_ROLES.includes(role)) return res.status(400).json({ error: 'Invalid role.' });
   const ap = role === 'Director' ? '*' : (allowedProjects ?? '*');
   try {
-    const info = db.prepare('UPDATE users SET role = ?, allowed_projects = ? WHERE id = ?').run(role, ap, req.params.id);
+    // Bump token_version: role/project access is baked into the JWT, so existing
+    // tokens must be invalidated to prevent stale permissions lingering until expiry.
+    const info = db.prepare('UPDATE users SET role = ?, allowed_projects = ?, token_version = token_version + 1 WHERE id = ?').run(role, ap, req.params.id);
     if (info.changes === 0) return res.status(404).json({ error: 'User not found.' });
     res.json({ id: req.params.id, role, allowedProjects: ap });
   } catch (err) {
@@ -1367,7 +1390,8 @@ app.patch('/api/users/:id/reset-password', requireDirector, async (req, res) => 
     const user = db.prepare('SELECT id FROM users WHERE id = ?').get(req.params.id);
     if (!user) return res.status(404).json({ error: 'User not found.' });
     const hashed = await bcrypt.hash(newPassword, SALT_ROUNDS);
-    db.prepare('UPDATE users SET password = ? WHERE id = ?').run(hashed, req.params.id);
+    // Bump token_version so the user's existing tokens are invalidated immediately.
+    db.prepare('UPDATE users SET password = ?, token_version = token_version + 1 WHERE id = ?').run(hashed, req.params.id);
     console.log(`✅ Director reset password for user id=${req.params.id}`);
     res.json({ message: 'Password reset successfully.' });
   } catch (err) {
@@ -1383,7 +1407,13 @@ app.patch('/api/users/:id/deactivate', requireDirector, (req, res) => {
     if (!user) return res.status(404).json({ error: 'User not found.' });
     if (user.id === req.user.id) return res.status(400).json({ error: 'You cannot deactivate your own account.' });
     const newActive = user.active === 0 ? 1 : 0;
-    db.prepare('UPDATE users SET active = ? WHERE id = ?').run(newActive, req.params.id);
+    // Deactivating bumps token_version to kill the user's live sessions at once;
+    // reactivating leaves it untouched (there are no live tokens to preserve).
+    if (newActive === 0) {
+      db.prepare('UPDATE users SET active = ?, token_version = token_version + 1 WHERE id = ?').run(newActive, req.params.id);
+    } else {
+      db.prepare('UPDATE users SET active = ? WHERE id = ?').run(newActive, req.params.id);
+    }
     console.log(`✅ Director ${newActive ? 'reactivated' : 'deactivated'} user id=${req.params.id}`);
     res.json({ id: user.id, active: newActive });
   } catch (err) {
@@ -1417,11 +1447,32 @@ app.patch('/api/users/me/password', async (req, res) => {
     const match = await bcrypt.compare(currentPassword, user.password);
     if (!match) return res.status(401).json({ error: 'Current password is incorrect.' });
     const hashed = await bcrypt.hash(newPassword, SALT_ROUNDS);
-    db.prepare('UPDATE users SET password = ? WHERE id = ?').run(hashed, req.user.id);
-    res.json({ message: 'Password updated successfully.' });
+    // Bump token_version so existing sessions (other devices) are signed out.
+    db.prepare('UPDATE users SET password = ?, token_version = token_version + 1 WHERE id = ?').run(hashed, req.user.id);
+    // Re-issue a token carrying the new version so THIS device stays signed in.
+    const fresh = db.prepare('SELECT * FROM users WHERE id = ?').get(req.user.id);
+    const token = jwt.sign(
+      { id: fresh.id, username: fresh.username, name: fresh.name, role: fresh.role, avatar: fresh.avatar, allowedProjects: fresh.allowed_projects ?? '*', tv: fresh.token_version },
+      JWT_SECRET,
+      { expiresIn: '7d' }
+    );
+    res.json({ message: 'Password updated successfully.', token });
   } catch (err) {
     console.error('❌ PATCH /api/users/me/password error:', err);
     res.status(500).json({ error: 'Failed to update password.' });
+  }
+});
+
+/* ── POST /api/logout-all — sign out of all devices ─────────────── */
+app.post('/api/logout-all', (req, res) => {
+  try {
+    // Bumping the version invalidates every token for this user, including the
+    // one making this request — the client clears it and returns to login.
+    db.prepare('UPDATE users SET token_version = token_version + 1 WHERE id = ?').run(req.user.id);
+    res.json({ message: 'Signed out of all devices.' });
+  } catch (err) {
+    console.error('❌ POST /api/logout-all error:', err);
+    res.status(500).json({ error: 'Failed to sign out of all devices.' });
   }
 });
 
@@ -1436,7 +1487,7 @@ app.post('/api/login', async (req, res) => {
     if (!match) return res.status(401).json({ error: 'Invalid username or password' });
     const allowedProjects = user.allowed_projects ?? '*';
     const token = jwt.sign(
-      { id: user.id, username: user.username, name: user.name, role: user.role, avatar: user.avatar, allowedProjects },
+      { id: user.id, username: user.username, name: user.name, role: user.role, avatar: user.avatar, allowedProjects, tv: user.token_version ?? 0 },
       JWT_SECRET,
       { expiresIn: '7d' }
     );
