@@ -526,13 +526,13 @@ export default function SettingsView({ currentUser, token }) {
                           <p className="text-[11px] text-on-surface-variant">@{u.username}</p>
                         </div>
 
-                        {/* Role dropdown */}
-                        <div className="relative flex items-center gap-1.5 shrink-0">
+                        {/* Role dropdown — fixed width so project buttons stay in a straight column */}
+                        <div className="relative flex items-center gap-1.5 shrink-0 w-[160px]">
                           <select
                             value={u.role}
                             onChange={e => handleRoleChange(u.id, e.target.value, u.allowed_projects)}
                             disabled={isSelf}
-                            className="bg-white border border-border-slate rounded-lg px-2 py-1.5 text-[12px] text-on-surface focus:outline-none focus:ring-1 focus:ring-primary/20 disabled:opacity-50 max-w-[150px] sm:max-w-none"
+                            className="flex-1 min-w-0 bg-white border border-border-slate rounded-lg px-2 py-1.5 text-[12px] text-on-surface focus:outline-none focus:ring-1 focus:ring-primary/20 disabled:opacity-50"
                           >
                             {ROLES.map(r => <option key={r} value={r}>{r}</option>)}
                           </select>
@@ -542,17 +542,17 @@ export default function SettingsView({ currentUser, token }) {
                                 ? 'bg-status-emerald-bg text-status-emerald-text'
                                 : 'bg-status-rose-bg text-status-rose-text'
                             }`}>
-                              {roleFlash.ok ? '✓ saved' : '✗ failed'}
+                              {roleFlash.ok ? '✓' : '✗'}
                             </span>
                           )}
                         </div>
 
-                        {/* Project access pill — non-Director, non-self (primary way to edit access) */}
+                        {/* Project access pill — fixed width so the ⋮ button stays in a straight column */}
                         {isNonDirector && !isSelf && (
                           allowedList === null ? (
                             <button
                               onClick={() => isExpanded ? setEditingProjectsFor(null) : openProjectEditor(u)}
-                              className="hidden sm:flex px-2 py-0.5 rounded-full text-[10px] font-medium bg-surface-container text-on-surface-variant border border-border-slate hover:bg-surface-container-high transition-colors shrink-0 items-center gap-1"
+                              className="hidden sm:flex w-[96px] justify-center items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-surface-container text-on-surface-variant border border-border-slate hover:bg-surface-container-high transition-colors shrink-0"
                             >
                               All projects
                               <span className="material-symbols-outlined text-[11px]">edit</span>
@@ -560,15 +560,15 @@ export default function SettingsView({ currentUser, token }) {
                           ) : (
                             <button
                               onClick={() => isExpanded ? setEditingProjectsFor(null) : openProjectEditor(u)}
-                              className="hidden sm:flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-primary/10 text-primary border border-primary/20 hover:bg-primary/20 transition-colors shrink-0"
+                              className="hidden sm:flex w-[96px] justify-center items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-primary/10 text-primary border border-primary/20 hover:bg-primary/20 transition-colors shrink-0"
                             >
                               <span>{allowedList.length} project{allowedList.length !== 1 ? 's' : ''}</span>
                               <span className="material-symbols-outlined text-[12px]">edit</span>
                             </button>
                           )
                         )}
-                        {/* Spacer keeps columns aligned for Director / self rows */}
-                        {(!isNonDirector || isSelf) && <div className="w-[80px] shrink-0" />}
+                        {/* Spacer keeps ⋮ column aligned for Director / self rows (sm+ only, matching button visibility) */}
+                        {(!isNonDirector || isSelf) && <div className="hidden sm:block w-[96px] shrink-0" />}
 
                         {/* ⋮ button */}
                         <button
