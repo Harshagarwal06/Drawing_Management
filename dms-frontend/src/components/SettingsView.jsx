@@ -6,6 +6,23 @@ const API = import.meta.env.VITE_API_URL;
 
 const ROLES = ['Director', 'In House Architect', 'Project Team'];
 
+/* Strip the project code from the start of the title when it's redundant.
+   "QUE-154", "QUE 154 — Punawale"  →  "Punawale"
+   Comparison is alnum-only so "QUE-154" matches "QUE 154" at the start. */
+function stripProjectCode(code, title) {
+  if (!code || !title) return title ?? '';
+  const alnum = s => s.replace(/[^a-z0-9]/gi, '').toLowerCase();
+  if (!alnum(title).startsWith(alnum(code))) return title;
+  let matched = 0, i = 0;
+  const target = alnum(code).length;
+  while (i < title.length && matched < target) {
+    if (/[a-z0-9]/i.test(title[i])) matched++;
+    i++;
+  }
+  const rest = title.slice(i).replace(/^[\s—–\-]+/, '').trim();
+  return rest || title;
+}
+
 const ROLE_COLOR = {
   'Director':            'bg-primary/10 text-primary',
   'In House Architect':  'bg-status-emerald-bg text-status-emerald-text',
@@ -774,30 +791,35 @@ export default function SettingsView({ currentUser, token }) {
               <p className="text-[13px] text-on-surface-variant">No projects yet.</p>
             )}
             {projects.map(p => (
-              <div key={p.id} className="flex items-center gap-3 px-4 py-3 rounded-xl border border-border-slate bg-white hover:bg-surface-container-low transition-colors">
-                <span className="font-mono text-[12px] font-bold text-primary bg-primary/10 px-2 py-0.5 rounded shrink-0">{p.code}</span>
-                <span className="flex-1 text-[13px] text-on-surface truncate">{p.name}</span>
-                {!!p.slackConfigured && (
-                  <span className="hidden sm:inline-flex items-center gap-1 text-[11px] font-medium text-status-emerald-600 bg-status-emerald-50 px-2 py-0.5 rounded-full shrink-0">
-                    <span className="material-symbols-outlined text-[12px]">check_circle</span>
-                    Slack
-                  </span>
-                )}
-                <button
-                  onClick={() => openSlackEditor(p)}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border-slate text-[12px] font-medium text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-colors shrink-0"
-                  title="Configure Slack notifications"
-                >
-                  <span className="material-symbols-outlined text-[14px]">chat</span>
-                  <span className="hidden sm:inline">Slack</span>
-                </button>
-                <button
-                  onClick={() => { setRenamingProject(p); setRenameForm({ name: p.name, code: p.code }); setRenameMsg(null); }}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border-slate text-[12px] font-medium text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-colors shrink-0"
-                >
-                  <span className="material-symbols-outlined text-[14px]">edit</span>
-                  <span className="hidden sm:inline">Rename</span>
-                </button>
+              <div key={p.id} className="grid grid-cols-[140px_1fr_auto] items-center gap-3 px-4 py-3 rounded-xl border border-border-slate bg-white hover:bg-surface-container-low transition-colors">
+                {/* Fixed-width badge column — titles always start at the same x position */}
+                <span className="font-mono text-[12px] font-bold text-primary bg-primary/10 px-2 py-0.5 rounded truncate">{p.code}</span>
+                {/* Title with redundant code prefix stripped */}
+                <span className="text-[13px] text-on-surface truncate">{stripProjectCode(p.code, p.name)}</span>
+                {/* Actions */}
+                <div className="flex items-center gap-2">
+                  {!!p.slackConfigured && (
+                    <span className="hidden sm:inline-flex items-center gap-1 text-[11px] font-medium text-status-emerald-text bg-status-emerald-bg px-2 py-0.5 rounded-full">
+                      <span className="material-symbols-outlined text-[12px]">check_circle</span>
+                      Slack
+                    </span>
+                  )}
+                  <button
+                    onClick={() => openSlackEditor(p)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border-slate text-[12px] font-medium text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-colors"
+                    title="Configure Slack notifications"
+                  >
+                    <span className="material-symbols-outlined text-[14px]">chat</span>
+                    <span className="hidden sm:inline">Slack</span>
+                  </button>
+                  <button
+                    onClick={() => { setRenamingProject(p); setRenameForm({ name: p.name, code: p.code }); setRenameMsg(null); }}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border-slate text-[12px] font-medium text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-colors"
+                  >
+                    <span className="material-symbols-outlined text-[14px]">edit</span>
+                    <span className="hidden sm:inline">Rename</span>
+                  </button>
+                </div>
               </div>
             ))}
           </div>
