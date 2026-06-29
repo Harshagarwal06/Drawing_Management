@@ -16,6 +16,7 @@ import ProjectModal      from "./components/ProjectModal";
 import Toast             from "./components/Toast";
 
 import { registerAppListeners } from "./utils/native";
+import { getStored, setStored, removeStored } from "./utils/tokenStore";
 
 import { OVERDUE_PURPOSES, MS_30_DAYS, MEP_SUBTYPES } from "./constants";
 
@@ -47,22 +48,16 @@ async function fetchTransmittals(projectId, token) {
   return res.json();
 }
 
-/* ── Session restore + token expiry check (runs once as useState initializer) ── */
-function loadStoredUser() {
+/* ── Token expiry check ──
+   Pure: true when the JWT is missing/malformed or its exp has passed.
+   Session storage is now async (native uses Capacitor Preferences), so the
+   restore happens in an effect rather than a synchronous useState initializer. */
+function isTokenExpired(token) {
   try {
-    const saved = localStorage.getItem("dms_user");
-    if (!saved) return null;
-    const user = JSON.parse(saved);
-    // Decode JWT payload (base64url) and check exp
-    const payload = JSON.parse(atob(user.token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/")));
-    if (payload.exp * 1000 < Date.now()) {
-      localStorage.removeItem("dms_user");
-      return null;
-    }
-    return user;
+    const payload = JSON.parse(atob(token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/")));
+    return payload.exp * 1000 < Date.now();
   } catch {
-    localStorage.removeItem("dms_user");
-    return null;
+    return true;
   }
 }
 
@@ -84,7 +79,8 @@ export default function App() {
   const [modalFolder,      setModalFolder]      = useState("");
   const [showTransmittal,  setShowTransmittal]  = useState(false);
   const [toast,            setToast]            = useState(null);
-  const [currentUser,      setCurrentUser]      = useState(loadStoredUser);
+  const [currentUser,      setCurrentUser]      = useState(null);
+  const [sessionLoading,   setSessionLoading]   = useState(true);
   const [mobileNavOpen,    setMobileNavOpen]    = useState(false);
   const [search,           setSearch]           = useState("");
   const [filterDisc,       setFilterDisc]       = useState("All");
@@ -98,11 +94,34 @@ export default function App() {
   const isDirector    = activeRole === "Director";
   const isProjectTeam = activeRole === "Project Team";
 
-  /* ── Persist session ── */
+  /* ── Restore session from storage on mount (async) ── */
   useEffect(() => {
-    if (currentUser) localStorage.setItem("dms_user", JSON.stringify(currentUser));
-    else localStorage.removeItem("dms_user");
-  }, [currentUser]);
+    let cancelled = false;
+    (async () => {
+      try {
+        const saved = await getStored("dms_user");
+        if (saved) {
+          const user = JSON.parse(saved);
+          if (isTokenExpired(user.token)) await removeStored("dms_user");
+          else if (!cancelled) setCurrentUser(user);
+        }
+      } catch {
+        await removeStored("dms_user");
+      } finally {
+        if (!cancelled) setSessionLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  /* ── Persist session ──
+     Guarded by sessionLoading so the initial null state can't wipe a stored
+     session before the async restore above has had a chance to run. */
+  useEffect(() => {
+    if (sessionLoading) return;
+    if (currentUser) setStored("dms_user", JSON.stringify(currentUser));
+    else removeStored("dms_user");
+  }, [currentUser, sessionLoading]);
 
   /* ── Auth handlers ── */
   const handleLogin = (user) => {
@@ -128,10 +147,10 @@ export default function App() {
   const onAuthError = useEffectEvent(handleUnauthorized);
 
   /* ── Native (Capacitor) lifecycle ──
-     Re-validate the stored session when the app returns to the foreground;
-     loadStoredUser() returns null once the JWT has expired. */
+     Re-validate the in-memory session when the app returns to the foreground;
+     the JWT may have expired while the app was backgrounded. */
   const onResume = useEffectEvent(() => {
-    if (currentUser && !loadStoredUser()) handleUnauthorized();
+    if (currentUser && isTokenExpired(currentUser.token)) handleUnauthorized();
   });
 
   /* Hardware back button + app-resume token check (native) and an
@@ -331,6 +350,10 @@ export default function App() {
     onRefresh: handleRefresh,
   };
 
+  /* Block render until the async session restore has finished, so we never
+     flash the login page at an already-authenticated user. */
+  if (sessionLoading) return null;
+
   return (
     <>
       <Routes>
@@ -418,7 +441,7 @@ export default function App() {
 
             {/* ── Settings — all roles (password change for everyone, user mgmt for director) ── */}
             <Route path="/settings" element={
-              <SettingsView currentUser={currentUser} onUserUpdate={setCurrentUser} token={currentUser?.token} />
+              <SettingsView currentUser={currentUser} onUserUpdate={setCurrentUser} onLogout={handleLogout} token={currentUser?.token} />
             } />
 
             {/* Catch-all */}

@@ -3,7 +3,7 @@ import { createPortal } from "react-dom";
 import {
   MoreVertical, KeyRound, UserX, Trash2, X, RotateCcw,
   Eye, EyeOff, UserPlus, Search, Pencil, FolderOpen,
-  MessageSquare, CheckCircle2, Lock, User, Users, Check, Unplug,
+  MessageSquare, CheckCircle2, Lock, User, Users, Check, Unplug, LogOut,
 } from "lucide-react";
 
 /* Shared focus-visible ring — keyboard users can see what's focused. */
@@ -133,12 +133,13 @@ function MenuDivider() {
   return <div className="my-1 border-t border-border-slate" />;
 }
 
-export default function SettingsView({ currentUser, token }) {
+export default function SettingsView({ currentUser, token, onUserUpdate, onLogout }) {
   const isAdmin = currentUser?.role === 'Director';
 
   const [pwForm,      setPwForm]      = useState({ currentPassword: '', newPassword: '', confirm: '' });
   const [pwMsg,       setPwMsg]       = useState(null);
   const [pwLoading,   setPwLoading]   = useState(false);
+  const [signOutAllLoading, setSignOutAllLoading] = useState(false);
   const [users,       setUsers]       = useState([]);
   const [newUser,     setNewUser]     = useState({ username: '', password: '', name: '', role: 'In House Architect', selectedProjects: [] });
   const [userMsg,     setUserMsg]     = useState(null);
@@ -211,10 +212,28 @@ export default function SettingsView({ currentUser, token }) {
         body:    JSON.stringify({ currentPassword: pwForm.currentPassword, newPassword: pwForm.newPassword }),
       });
       const data = await res.json();
-      if (res.ok) { setPwMsg({ type: 'success', text: 'Password updated successfully.' }); setPwForm({ currentPassword: '', newPassword: '', confirm: '' }); }
+      if (res.ok) {
+        setPwMsg({ type: 'success', text: 'Password updated. Other devices have been signed out.' });
+        setPwForm({ currentPassword: '', newPassword: '', confirm: '' });
+        // Swap in the fresh token so this device stays signed in (old token is now revoked).
+        if (data.token) onUserUpdate?.(prev => ({ ...prev, token: data.token }));
+      }
       else          setPwMsg({ type: 'error',   text: data.error || 'Failed to update password.' });
     } catch    { setPwMsg({ type: 'error', text: 'Cannot connect to server.' }); }
     finally    { setPwLoading(false); }
+  };
+
+  const handleSignOutAll = async () => {
+    setSignOutAllLoading(true);
+    try {
+      const res = await fetch(`${API}/api/logout-all`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) onLogout?.();           // current token is now revoked too — return to login
+      else setPwMsg({ type: 'error', text: 'Failed to sign out of all devices.' });
+    } catch { setPwMsg({ type: 'error', text: 'Cannot connect to server.' }); }
+    finally { setSignOutAllLoading(false); }
   };
 
   const loadUsers = useCallback(() => {
@@ -511,6 +530,20 @@ export default function SettingsView({ currentUser, token }) {
             {pwLoading ? 'Updating…' : 'Update Password'}
           </button>
         </form>
+
+        {/* ── Sign out everywhere ── */}
+        <div className="max-w-sm mt-7 pt-6 border-t border-outline-variant">
+          <h3 className="text-[14px] font-semibold text-on-surface flex items-center gap-2">
+            <LogOut size={15} /> Sign out everywhere
+          </h3>
+          <p className="text-[12px] text-on-surface-variant mt-1 mb-3">
+            Signs you out of this device and every other device. Use this if you think your account may be compromised.
+          </p>
+          <button type="button" onClick={handleSignOutAll} disabled={signOutAllLoading}
+            className={`border border-status-rose-text/30 text-status-rose-text rounded-lg hover:bg-status-rose-bg px-5 py-2.5 font-medium text-[14px] transition-colors disabled:opacity-60 ${FOCUS_RING}`}>
+            {signOutAllLoading ? 'Signing out…' : 'Sign out of all devices'}
+          </button>
+        </div>
       </Section>
 
       {/* ── User Management ──────────────────────────────────────────── */}
