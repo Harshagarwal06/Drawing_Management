@@ -21,10 +21,10 @@ export default function Sidebar({
 
   return (
     <>
-      {/* ── Mobile backdrop ── */}
+      {/* ── Mobile backdrop — z-50 so it covers the bottom nav ── */}
       {mobileOpen && (
         <div
-          className="fixed inset-0 bg-black/40 backdrop-blur-sm z-40 md:hidden"
+          className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 md:hidden"
           onClick={onMobileClose}
         />
       )}
@@ -40,7 +40,7 @@ export default function Sidebar({
         `}
       >
         {/* Logo + close button on mobile */}
-        <div className="flex items-center justify-between px-5 pt-4 pb-4">
+        <div className="flex items-center justify-between pb-3">
           <img
             src="/logo.png"
             alt="Unique Properties"
@@ -88,6 +88,10 @@ export default function Sidebar({
 
         {/* Footer */}
         <div className="mt-auto pt-4 border-t border-border-slate space-y-1">
+          <div className="px-4 pb-2 flex items-center gap-1.5">
+            <span className="w-1.5 h-1.5 rounded-full bg-status-emerald-text shrink-0" />
+            <span className="text-[10px] font-semibold text-on-surface-variant/50 uppercase tracking-widest">DrawVault · v2.2</span>
+          </div>
           <NavLink
             to="/settings"
             onClick={onMobileClose}

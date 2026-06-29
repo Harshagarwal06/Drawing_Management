@@ -218,9 +218,10 @@ export default function Dashboard({
           <div className="px-6 py-3 border-t border-border-slate shrink-0">
             <button
               onClick={() => navigate("/register")}
-              className="w-full text-center text-[12px] font-medium text-primary hover:underline"
+              className="w-full flex items-center justify-center gap-1 text-[12px] font-semibold text-primary hover:text-primary-container transition-colors"
             >
               View All Activity
+              <span className="material-symbols-outlined text-[14px]">arrow_forward</span>
             </button>
           </div>
         </div>
@@ -279,7 +280,7 @@ export default function Dashboard({
 function MetricCard({ icon, badge, title, value, sub, iconBg, iconColor, onClick }) {
   return (
     <div
-      className={`bg-white border border-border-slate p-5 rounded-xl hover:shadow-md transition-shadow flex items-start gap-4 ${onClick ? "cursor-pointer" : ""}`}
+      className={`bg-white border border-border-slate p-5 rounded-xl shadow-card hover:shadow-card-md transition-shadow duration-200 flex items-start gap-4 ${onClick ? "cursor-pointer focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 outline-none" : ""}`}
       onClick={onClick}
       role={onClick ? "button" : undefined}
       tabIndex={onClick ? 0 : undefined}
