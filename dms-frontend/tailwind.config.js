@@ -25,6 +25,10 @@ export default {
         "status-rose-text":       "#E11D48",
         "status-blue-bg":         "#EFF6FF",
         "status-blue-text":       "#2563EB",
+        "status-purple-bg":       "#F5F3FF",
+        "status-purple-text":     "#7C3AED",
+        "status-orange-bg":       "#FFF7ED",
+        "status-orange-text":     "#EA580C",
         "glass-surface":          "rgba(255,255,255,0.8)",
         "background":             "#f6f6ff",
         /* extras used by modals / toast / transmittals */

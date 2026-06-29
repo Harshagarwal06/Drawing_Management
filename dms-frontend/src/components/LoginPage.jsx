@@ -239,13 +239,6 @@ export default function LoginPage({ onLogin }) {
                 <div>
                   <div className="flex items-center justify-between mb-1.5">
                     <label className="text-[12px] font-semibold text-on-surface-variant">Password</label>
-                    <button
-                      type="button"
-                      className="text-[11px] text-primary hover:underline font-medium"
-                      tabIndex={-1}
-                    >
-                      Forgot password?
-                    </button>
                   </div>
                   <div className="relative group">
                     <Lock

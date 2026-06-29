@@ -222,7 +222,10 @@ function MobileTopBar({ title, activeProject, projects, onProjectChange, onMenu,
         <button
           onClick={() => setMenu(m => m === "account" ? null : "account")}
           title={currentUser?.name}
-          className="w-8 h-8 rounded-full bg-primary text-white text-[13px] font-bold grid place-items-center shrink-0 ml-0.5"
+          aria-label={`Account menu for ${currentUser?.name}`}
+          aria-haspopup="menu"
+          aria-expanded={menu === "account"}
+          className="w-8 h-8 rounded-full bg-primary text-white text-[13px] font-bold grid place-items-center shrink-0 ml-0.5 outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
         >
           {(currentUser?.name || "?").charAt(0).toUpperCase()}
         </button>

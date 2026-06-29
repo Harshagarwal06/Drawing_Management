@@ -4,11 +4,11 @@ import { openExternal } from "../utils/native";
 const TRUNCATE_AT = 5; // show first N drawings, rest behind "+X more"
 
 const PURPOSE_COLOR = {
-  "For Construction":     { dot: "bg-emerald-500", text: "text-emerald-700", bg: "bg-emerald-50 border-emerald-200"  },
-  "For Approval":         { dot: "bg-amber-500",   text: "text-amber-700",   bg: "bg-amber-50 border-amber-200"     },
-  "For Information":      { dot: "bg-blue-500",    text: "text-blue-700",    bg: "bg-blue-50 border-blue-200"       },
-  "For Review & Comment": { dot: "bg-purple-500",  text: "text-purple-700",  bg: "bg-purple-50 border-purple-200"   },
-  "For Tender":           { dot: "bg-orange-500",  text: "text-orange-700",  bg: "bg-orange-50 border-orange-200"   },
+  "For Construction":     { dot: "bg-status-emerald-text", text: "text-status-emerald-text", bg: "bg-status-emerald-bg border-status-emerald-text/20" },
+  "For Approval":         { dot: "bg-status-amber-text",   text: "text-status-amber-text",   bg: "bg-status-amber-bg border-status-amber-text/20"    },
+  "For Information":      { dot: "bg-status-blue-text",    text: "text-status-blue-text",    bg: "bg-status-blue-bg border-status-blue-text/20"      },
+  "For Review & Comment": { dot: "bg-status-purple-text",  text: "text-status-purple-text",  bg: "bg-status-purple-bg border-status-purple-text/20"  },
+  "For Tender":           { dot: "bg-status-orange-text",  text: "text-status-orange-text",  bg: "bg-status-orange-bg border-status-orange-text/20"  },
 };
 
 /* ── Skeleton card ── */

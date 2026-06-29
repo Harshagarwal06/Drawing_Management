@@ -127,7 +127,7 @@ export default function Dashboard({
 
         {/* Hero: Total Drawings — spans 2 cols × 2 rows on desktop */}
         <div
-          className="col-span-2 lg:col-span-2 lg:row-span-2 bg-surface border border-border-slate rounded-xl p-5 hover:shadow-md transition-shadow cursor-pointer group focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 outline-none"
+          className="col-span-2 lg:col-span-2 lg:row-span-2 bg-surface border border-border-slate rounded-xl p-5 shadow-card hover:shadow-card-md transition-shadow duration-200 cursor-pointer group focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 outline-none"
           onClick={() => navigate("/register")}
           role="button"
           tabIndex={0}
@@ -364,9 +364,10 @@ export default function Dashboard({
           <div className="px-6 py-3 border-t border-border-slate shrink-0">
             <button
               onClick={() => navigate("/register")}
-              className="w-full text-center text-[12px] font-medium text-primary hover:underline"
+              className="w-full flex items-center justify-center gap-1 text-[12px] font-semibold text-primary hover:text-primary-container transition-colors"
             >
               View All Activity
+              <span className="material-symbols-outlined text-[14px]">arrow_forward</span>
             </button>
           </div>
         </div>
@@ -430,7 +431,7 @@ function MetricCard({
 }) {
   return (
     <div
-      className={`${mobileTileBg || "bg-surface"} md:bg-surface border border-border-slate p-3.5 md:p-5 rounded-xl hover:shadow-md transition-shadow flex flex-col md:flex-row items-start gap-2.5 md:gap-4 outline-none ${onClick ? "cursor-pointer focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2" : ""} ${className}`}
+      className={`${mobileTileBg || "bg-surface"} md:bg-surface border border-border-slate p-3.5 md:p-5 rounded-xl shadow-card hover:shadow-card-md transition-shadow duration-200 flex flex-col md:flex-row items-start gap-2.5 md:gap-4 outline-none ${onClick ? "cursor-pointer focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2" : ""} ${className}`}
       onClick={onClick}
       role={onClick ? "button" : undefined}
       tabIndex={onClick ? 0 : undefined}
