@@ -166,7 +166,7 @@ export default function LoginPage({ onLogin }) {
 
           {/* Mobile-only logo (left panel hidden on mobile) */}
           <div className="flex flex-col items-center mb-8 lg:hidden">
-            <img src="/logo.png" alt="Unique Properties" className="h-10 w-auto object-contain mb-3" />
+            <img src="/logo.png" alt="Unique Properties" className="h-20 w-auto object-contain mb-4" />
             <h1
               className="font-bold text-[18px]"
               style={{
