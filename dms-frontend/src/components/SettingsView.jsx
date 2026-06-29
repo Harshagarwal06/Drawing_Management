@@ -108,7 +108,7 @@ function MenuDivider() {
   return <div className="my-1 border-t border-border-slate" />;
 }
 
-export default function SettingsView({ currentUser, token }) {
+export default function SettingsView({ currentUser, token, onUserUpdate }) {
   const isAdmin = currentUser?.role === 'Director';
 
   const [pwForm,      setPwForm]      = useState({ currentPassword: '', newPassword: '', confirm: '' });
@@ -186,7 +186,13 @@ export default function SettingsView({ currentUser, token }) {
         body:    JSON.stringify({ currentPassword: pwForm.currentPassword, newPassword: pwForm.newPassword }),
       });
       const data = await res.json();
-      if (res.ok) { setPwMsg({ type: 'success', text: 'Password updated successfully.' }); setPwForm({ currentPassword: '', newPassword: '', confirm: '' }); }
+      if (res.ok) {
+        setPwMsg({ type: 'success', text: 'Password updated successfully.' });
+        setPwForm({ currentPassword: '', newPassword: '', confirm: '' });
+        // Changing the password revokes the old token server-side; swap in the
+        // fresh one so this session stays signed in instead of being bounced to login.
+        if (data.token) onUserUpdate?.(prev => ({ ...prev, token: data.token }));
+      }
       else          setPwMsg({ type: 'error',   text: data.error || 'Failed to update password.' });
     } catch    { setPwMsg({ type: 'error', text: 'Cannot connect to server.' }); }
     finally    { setPwLoading(false); }
