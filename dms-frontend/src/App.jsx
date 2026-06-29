@@ -383,6 +383,7 @@ export default function App() {
                   onVoid={handleVoid}
                   isRestricted={false}
                   loading={drawingsLoading}
+                  token={currentUser?.token}
                 />
               ) : <Navigate to="/documents" replace />
             } />

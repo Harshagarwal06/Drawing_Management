@@ -2,10 +2,10 @@ import { useState, useRef, useEffect, useEffectEvent } from "react";
 import { useLocation } from "react-router-dom";
 import { createPortal } from "react-dom";
 import { MoreVertical, Eye, Download, Ban } from "lucide-react";
-import { isNative, openExternal, saveBlob } from "../utils/native";
+import { saveBlob } from "../utils/native";
+import { fileNameFromPath, openSignedDrawingFile } from "../utils/signedFiles";
 import StatusBadge from "./StatusBadge";
 
-const API = import.meta.env.VITE_API_URL;
 
 /* ── Mobile M3 helpers ── */
 const DISC_COLORS = {
@@ -82,6 +82,7 @@ export default function MasterRegisterTable({
   onVoid,
   isRestricted = false,
   loading = false,
+  token = "",
 }) {
   const [discOpen, setDiscOpen] = useState(false);
   const location = useLocation();
@@ -107,15 +108,13 @@ export default function MasterRegisterTable({
     saveBlob("drawing-register.csv", new Blob([csv], { type: "text/csv" }));
   };
 
-  /* Supports both legacy local paths (/uploads/…) and full R2 URLs */
-  const resolveUrl = p => p?.startsWith('http') ? p : `${API}${p}`;
-
-  const handleView     = d => { if (d.path) openExternal(resolveUrl(d.path)); };
+  const handleView = d => {
+    if (!d.path) return;
+    openSignedDrawingFile(d, token, "view").catch(() => window.alert("Could not open this file. Please try again."));
+  };
   const handleDownload = d => {
     if (!d.path) return;
-    if (isNative()) return openExternal(resolveUrl(d.path));
-    const ext = d.path.slice(d.path.lastIndexOf("."));
-    const a   = document.createElement("a"); a.href = resolveUrl(d.path); a.download = `${d.number}_Rev${d.rev}${ext}`; a.click();
+    openSignedDrawingFile(d, token, "download").catch(() => window.alert("Could not download this file. Please try again."));
   };
   const handleVoidClick = d => {
     if (window.confirm(`Void drawing ${d.number}?\n\nThis marks it as superseded and cannot be undone.`)) onVoid?.(d.id);
@@ -333,7 +332,7 @@ export default function MasterRegisterTable({
                 </tr>
               ) : drawings.map(d => {
                 const s        = STATUS_MAP[d.status] || { label: d.status, pillCls: "bg-surface-container text-on-surface-variant", dot: "bg-on-surface-variant" };
-                const filename = d.path ? d.path.split("/").pop() : null;
+                const filename = d.fileName || (d.path ? fileNameFromPath(d.path) : null);
                 return (
                   <tr key={d.id} className="border-b border-border-slate hover:bg-surface-container-low/50 transition-colors group">
 
@@ -450,7 +449,13 @@ function MobileRegister({ allDrawings, search, filterStat, onSearch, onFilterSta
             placeholder="Search drawings"
             className="flex-1 bg-transparent outline-none text-[15px] text-on-surface placeholder:text-on-surface-variant"
           />
-          <span className="material-symbols-outlined text-[22px] text-on-surface-variant">tune</span>
+          {search ? (
+            <button onClick={() => onSearch?.("")} aria-label="Clear search" className="w-7 h-7 grid place-items-center rounded-full active:bg-black/5 shrink-0">
+              <span className="material-symbols-outlined text-[18px] text-on-surface-variant">close</span>
+            </button>
+          ) : (
+            <span className="material-symbols-outlined text-[22px] text-on-surface-variant">tune</span>
+          )}
         </div>
         <div className="flex gap-2 overflow-x-auto scrollbar-hide -mx-4 px-4">
           {M_FILTERS.map((f) => {
@@ -482,7 +487,7 @@ function MobileRegister({ allDrawings, search, filterStat, onSearch, onFilterSta
             <button
               key={d.id}
               onClick={() => onView(d)}
-              className="flex items-center gap-3 p-3 bg-surface rounded-2xl shadow-card text-left active:bg-primary/5 transition-colors"
+              className="flex items-center gap-3 py-3 pl-3 pr-4 bg-surface rounded-2xl shadow-card text-left active:bg-primary/5 transition-colors"
             >
               <span className="flex flex-col items-center justify-center w-11 h-11 rounded-xl shrink-0" style={{ background: eBg, color: eFg }}>
                 <span className="material-symbols-outlined text-[18px]" style={{ fontVariationSettings: "'FILL' 1" }}>description</span>

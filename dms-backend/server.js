@@ -12,12 +12,18 @@ const Database     = require('better-sqlite3');
 const PDFDocument  = require('pdfkit');
 const nodemailer   = require('nodemailer');
 const crypto       = require('crypto');
-const { S3Client, PutObjectCommand, DeleteObjectCommand } = require('@aws-sdk/client-s3');
+const { URL }      = require('url');
+const { S3Client, PutObjectCommand, DeleteObjectCommand, GetObjectCommand } = require('@aws-sdk/client-s3');
+const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
 const helmet       = require('helmet');
 
 const app         = express();
+const DEFAULT_JWT_SECRET = 'dev-secret-change-in-production';
 const PORT        = process.env.PORT        || 3000;
-const JWT_SECRET  = process.env.JWT_SECRET  || 'dev-secret-change-in-production';
+const JWT_SECRET  = process.env.JWT_SECRET  || DEFAULT_JWT_SECRET;
+if (process.env.NODE_ENV === 'production' && JWT_SECRET === DEFAULT_JWT_SECRET) {
+  throw new Error('JWT_SECRET must be set to a strong production secret before starting DrawVault.');
+}
 const CORS_ORIGIN = process.env.CORS_ORIGIN || 'http://localhost:5173';
 // Support comma-separated origins in CORS_ORIGIN env var for multiple deployments.
 // capacitor://localhost is the iOS WKWebView origin; https://localhost is the Android WebView origin.
@@ -44,18 +50,19 @@ const R2_PUBLIC_URL      = (process.env.R2_PUBLIC_URL || '').replace(/\/+$/, '')
 const CLOUDFLARE_ACCT_ID = process.env.CLOUDFLARE_ACCOUNT_ID;
 const R2_KEY_ID          = process.env.R2_ACCESS_KEY_ID;
 const R2_SECRET          = process.env.R2_SECRET_ACCESS_KEY;
+const R2_SIGNED_URL_TTL_SECONDS = Math.max(60, parseInt(process.env.R2_SIGNED_URL_TTL_SECONDS || '300', 10));
 
-const R2_CONFIGURED = !!(R2_BUCKET && R2_PUBLIC_URL && CLOUDFLARE_ACCT_ID && R2_KEY_ID && R2_SECRET);
+const R2_CONFIGURED = !!(R2_BUCKET && CLOUDFLARE_ACCT_ID && R2_KEY_ID && R2_SECRET);
 
 // ── Startup validation ──────────────────────────────────────────────
 console.log('');
 console.log('=== DrawVault Storage Configuration ===');
 console.log(`  R2_BUCKET_NAME        : ${R2_BUCKET        ? '✅ set' : '❌ NOT SET'}`);
-console.log(`  R2_PUBLIC_URL         : ${R2_PUBLIC_URL     ? '✅ set' : '❌ NOT SET'}`);
+console.log(`  R2_PUBLIC_URL         : ${R2_PUBLIC_URL     ? '✅ set (legacy URL parsing)' : 'optional for signed URLs'}`);
 console.log(`  CLOUDFLARE_ACCOUNT_ID : ${CLOUDFLARE_ACCT_ID ? '✅ set' : '❌ NOT SET'}`);
 console.log(`  R2_ACCESS_KEY_ID      : ${R2_KEY_ID         ? '✅ set' : '❌ NOT SET'}`);
 console.log(`  R2_SECRET_ACCESS_KEY  : ${R2_SECRET         ? '✅ set' : '❌ NOT SET'}`);
-console.log(`  Storage mode          : ${R2_CONFIGURED ? '☁️  Cloudflare R2' : '⛔ UNCONFIGURED — uploads will be rejected'}`);
+console.log(`  Storage mode          : ${R2_CONFIGURED ? `☁️  Cloudflare R2 (signed URLs, ${R2_SIGNED_URL_TTL_SECONDS}s TTL)` : '⛔ UNCONFIGURED — uploads will be rejected'}`);
 console.log('=======================================');
 console.log('');
 
@@ -68,11 +75,76 @@ const r2 = R2_CONFIGURED ? new S3Client({
   },
 }) : null;
 
-/* ── R2 delete helper ───────────────────────────────────────────── */
+/* ── R2 object helpers ───────────────────────────────────────────── */
+function extractR2Key(filePath) {
+  if (!filePath) return '';
+  const raw = String(filePath).trim();
+  if (!raw) return '';
+
+  if (R2_PUBLIC_URL && raw.startsWith(`${R2_PUBLIC_URL}/`)) {
+    return decodeURIComponent(raw.slice(R2_PUBLIC_URL.length + 1).replace(/^\/+/, ''));
+  }
+
+  try {
+    const url = new URL(raw);
+    return decodeURIComponent(url.pathname.replace(/^\/+/, ''));
+  } catch {
+    return raw.replace(/^\/+/, '');
+  }
+}
+
+function fileNameFromPath(filePath) {
+  const key = extractR2Key(filePath);
+  const name = key.split('/').filter(Boolean).pop() || 'drawing-file';
+  try {
+    return decodeURIComponent(name);
+  } catch {
+    return name;
+  }
+}
+
+function normalizeFileMode(mode) {
+  return mode === 'download' ? 'download' : 'view';
+}
+
+function contentDispositionFor(mode, filename) {
+  const disposition = normalizeFileMode(mode) === 'download' ? 'attachment' : 'inline';
+  const safeName = String(filename || 'drawing-file').replace(/[\r\n"]/g, '_');
+  return `${disposition}; filename="${safeName}"`;
+}
+
+async function createSignedR2Url(filePath, mode = 'view') {
+  if (!r2) {
+    const err = new Error('File storage is not configured.');
+    err.status = 503;
+    throw err;
+  }
+  const key = extractR2Key(filePath);
+  if (!key) {
+    const err = new Error('File is not available.');
+    err.status = 404;
+    throw err;
+  }
+
+  const filename = fileNameFromPath(filePath);
+  const command = new GetObjectCommand({
+    Bucket: R2_BUCKET,
+    Key: key,
+    ResponseContentDisposition: contentDispositionFor(mode, filename),
+  });
+  const url = await getSignedUrl(r2, command, { expiresIn: R2_SIGNED_URL_TTL_SECONDS });
+  return {
+    url,
+    filename,
+    expiresAt: new Date(Date.now() + R2_SIGNED_URL_TTL_SECONDS * 1000).toISOString(),
+  };
+}
+
 async function deleteFromR2(filePath) {
   if (!r2 || !filePath) return;
+  const key = extractR2Key(filePath);
+  if (!key) return;
   try {
-    const key = filePath.replace(R2_PUBLIC_URL + '/', '');
     await r2.send(new DeleteObjectCommand({ Bucket: R2_BUCKET, Key: key }));
     console.log(`🗑️  R2 deleted: ${key}`);
   } catch (err) {
@@ -407,18 +479,77 @@ function requireDirector(req, res, next) {
   next();
 }
 
+function parseProjectId(value) {
+  const id = Number.parseInt(value, 10);
+  return Number.isInteger(id) && id > 0 ? id : null;
+}
+
+function parseAllowedProjects(user) {
+  const allowed = user?.allowedProjects ?? user?.allowed_projects;
+  if (allowed === '*') return '*';
+  if (Array.isArray(allowed)) return allowed.map(Number).filter(Number.isInteger);
+  try {
+    const parsed = JSON.parse(allowed || '[]');
+    return Array.isArray(parsed) ? parsed.map(Number).filter(Number.isInteger) : [];
+  } catch {
+    return null;
+  }
+}
+
+function userCanAccessProject(user, projectId) {
+  const allowed = parseAllowedProjects(user);
+  if (allowed === '*') return true;
+  if (!allowed) return false;
+  return allowed.includes(Number(projectId));
+}
+
+function ensureProjectAccess(req, res, projectId) {
+  const id = parseProjectId(projectId);
+  if (!id) {
+    res.status(400).json({ error: 'Valid projectId is required.' });
+    return false;
+  }
+  const allowed = parseAllowedProjects(req.user);
+  if (!allowed) {
+    res.status(403).json({ error: 'Invalid project access configuration.' });
+    return false;
+  }
+  if (userCanAccessProject(req.user, id)) return true;
+  res.status(403).json({ error: 'Access denied — you do not have access to this project.' });
+  return false;
+}
+
 /* ── RBAC: check user has access to the requested project ───────── */
 function requireProjectAccess(req, res, next) {
-  const allowed   = req.user?.allowedProjects;
-  if (allowed === '*') return next();
-  const projectId = parseInt(req.params.id || req.query.projectId || req.body?.projectId || 1, 10);
-  try {
-    const ids = JSON.parse(allowed || '[]');
-    if (ids.includes(projectId)) return next();
-    return res.status(403).json({ error: 'Access denied — you do not have access to this project.' });
-  } catch {
-    return res.status(403).json({ error: 'Invalid project access configuration.' });
+  const projectId = parseProjectId(req.params.id ?? req.query.projectId ?? req.body?.projectId) || 1;
+  if (!ensureProjectAccess(req, res, projectId)) return;
+  req.projectId = projectId;
+  next();
+}
+
+function loadDrawingForRequest(req, res, id) {
+  const drawing = db.prepare('SELECT * FROM drawings WHERE id = ?').get(id);
+  if (!drawing) {
+    res.status(404).json({ error: 'Drawing not found.' });
+    return null;
   }
+  if (!ensureProjectAccess(req, res, drawing.project_id)) return null;
+  return drawing;
+}
+
+function loadRevisionForRequest(req, res, id) {
+  const revision = db.prepare(`
+    SELECT r.*, d.project_id, d.number AS drawing_number
+    FROM drawing_revisions r
+    JOIN drawings d ON d.id = r.drawing_id
+    WHERE r.id = ?
+  `).get(id);
+  if (!revision) {
+    res.status(404).json({ error: 'Revision not found.' });
+    return null;
+  }
+  if (!ensureProjectAccess(req, res, revision.project_id)) return null;
+  return revision;
 }
 
 /* ── Upload rate limiter — max 20 uploads per 15 min per IP ─────── */
@@ -430,10 +561,21 @@ const uploadLimiter = rateLimit({
   message: { error: 'Too many uploads — please wait 15 minutes before uploading again.' },
 });
 
-/* Apply verifyToken to all /api/* routes except POST /api/login and GET /api/health */
+/* ── Login limiter — max 10 failed attempts per 15 min per IP ───── */
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  skipSuccessfulRequests: true,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many failed login attempts — please wait 15 minutes before trying again.' },
+});
+
+/* Apply verifyToken to all /api/* routes except login, health, and tokenized PDF downloads */
 app.use('/api', (req, res, next) => {
   if (req.path === '/login'  && req.method === 'POST') return next();
-  if (req.path === '/health' && req.method === 'GET')  return next();
+  if (req.path === '/health' && (req.method === 'GET' || req.method === 'HEAD')) return next();
+  if (/^\/transmittals\/\d+\/pdf$/.test(req.path) && req.method === 'GET' && req.query.token) return next();
   verifyToken(req, res, next);
 });
 
@@ -560,7 +702,7 @@ app.get('/api/projects/:id/folders', requireProjectAccess, (req, res) => {
 });
 
 /* ── PUT /api/projects/:id/folders ─────────────────────────────── */
-app.put('/api/projects/:id/folders', requireProjectAccess, (req, res) => {
+app.put('/api/projects/:id/folders', requireWriteAccess, requireProjectAccess, (req, res) => {
   const { tree } = req.body;
   if (!tree) return res.status(400).json({ error: 'tree is required.' });
   try {
@@ -577,7 +719,7 @@ app.put('/api/projects/:id/folders', requireProjectAccess, (req, res) => {
 });
 
 /* ── POST /api/projects/:id/folders/rename ───────────────────────── */
-app.post('/api/projects/:id/folders/rename', requireProjectAccess, (req, res) => {
+app.post('/api/projects/:id/folders/rename', requireWriteAccess, requireProjectAccess, (req, res) => {
   const { oldPath, newPath } = req.body;
   if (!oldPath || !newPath) return res.status(400).json({ error: 'oldPath and newPath are required.' });
   try {
@@ -604,7 +746,7 @@ app.post('/api/projects/:id/folders/rename', requireProjectAccess, (req, res) =>
 });
 
 /* ── POST /api/projects/:id/folders/delete ───────────────────────── */
-app.post('/api/projects/:id/folders/delete', requireProjectAccess, (req, res) => {
+app.post('/api/projects/:id/folders/delete', requireWriteAccess, requireProjectAccess, (req, res) => {
   const { folderPath, parentPath } = req.body;
   if (!folderPath) return res.status(400).json({ error: 'folderPath is required.' });
   
@@ -633,7 +775,7 @@ app.post('/api/projects/:id/folders/delete', requireProjectAccess, (req, res) =>
 });
 
 /* ── POST /api/projects/:id/folders/move ────────────────────────── */
-app.post('/api/projects/:id/folders/move', requireProjectAccess, (req, res) => {
+app.post('/api/projects/:id/folders/move', requireWriteAccess, requireProjectAccess, (req, res) => {
   const { oldPath, newPath } = req.body;
   if (!oldPath || !newPath) return res.status(400).json({ error: 'oldPath and newPath are required.' });
   try {
@@ -676,7 +818,8 @@ app.get('/api/drawings', requireProjectAccess, (req, res) => {
       issueDate:    r.issue_date,
       originator:   r.originator,
       transmittals: r.transmittals,
-      path:         r.path,
+      path:         r.path ? extractR2Key(r.path) : null,
+      fileName:     r.path ? fileNameFromPath(r.path) : null,
       folderPath:   r.folder_path || '',
     }));
     res.set('X-Total-Count', String(total));
@@ -689,19 +832,21 @@ app.get('/api/drawings', requireProjectAccess, (req, res) => {
 
 /* ── POST /api/upload ───────────────────────────────────────────── */
 app.post('/api/upload', requireWriteAccess, uploadLimiter, upload.single('drawingFile'), async (req, res) => {
-  /* ── Guard: reject immediately if R2 is not configured ── */
+  if (!req.file) return res.status(400).json({ error: 'No file uploaded.' });
+
+  const { drawingNumber, title, discipline, originator, revision, status, projectId, folderPath } = req.body;
+  const pId = parseProjectId(projectId) || 1;
+  if (!ensureProjectAccess(req, res, pId)) return;
+
+  /* ── Guard: reject before storage writes if R2 is not configured ── */
   if (!R2_CONFIGURED) {
     console.error('❌ Upload rejected — Cloudflare R2 environment variables are not configured.');
     return res.status(503).json({
       error: 'File storage is not configured. Contact the administrator.',
-      detail: 'R2_BUCKET_NAME, R2_PUBLIC_URL, CLOUDFLARE_ACCOUNT_ID, R2_ACCESS_KEY_ID, and R2_SECRET_ACCESS_KEY must all be set.',
+      detail: 'R2_BUCKET_NAME, CLOUDFLARE_ACCOUNT_ID, R2_ACCESS_KEY_ID, and R2_SECRET_ACCESS_KEY must all be set.',
     });
   }
 
-  if (!req.file) return res.status(400).json({ error: 'No file uploaded.' });
-
-  const { drawingNumber, title, discipline, originator, revision, status, projectId, folderPath } = req.body;
-  const pId  = parseInt(projectId) || 1;
   const fPath = folderPath || '';
   const today = new Date().toISOString().split('T')[0];
 
@@ -722,7 +867,7 @@ app.post('/api/upload', requireWriteAccess, uploadLimiter, upload.single('drawin
       ContentType: req.file.mimetype,
     }));
 
-    const filePath = `${R2_PUBLIC_URL}/${r2Key}`;
+    const filePath = r2Key;
     console.log(`✅ R2 upload succeeded → ${filePath}`);
 
     /* ── Persist to SQLite ── */
@@ -738,8 +883,8 @@ app.post('/api/upload', requireWriteAccess, uploadLimiter, upload.single('drawin
         req.user?.name || 'Unknown',
         existing.issue_date || new Date().toISOString()
       );
-      db.prepare(`UPDATE drawings SET title=?, discipline=?, rev=?, status=?, issue_date=?, originator=?, path=?, project_id=?, folder_path=? WHERE number=?`)
-        .run(title, discipline, revision, status, today, originator, filePath, pId, fPath, drawingNumber);
+      db.prepare(`UPDATE drawings SET title=?, discipline=?, rev=?, status=?, issue_date=?, originator=?, path=?, project_id=?, folder_path=? WHERE number=? AND project_id=?`)
+        .run(title, discipline, revision, status, today, originator, filePath, pId, fPath, drawingNumber, pId);
       console.log(`✅ Updated drawing ${drawingNumber} → Rev ${revision} (previous Rev ${existing.rev} archived)`);
     } else {
       db.prepare(`INSERT INTO drawings (number,title,discipline,rev,status,issue_date,originator,transmittals,path,project_id,folder_path) VALUES (?,?,?,?,?,?,?,0,?,?,?)`)
@@ -752,7 +897,7 @@ app.post('/api/upload', requireWriteAccess, uploadLimiter, upload.single('drawin
            existing ? `${drawingNumber} revised to Rev ${revision}` : `${drawingNumber} registered`,
            title, new Date().toISOString());
 
-    res.json({ message: 'Drawing saved successfully.', path: filePath });
+    res.json({ message: 'Drawing saved successfully.', path: extractR2Key(filePath), fileName: fileNameFromPath(filePath) });
 
     // ── Async Slack notification (metadata only — never the file link) ──
     setImmediate(() => {
@@ -773,13 +918,17 @@ app.post('/api/upload', requireWriteAccess, uploadLimiter, upload.single('drawin
 app.get('/api/drawings/:id/revisions', (req, res) => {
   const { id } = req.params;
   try {
-    const drawing = db.prepare('SELECT * FROM drawings WHERE id = ?').get(id);
-    if (!drawing) return res.status(404).json({ error: 'Drawing not found.' });
+    const drawing = loadDrawingForRequest(req, res, id);
+    if (!drawing) return;
 
     // Archived past revisions (oldest first)
     const past = db.prepare(
       'SELECT id, rev, status, title, discipline, originator, path, uploaded_by, created_at FROM drawing_revisions WHERE drawing_id = ? ORDER BY id ASC'
-    ).all(id);
+    ).all(id).map(r => ({
+      ...r,
+      path: r.path ? extractR2Key(r.path) : null,
+      fileName: r.path ? fileNameFromPath(r.path) : null,
+    }));
 
     // Current revision = what's in the drawings table now
     const current = {
@@ -789,7 +938,8 @@ app.get('/api/drawings/:id/revisions', (req, res) => {
       title:      drawing.title,
       discipline: drawing.discipline,
       originator: drawing.originator,
-      path:       drawing.path,
+      path:       drawing.path ? extractR2Key(drawing.path) : null,
+      fileName:   drawing.path ? fileNameFromPath(drawing.path) : null,
       uploaded_by: null,
       created_at: drawing.issue_date,
       current:    true,
@@ -800,6 +950,30 @@ app.get('/api/drawings/:id/revisions', (req, res) => {
   } catch (err) {
     console.error('❌ GET /api/drawings/:id/revisions error:', err);
     res.status(500).json({ error: 'Failed to fetch revisions.' });
+  }
+});
+
+/* ── GET /api/drawings/:id/file-url ─────────────────────────────── */
+app.get('/api/drawings/:id/file-url', async (req, res) => {
+  try {
+    const drawing = loadDrawingForRequest(req, res, req.params.id);
+    if (!drawing) return;
+    res.json(await createSignedR2Url(drawing.path, normalizeFileMode(req.query.mode)));
+  } catch (err) {
+    console.error('❌ GET /api/drawings/:id/file-url error:', err);
+    res.status(err.status || 500).json({ error: err.status ? err.message : 'Failed to create file URL.' });
+  }
+});
+
+/* ── GET /api/drawing-revisions/:id/file-url ────────────────────── */
+app.get('/api/drawing-revisions/:id/file-url', async (req, res) => {
+  try {
+    const revision = loadRevisionForRequest(req, res, req.params.id);
+    if (!revision) return;
+    res.json(await createSignedR2Url(revision.path, normalizeFileMode(req.query.mode)));
+  } catch (err) {
+    console.error('❌ GET /api/drawing-revisions/:id/file-url error:', err);
+    res.status(err.status || 500).json({ error: err.status ? err.message : 'Failed to create file URL.' });
   }
 });
 
@@ -845,24 +1019,37 @@ app.get('/api/transmittals', requireProjectAccess, (req, res) => {
 /* ── POST /api/transmittals ─────────────────────────────────────── */
 app.post('/api/transmittals', requireWriteAccess, (req, res) => {
   const { drawingIds, recipients, purpose, remarks, issuedAt, projectId } = req.body;
-  const pId = parseInt(projectId, 10) || 1;
-  if (!drawingIds?.length || !recipients?.length || !purpose)
+  const pId = parseProjectId(projectId) || 1;
+  const drawingIdList = Array.isArray(drawingIds)
+    ? drawingIds.map(id => Number.parseInt(id, 10)).filter(Number.isInteger)
+    : [];
+  if (!drawingIdList.length || !recipients?.length || !purpose)
     return res.status(400).json({ error: 'drawingIds, recipients, and purpose are required.' });
+  if (!Array.isArray(drawingIds) || drawingIdList.length !== drawingIds.length)
+    return res.status(400).json({ error: 'drawingIds must be valid drawing IDs.' });
+  if (!ensureProjectAccess(req, res, pId)) return;
   try {
+    const placeholdersForValidation = drawingIdList.map(() => '?').join(',');
+    const validDrawingIds = db.prepare(
+      `SELECT id FROM drawings WHERE project_id = ? AND id IN (${placeholdersForValidation})`
+    ).all(pId, ...drawingIdList).map(r => r.id);
+    if (validDrawingIds.length !== drawingIdList.length) {
+      return res.status(400).json({ error: 'All drawingIds must belong to the selected project.' });
+    }
     // Auto-generate TRN number (per-project sequential)
     const count = db.prepare('SELECT COUNT(*) as n FROM transmittals WHERE project_id = ?').get(pId).n;
     const number = `TRN-${String(count + 1).padStart(3, '0')}`;
 
     const today = issuedAt || new Date().toISOString().split('T')[0];
     const result = db.prepare(`INSERT INTO transmittals (number,drawing_ids,recipients,purpose,remarks,issued_at,project_id) VALUES (?,?,?,?,?,?,?)`)
-      .run(number, JSON.stringify(drawingIds), JSON.stringify(recipients), purpose, remarks || '', today, pId);
+      .run(number, JSON.stringify(drawingIdList), JSON.stringify(recipients), purpose, remarks || '', today, pId);
     // Single bulk UPDATE instead of N+1 loop
-    if (drawingIds.length > 0) {
-      const placeholders = drawingIds.map(() => '?').join(',');
-      db.prepare(`UPDATE drawings SET transmittals = transmittals + 1 WHERE id IN (${placeholders})`).run(drawingIds);
+    if (drawingIdList.length > 0) {
+      const placeholders = drawingIdList.map(() => '?').join(',');
+      db.prepare(`UPDATE drawings SET transmittals = transmittals + 1 WHERE id IN (${placeholders})`).run(...drawingIdList);
     }
     db.prepare('INSERT INTO activity_log (project_id,type,title,detail,created_at) VALUES (?,?,?,?,?)')
-      .run(pId, 'transmittal', `${number} issued`, `${drawingIds.length} drawing(s) — ${purpose}`, new Date().toISOString());
+      .run(pId, 'transmittal', `${number} issued`, `${drawingIdList.length} drawing(s) — ${purpose}`, new Date().toISOString());
     console.log(`✅ Transmittal ${number} saved`);
 
     const trnId = result.lastInsertRowid;
@@ -883,7 +1070,7 @@ app.post('/api/transmittals', requireWriteAccess, (req, res) => {
     setImmediate(() => {
       const proj = db.prepare('SELECT code FROM projects WHERE id = ?').get(pId);
       const tag  = proj?.code ? ` · ${proj.code}` : '';
-      postToSlack(pId, `📋 *${number}* issued — ${drawingIds.length} drawing(s), "${purpose}"${tag}`);
+      postToSlack(pId, `📋 *${number}* issued — ${drawingIdList.length} drawing(s), "${purpose}"${tag}`);
     });
 
     // ── Async: generate PDF and send emails (don't block response) ──
@@ -891,8 +1078,8 @@ app.post('/api/transmittals', requireWriteAccess, (req, res) => {
       setImmediate(async () => {
         try {
           const project = db.prepare('SELECT * FROM projects WHERE id = ?').get(pId);
-          const drws = drawingIds.length > 0
-            ? db.prepare(`SELECT * FROM drawings WHERE id IN (${drawingIds.map(() => '?').join(',')})`).all(drawingIds)
+          const drws = drawingIdList.length > 0
+            ? db.prepare(`SELECT * FROM drawings WHERE id IN (${drawingIdList.map(() => '?').join(',')})`).all(...drawingIdList)
             : [];
 
           // Build PDF buffer
@@ -1183,13 +1370,7 @@ app.get('/api/transmittals/:id/pdf', verifyTokenForDownload, (req, res) => {
     const t = db.prepare('SELECT * FROM transmittals WHERE id = ?').get(req.params.id);
     if (!t) return res.status(404).json({ error: 'Transmittal not found.' });
 
-    const allowed = req.user?.allowedProjects;
-    if (allowed !== '*') {
-      const ids = JSON.parse(allowed || '[]');
-      if (!ids.includes(t.project_id)) {
-        return res.status(403).json({ error: 'Access denied — you do not have access to this project.' });
-      }
-    }
+    if (!ensureProjectAccess(req, res, t.project_id)) return;
 
     let drawingIds = [], recipients = [];
     try { drawingIds = JSON.parse(t.drawing_ids); } catch {}
@@ -1225,8 +1406,8 @@ app.get('/api/transmittals/:id/pdf', verifyTokenForDownload, (req, res) => {
 app.patch('/api/drawings/:id/void', requireWriteAccess, (req, res) => {
   const { id } = req.params;
   try {
-    const drawing = db.prepare('SELECT number, project_id FROM drawings WHERE id = ?').get(id);
-    if (!drawing) return res.status(404).json({ error: 'Drawing not found.' });
+    const drawing = loadDrawingForRequest(req, res, id);
+    if (!drawing) return;
     db.prepare("UPDATE drawings SET status = 'VOID' WHERE id = ?").run(id);
     db.prepare('INSERT INTO activity_log (project_id,type,title,detail,created_at) VALUES (?,?,?,?,?)')
       .run(drawing.project_id, 'void', `${drawing.number} voided`, 'Drawing superseded / voided', new Date().toISOString());
@@ -1242,8 +1423,8 @@ app.patch('/api/drawings/:id/void', requireWriteAccess, (req, res) => {
 app.delete('/api/drawings/:id', requireWriteAccess, (req, res) => {
   const { id } = req.params;
   try {
-    const drawing   = db.prepare('SELECT number, project_id, path FROM drawings WHERE id = ?').get(id);
-    if (!drawing) return res.status(404).json({ error: 'Drawing not found.' });
+    const drawing = loadDrawingForRequest(req, res, id);
+    if (!drawing) return;
     const revisions = db.prepare('SELECT path FROM drawing_revisions WHERE drawing_id = ?').all(id);
 
     // Delete DB rows (synchronous)
@@ -1268,8 +1449,8 @@ app.delete('/api/drawings/:id', requireWriteAccess, (req, res) => {
 app.patch('/api/drawings/:id', requireWriteAccess, (req, res) => {
   const { id } = req.params;
   try {
-    const drawing = db.prepare('SELECT * FROM drawings WHERE id = ?').get(id);
-    if (!drawing) return res.status(404).json({ error: 'Drawing not found.' });
+    const drawing = loadDrawingForRequest(req, res, id);
+    if (!drawing) return;
 
     const {
       number     = drawing.number,
@@ -1304,6 +1485,11 @@ app.patch('/api/drawings/:id', requireWriteAccess, (req, res) => {
       db.prepare('INSERT INTO activity_log (project_id,type,title,detail,created_at) VALUES (?,?,?,?,?)')
         .run(drawing.project_id, 'update', `${updated.number} updated`, 'Drawing metadata updated', new Date().toISOString());
     } catch {}
+
+    if (updated?.path) {
+      updated.fileName = fileNameFromPath(updated.path);
+      updated.path = extractR2Key(updated.path);
+    }
 
     res.json(updated);
   } catch (err) {
@@ -1426,7 +1612,7 @@ app.patch('/api/users/me/password', async (req, res) => {
 });
 
 /* ── POST /api/login ────────────────────────────────────────────── */
-app.post('/api/login', async (req, res) => {
+app.post('/api/login', loginLimiter, async (req, res) => {
   const { username, password } = req.body;
   try {
     const user = db.prepare('SELECT * FROM users WHERE username = ?').get(username);

@@ -1,8 +1,8 @@
 import { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { History, X, Loader2, Eye, Download } from "lucide-react";
-import { API, resolveUrl, STATUS_PILL, STATUS_LABEL } from "./constants";
-import { anchorClick } from "../../utils/native";
+import { API, STATUS_PILL, STATUS_LABEL } from "./constants";
+import { openSignedRevisionFile } from "../../utils/signedFiles";
 
 /* Inject the slide-in keyframes once per document */
 if (!document.getElementById("dms-slide-right")) {
@@ -12,7 +12,7 @@ if (!document.getElementById("dms-slide-right")) {
   document.head.appendChild(s);
 }
 
-export default function RevisionHistoryPanel({ drawing, token, onClose }) {
+export default function RevisionHistoryPanel({ drawing, token, onClose, onToast }) {
   const [revisions, setRevisions] = useState([]);
   const [loading,   setLoading]   = useState(true);
   const [error,     setError]     = useState("");
@@ -49,7 +49,7 @@ export default function RevisionHistoryPanel({ drawing, token, onClose }) {
         onClick={onClose}
       />
 
-      <div className="fixed inset-y-0 right-0 z-[9989] w-full max-w-md bg-white border-l border-border-slate shadow-2xl flex flex-col animate-in slide-in-from-right"
+      <div className="fixed inset-y-0 right-0 z-[9989] w-full max-w-md bg-surface border-l border-border-slate shadow-2xl flex flex-col animate-in slide-in-from-right"
            style={{ animation: "slideInRight .2s ease-out" }}
       >
         <div className="shrink-0 border-b border-border-slate px-5 py-4">
@@ -60,7 +60,8 @@ export default function RevisionHistoryPanel({ drawing, token, onClose }) {
             </h2>
             <button
               onClick={onClose}
-              className="p-1.5 rounded-lg text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-colors"
+              aria-label="Close revision history"
+              className="h-11 w-11 flex items-center justify-center rounded-lg text-on-surface-variant hover:bg-surface-container active:bg-surface-container hover:text-on-surface transition-colors touch-manipulation"
             >
               <X size={16} />
             </button>
@@ -69,7 +70,7 @@ export default function RevisionHistoryPanel({ drawing, token, onClose }) {
           <p className="text-[11px] text-on-surface-variant mt-0.5 break-words">{drawing.title}</p>
         </div>
 
-        <div className="flex-1 overflow-y-auto">
+        <div className="flex-1 overflow-y-auto overscroll-contain">
           {loading && (
             <div className="flex items-center justify-center h-40">
               <Loader2 size={20} className="animate-spin text-primary" />
@@ -97,8 +98,6 @@ export default function RevisionHistoryPanel({ drawing, token, onClose }) {
 
                 {[...revisions].reverse().map((rev) => {
                   const isCurrent = rev.current;
-                  const filename  = rev.path?.split("/").pop() ?? "";
-                  const ext       = filename.split(".").pop().toUpperCase();
                   const statusPill  = STATUS_PILL[rev.status]  ?? "bg-surface-container text-on-surface-variant";
                   const statusLabel = STATUS_LABEL[rev.status] ?? rev.status;
 
@@ -117,12 +116,12 @@ export default function RevisionHistoryPanel({ drawing, token, onClose }) {
                       } transition-colors`}>
 
                         {!isCurrent && (
-                          <div className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 border-b border-amber-200">
-                            <svg width="11" height="11" viewBox="0 0 16 16" fill="none" className="shrink-0 text-amber-600">
+                          <div className="flex items-center gap-1.5 px-3 py-1.5 bg-status-amber-bg border-b border-status-amber-text/20">
+                            <svg width="11" height="11" viewBox="0 0 16 16" fill="none" className="shrink-0 text-status-amber-text">
                               <path d="M8 1L15 14H1L8 1Z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/>
                               <path d="M8 6v4M8 11.5v.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
                             </svg>
-                            <p className="text-[10px] font-medium text-amber-700">
+                            <p className="text-[11px] font-medium text-status-amber-text">
                               Older revision — use the current revision for latest work.
                             </p>
                           </div>
@@ -137,11 +136,11 @@ export default function RevisionHistoryPanel({ drawing, token, onClose }) {
                             </span>
 
                             {isCurrent ? (
-                              <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider bg-status-emerald-bg text-status-emerald-text border border-status-emerald-text/20">
+                              <span className="px-1.5 py-0.5 rounded text-[11px] font-bold uppercase tracking-wider bg-status-emerald-bg text-status-emerald-text border border-status-emerald-text/20">
                                 ✓ Current
                               </span>
                             ) : (
-                              <span className="px-1.5 py-0.5 rounded text-[9px] font-semibold uppercase tracking-wider bg-amber-50 text-amber-700 border border-amber-200">
+                              <span className="px-1.5 py-0.5 rounded text-[11px] font-semibold uppercase tracking-wider bg-status-amber-bg text-status-amber-text border border-status-amber-text/20">
                                 Superseded
                               </span>
                             )}
@@ -166,24 +165,23 @@ export default function RevisionHistoryPanel({ drawing, token, onClose }) {
                           </div>
 
                           {rev.path && (
-                            <div className="flex items-center gap-1 mt-2.5">
-                              <a
-                                href={resolveUrl(rev.path)}
-                                target="_blank"
-                                rel="noreferrer"
-                                onClick={anchorClick(resolveUrl(rev.path))}
-                                className="flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium text-on-surface-variant hover:text-primary hover:bg-surface-container transition-colors"
+                            <div className="flex items-center gap-2 mt-2.5">
+                              <button
+                                type="button"
+                                onClick={() => openSignedRevisionFile(drawing, rev, token, "view").catch(() => onToast?.("Could not open this revision. Please try again.", "error"))}
+                                aria-label={`View revision ${rev.rev}`}
+                                className="flex items-center gap-1.5 min-h-[44px] px-3 rounded-md text-[12px] font-medium text-on-surface-variant hover:text-primary hover:bg-surface-container active:bg-surface-container transition-colors touch-manipulation"
                               >
-                                <Eye size={12} /> View
-                              </a>
-                              <a
-                                href={resolveUrl(rev.path)}
-                                download={`${drawing.number}_Rev${rev.rev || "X"}.${ext.toLowerCase()}`}
-                                onClick={anchorClick(resolveUrl(rev.path))}
-                                className="flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium text-on-surface-variant hover:text-primary hover:bg-surface-container transition-colors"
+                                <Eye size={13} /> View
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => openSignedRevisionFile(drawing, rev, token, "download").catch(() => onToast?.("Could not download this revision. Please try again.", "error"))}
+                                aria-label={`Download revision ${rev.rev}`}
+                                className="flex items-center gap-1.5 min-h-[44px] px-3 rounded-md text-[12px] font-medium text-on-surface-variant hover:text-primary hover:bg-surface-container active:bg-surface-container transition-colors touch-manipulation"
                               >
-                                <Download size={12} /> Download
-                              </a>
+                                <Download size={13} /> Download
+                              </button>
                             </div>
                           )}
                         </div>

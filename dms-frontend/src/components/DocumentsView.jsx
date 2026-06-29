@@ -91,7 +91,7 @@ function StatChip({ label, value, Icon, colorCls }) {
         <Icon size={13} />
       </div>
       <div className="min-w-0">
-        <p className="text-[10px] text-on-surface-variant leading-none truncate">{label}</p>
+        <p className="text-[11px] text-on-surface-variant leading-none truncate">{label}</p>
         <p className="text-[14px] font-bold text-on-surface leading-tight mt-0.5">{value}</p>
       </div>
     </div>
@@ -99,7 +99,7 @@ function StatChip({ label, value, Icon, colorCls }) {
 }
 
 /* ─────────────────────── SwitchProjectDropdown ─────────────────────── */
-function SwitchProjectDropdown({ projects, activeProject, onProjectChange }) {
+function SwitchProjectDropdown({ projects, activeProject, onProjectChange, wide = false }) {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
 
@@ -110,17 +110,20 @@ function SwitchProjectDropdown({ projects, activeProject, onProjectChange }) {
   }, []);
 
   return (
-    <div className="relative shrink-0" ref={ref}>
+    <div className={`relative ${wide ? "w-full" : "shrink-0"}`} ref={ref}>
       <button
         onClick={() => setOpen(o => !o)}
-        className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-border-slate bg-white hover:bg-surface-container text-[12px] font-medium text-on-surface transition-colors shadow-sm"
+        className={wide
+          ? "w-full flex items-center justify-center gap-2 py-2 rounded-xl border border-outline-variant text-[12px] font-medium text-on-surface"
+          : "flex items-center gap-1.5 px-3 py-2 rounded-lg border border-border-slate bg-white hover:bg-surface-container text-[12px] font-medium text-on-surface transition-colors shadow-sm"
+        }
       >
-        <span className="material-symbols-outlined text-[15px] text-primary">sync_alt</span>
+        <span className="material-symbols-outlined text-[16px] text-on-surface-variant">sync_alt</span>
         Switch Project
-        <ChevronDown
+        {!wide && <ChevronDown
           size={12}
           className={`text-on-surface-variant transition-transform duration-200 ${open ? "rotate-180" : ""}`}
-        />
+        />}
       </button>
 
       {open && (
@@ -170,6 +173,18 @@ function SwitchProjectDropdown({ projects, activeProject, onProjectChange }) {
 }
 
 /* ─────────────────────── ProjectWorkspaceBar ───────────────────────── */
+function StatTile({ icon, label, value }) {
+  return (
+    <div className="bg-surface rounded-xl p-2.5 flex items-center gap-2.5">
+      <span className="material-symbols-outlined text-[18px] text-primary shrink-0">{icon}</span>
+      <div className="min-w-0">
+        <p className="text-[11px] text-on-surface-variant leading-none truncate">{label}</p>
+        <p className="text-[15px] font-bold text-on-surface leading-tight mt-0.5">{value}</p>
+      </div>
+    </div>
+  );
+}
+
 function ProjectWorkspaceBar({
   activeProject, projects, onProjectChange,
   totalFolders, totalDrawings, totalTransmittals, pendingApprovals,
@@ -179,41 +194,37 @@ function ProjectWorkspaceBar({
 
   return (
     <>
-    {/* ── Mobile: compact dark-indigo card ── */}
-    <div className="md:hidden bg-[#312e81] rounded-xl px-4 py-3 shadow-sm">
-      <div className="flex items-center gap-2 min-w-0">
-        <span className="font-mono font-bold text-white text-[14px] leading-none shrink-0">
-          {activeProject?.code ?? "—"}
-        </span>
-        <span className="text-[#c7d2fe]/60 shrink-0">·</span>
-        <span className="text-[14px] font-semibold text-white leading-none truncate">
-          {shortName}
-        </span>
-        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-white/12 text-[#c7d2fe] shrink-0">
+    {/* ── Mobile: M3 light card with 2×2 stat grid ── */}
+    <div className="md:hidden bg-surface-container-low rounded-2xl px-4 pt-3 pb-3.5 border border-outline-variant">
+      {/* Project header row */}
+      <div className="flex items-center justify-between gap-2 min-w-0">
+        <div className="flex items-center gap-2 min-w-0">
+          <span className="w-2.5 h-2.5 rounded-full bg-primary shrink-0" />
+          <span className="text-[15px] font-semibold text-on-surface truncate">
+            {activeProject?.code ?? "—"} {shortName}
+          </span>
+        </div>
+        <span className="px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-surface border border-outline-variant text-on-surface-variant shrink-0">
           Active
         </span>
       </div>
 
-      <div className="flex items-center gap-3 mt-2 text-[11px] font-medium text-[#c7d2fe]">
-        <span className="flex items-center gap-1">
-          <Layers size={12} /> {totalFolders} folders
-        </span>
-        <span className="text-[#c7d2fe]/40">·</span>
-        <span className="flex items-center gap-1">
-          <FileText size={12} /> {totalDrawings} drawings
-        </span>
-        <span className="text-[#c7d2fe]/40">·</span>
-        <span className="flex items-center gap-1">
-          <Send size={12} /> {totalTransmittals} sent
-        </span>
+      {/* 2×2 stats grid */}
+      <div className="grid grid-cols-2 gap-2 mt-3">
+        <StatTile icon="folder"        label="Folders"       value={totalFolders}       />
+        <StatTile icon="description"   label="Drawings"      value={totalDrawings}      />
+        <StatTile icon="outgoing_mail" label="Transmittals"  value={totalTransmittals}  />
+        <StatTile icon="schedule"      label="Pending"       value={pendingApprovals}   />
       </div>
 
+      {/* Switch project */}
       {projects.length > 1 && (
-        <div className="mt-2.5">
+        <div className="mt-3">
           <SwitchProjectDropdown
             projects={projects}
             activeProject={activeProject}
             onProjectChange={onProjectChange}
+            wide
           />
         </div>
       )}
@@ -298,9 +309,11 @@ export default function DocumentsView({
 
   const [localToast, setLocalToast] = useState(null);
 
-  const addInputRef    = useRef(null);
-  const renameInputRef = useRef(null);
-  const subInputRef    = useRef(null);
+  const addInputRef      = useRef(null);
+  const renameInputRef   = useRef(null);
+  const subInputRef      = useRef(null);
+  const mobileToolbarRef = useRef(null); // scroll anchor (mobile) — see nav effect
+  const contentCardRef   = useRef(null); // scroll anchor (desktop) — see nav effect
 
   useEffect(() => {
     if (!activeProject?.id || !token) return;
@@ -312,6 +325,18 @@ export default function DocumentsView({
 
   /* Loading is derived: true until the active project's tree has landed */
   const treeLoading = !activeProject?.id || !token || treeProjectId !== activeProject.id;
+
+  // On opening a folder, anchor the folder list just under the sticky toolbar so
+  // every folder lands in the same spot (project stats card scrolled off) — not
+  // jumping to the very top, and not keeping an arbitrary offset that makes the
+  // layout appear to "shift" when folder counts differ. At the root we leave the
+  // scroll alone so the stats card stays visible.
+  useEffect(() => {
+    if (segments.length === 0) return;
+    const desktop = window.matchMedia("(min-width: 768px)").matches;
+    const el = desktop ? contentCardRef.current : mobileToolbarRef.current;
+    el?.scrollIntoView({ block: "start", behavior: "auto" });
+  }, [segments]);
 
   useEffect(() => { if (addingFolder)         addInputRef.current?.focus();    }, [addingFolder]);
   useEffect(() => { if (renamingIdx !== null)  renameInputRef.current?.focus(); }, [renamingIdx]);
@@ -571,17 +596,145 @@ export default function DocumentsView({
         pendingApprovals={pendingApprovals}
       />
 
-      <div>
-        <h1 className="text-[22px] md:text-headline-lg font-semibold text-on-surface">Documents</h1>
+      {/* Desktop-only title */}
+      <div className="hidden md:block">
+        <h1 className="text-headline-lg font-semibold text-on-surface">Documents</h1>
         <p className="text-body-md text-on-surface-variant mt-0.5">
           Organize drawings, folders, revisions, and files.
         </p>
       </div>
 
-      <div className="bg-white border border-border-slate rounded-xl overflow-hidden">
+      {/* ── Mobile toolbar (flat, outside card) ── */}
+      {/* scroll-mt clears the sticky top app bar when this is the nav scroll anchor */}
+      <div ref={mobileToolbarRef} className="md:hidden space-y-3 scroll-mt-[64px]">
+        {/* Row 1: Breadcrumb + view toggle */}
+        <div className="flex items-center gap-1">
+          <nav className="flex items-center gap-1 flex-1 min-w-0 flex-wrap">
+            <button onClick={navigateRoot} className="p-1 rounded-md text-on-surface-variant shrink-0" aria-label="Go to root folder">
+              <Home size={14} />
+            </button>
+            <ChevronRight size={13} className="text-outline shrink-0" />
+            <button
+              onClick={navigateRoot}
+              className={`px-1.5 py-0.5 rounded text-[12px] font-medium leading-none ${
+                segments.length === 0
+                  ? "text-on-surface font-semibold pointer-events-none"
+                  : "text-on-surface-variant"
+              }`}
+            >
+              Documents
+            </button>
+            {segments.map((seg, i) => {
+              const isLast = i === segments.length - 1;
+              return (
+                <div key={i} className="flex items-center gap-1">
+                  <ChevronRight size={13} className="text-outline shrink-0" />
+                  <button
+                    onClick={() => !isLast && navigateTo(i + 1)}
+                    className={`px-1.5 py-0.5 rounded text-[12px] font-medium leading-none ${
+                      isLast ? "text-on-surface font-semibold pointer-events-none" : "text-on-surface-variant"
+                    }`}
+                  >
+                    {seg}
+                  </button>
+                </div>
+              );
+            })}
+          </nav>
+          <div className="flex items-center bg-surface-container-low border border-border-slate rounded-lg p-0.5 shrink-0">
+            <button
+              onClick={() => setViewMode("grid")}
+              className={`p-2 rounded-md transition-colors ${viewMode === "grid" ? "bg-white shadow-sm text-primary" : "text-on-surface-variant"}`}
+              aria-label="Grid view"
+            >
+              <LayoutGrid size={14} />
+            </button>
+            <button
+              onClick={() => setViewMode("list")}
+              className={`p-2 rounded-md transition-colors ${viewMode === "list" ? "bg-white shadow-sm text-primary" : "text-on-surface-variant"}`}
+              aria-label="List view"
+            >
+              <List size={14} />
+            </button>
+          </div>
+        </div>
 
-        {/* Card header: breadcrumb + toolbar */}
-        <div className="flex flex-col sm:flex-row sm:items-center gap-x-3 gap-y-2 px-5 py-3 border-b border-border-slate flex-wrap">
+        {/* Row 2: Pill search */}
+        <div className="relative">
+          <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-on-surface-variant pointer-events-none" />
+          <input
+            type="text"
+            value={localSearch}
+            onChange={e => setLocalSearch(e.target.value)}
+            placeholder="Search in this folder…"
+            className="w-full pl-11 pr-10 py-3 text-[14px] rounded-full bg-surface-container-low border border-outline-variant text-on-surface placeholder:text-on-surface-variant focus:outline-none focus:border-primary"
+          />
+          {localSearch && (
+            <button onClick={() => setLocalSearch("")} className="absolute right-4 top-1/2 -translate-y-1/2 text-on-surface-variant" aria-label="Clear search">
+              <X size={15} />
+            </button>
+          )}
+        </div>
+
+        {/* Row 3: Action buttons */}
+        <div className="flex gap-3">
+          {!isProjectTeam && (
+            <button
+              onClick={() => setAddingFolder(true)}
+              className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl border border-outline-variant text-[14px] font-medium text-on-surface active:bg-surface-container transition-colors"
+            >
+              <FolderPlus size={16} />
+              New Folder
+            </button>
+          )}
+          {onUpload && (
+            <button
+              onClick={() => onUpload(currentFolderPath)}
+              className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl bg-primary text-white text-[14px] font-semibold active:opacity-90 transition-opacity"
+            >
+              <Upload size={16} />
+              Upload
+            </button>
+          )}
+        </div>
+
+        {/* Row 4: Summary */}
+        <p className="text-[11px] text-on-surface-variant px-0.5">
+          {summaryLine}
+          {searchActive && <span className="ml-1 text-primary font-medium">· Showing results for "{localSearch}"</span>}
+        </p>
+
+        {/* Row 5: Filter chips */}
+        <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide">
+          {[
+            { key: "all",          label: "All" },
+            { key: "recent",       label: "Recent" },
+            { key: "construction", label: "For construction" },
+          ].map(({ key, label }) => (
+            <button
+              key={key}
+              onClick={() => setMobileFilter(key)}
+              className={`shrink-0 px-3 py-1.5 rounded-full text-[12px] transition-colors ${
+                mobileFilter === key
+                  ? "bg-primary/10 text-primary font-medium"
+                  : "bg-surface-container-low text-on-surface-variant"
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* ── Desktop + shared content card ── */}
+      {/* min-h keeps the card from violently collapsing/expanding as folders with
+          different item counts swap in, so navigation feels calm instead of jumpy.
+          It also guarantees enough scrollable height to anchor the toolbar to the
+          top. scroll-mt clears the desktop sticky header when this is the anchor. */}
+      <div ref={contentCardRef} className="md:bg-white md:border md:border-border-slate md:rounded-xl overflow-hidden min-h-[70vh] md:scroll-mt-[88px]">
+
+        {/* Desktop-only toolbar */}
+        <div className="hidden md:flex flex-col sm:flex-row sm:items-center gap-x-3 gap-y-2 px-5 py-3 border-b border-border-slate flex-wrap">
           <nav className="flex items-center gap-1 flex-1 min-w-0 flex-wrap">
             <button onClick={navigateRoot} className="p-1 rounded-md text-on-surface-variant hover:text-primary hover:bg-surface-container transition-colors shrink-0" title="Root" aria-label="Go to root folder">
               <Home size={14} />
@@ -637,7 +790,7 @@ export default function DocumentsView({
             <div className="flex items-center bg-surface-container-low border border-border-slate rounded-lg p-0.5 shrink-0">
               <button
                 onClick={() => setViewMode("grid")}
-                className={`p-2 md:p-1.5 rounded-md transition-colors ${viewMode === "grid" ? "bg-white shadow-sm text-primary" : "text-on-surface-variant hover:text-on-surface"}`}
+                className={`p-1.5 rounded-md transition-colors ${viewMode === "grid" ? "bg-white shadow-sm text-primary" : "text-on-surface-variant hover:text-on-surface"}`}
                 title="Grid view"
                 aria-label="Grid view"
               >
@@ -645,7 +798,7 @@ export default function DocumentsView({
               </button>
               <button
                 onClick={() => setViewMode("list")}
-                className={`p-2 md:p-1.5 rounded-md transition-colors ${viewMode === "list" ? "bg-white shadow-sm text-primary" : "text-on-surface-variant hover:text-on-surface"}`}
+                className={`p-1.5 rounded-md transition-colors ${viewMode === "list" ? "bg-white shadow-sm text-primary" : "text-on-surface-variant hover:text-on-surface"}`}
                 title="List view"
                 aria-label="List view"
               >
@@ -660,7 +813,7 @@ export default function DocumentsView({
                 title="New Folder"
               >
                 <FolderPlus size={13} />
-                <span className="hidden sm:inline">New Folder</span>
+                <span>New Folder</span>
               </button>
             )}
 
@@ -671,14 +824,14 @@ export default function DocumentsView({
                 title="Upload Here"
               >
                 <Upload size={13} />
-                <span className="hidden sm:inline">Upload Here</span>
+                <span>Upload Here</span>
               </button>
             )}
           </div>
         </div>
 
-        {/* Folder summary line */}
-        <div className="px-5 py-2 border-b border-border-slate bg-surface-container-low">
+        {/* Desktop-only summary line */}
+        <div className="hidden md:block px-5 py-2 border-b border-border-slate bg-surface-container-low">
           <p className="text-[11px] text-on-surface-variant">
             {summaryLine}
             {searchActive && (
@@ -687,27 +840,6 @@ export default function DocumentsView({
               </span>
             )}
           </p>
-        </div>
-
-        {/* Filter chips — mobile only; filter the file cards in this folder */}
-        <div className="md:hidden flex items-center gap-2 px-4 py-2.5 border-b border-border-slate overflow-x-auto scrollbar-hide">
-          {[
-            { key: "all",          label: "All" },
-            { key: "recent",       label: "Recent" },
-            { key: "construction", label: "For construction" },
-          ].map(({ key, label }) => (
-            <button
-              key={key}
-              onClick={() => setMobileFilter(key)}
-              className={`shrink-0 px-3 py-1.5 rounded-full text-[12px] transition-colors ${
-                mobileFilter === key
-                  ? "bg-primary/10 text-primary font-medium"
-                  : "bg-surface-container-low text-on-surface-variant"
-              }`}
-            >
-              {label}
-            </button>
-          ))}
         </div>
 
         {/* Empty / no-results states */}
@@ -733,7 +865,7 @@ export default function DocumentsView({
             )}
           </div>
         ) : (
-          <div className="p-5 space-y-6">
+          <div className="p-0 md:p-5 space-y-4 md:space-y-6">
 
             {/* ── Folders section ── */}
             {(filteredSubfolderEntries.length > 0 || addingFolder) && (
@@ -748,7 +880,7 @@ export default function DocumentsView({
                 </div>
 
                 <div className={viewMode === "grid"
-                  ? "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3"
+                  ? "grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3"
                   : "space-y-0.5"
                 }>
                   {filteredSubfolderEntries.map(({ child, originalIdx }) => {
@@ -833,7 +965,7 @@ export default function DocumentsView({
                   })}
 
                   {addingFolder && (
-                    <div className="flex items-center gap-2 border border-primary rounded-xl px-4 py-3 bg-primary/5">
+                    <div className="col-span-2 md:col-span-1 flex items-center gap-2 border border-primary rounded-xl px-4 py-3 bg-primary/5">
                       <Folder size={16} className="text-primary shrink-0" />
                       <input
                         ref={addInputRef}
@@ -869,11 +1001,12 @@ export default function DocumentsView({
                   )}
                 </div>
                 {viewMode === "grid" ? (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 md:gap-3">
                     {filteredFiles.map(d => (
                       <FileCard
                         key={d.id}
                         d={d}
+                        token={token}
                         viewMode="grid"
                         onDelete={onDeleteDrawing ? setConfirmDeleteDrawing : undefined}
                         onEditMetadata={onDeleteDrawing ? setEditDrawing   : undefined}
@@ -881,6 +1014,7 @@ export default function DocumentsView({
                         onMove=        {onDeleteDrawing ? setMoveDrawing    : undefined}
                         onNewRevision= {onUpload && onDeleteDrawing ? setRevisionDrawing : undefined}
                         onViewHistory= {setHistoryDrawing}
+                        onToast=       {showToast}
                       />
                     ))}
                   </div>
@@ -890,6 +1024,7 @@ export default function DocumentsView({
                       <FileCard
                         key={d.id}
                         d={d}
+                        token={token}
                         viewMode="list"
                         onDelete={onDeleteDrawing ? setConfirmDeleteDrawing : undefined}
                         onEditMetadata={onDeleteDrawing ? setEditDrawing   : undefined}
@@ -897,6 +1032,7 @@ export default function DocumentsView({
                         onMove=        {onDeleteDrawing ? setMoveDrawing    : undefined}
                         onNewRevision= {onUpload && onDeleteDrawing ? setRevisionDrawing : undefined}
                         onViewHistory= {setHistoryDrawing}
+                        onToast=       {showToast}
                       />
                     ))}
                   </div>
@@ -990,6 +1126,7 @@ export default function DocumentsView({
           drawing={historyDrawing}
           token={token}
           onClose={() => setHistoryDrawing(null)}
+          onToast={showToast}
         />
       )}
 

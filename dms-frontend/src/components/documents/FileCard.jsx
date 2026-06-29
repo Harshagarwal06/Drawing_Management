@@ -1,16 +1,24 @@
 import { memo } from "react";
 import { Eye, Download } from "lucide-react";
-import { resolveUrl, STATUS_PILL, STATUS_LABEL, STATUS_BAR, EXT_STYLE } from "./constants";
-import { anchorClick } from "../../utils/native";
+import { STATUS_PILL, STATUS_LABEL, STATUS_BAR, EXT_STYLE } from "./constants";
+import { fileNameFromPath, openSignedDrawingFile } from "../../utils/signedFiles";
 import FileMenu from "./FileMenu";
 
-export default memo(function FileCard({ d, viewMode, onDelete, onEditMetadata, onRename, onMove, onNewRevision, onViewHistory }) {
-  const filename    = d.path?.split("/").pop() ?? "";
-  const ext         = filename.split(".").pop().toUpperCase();
+export default memo(function FileCard({ d, token, viewMode, onDelete, onEditMetadata, onRename, onMove, onNewRevision, onViewHistory, onToast }) {
+  const filename    = d.fileName || fileNameFromPath(d.path);
+  const ext         = (filename.split(".").pop() || "").toUpperCase();
   const extStyle    = EXT_STYLE[ext] ?? "bg-surface-container text-on-surface-variant";
   const statusPill  = STATUS_PILL[d.status]  ?? "bg-surface-container text-on-surface-variant";
   const statusLabel = STATUS_LABEL[d.status] ?? d.status;
   const statusBar   = STATUS_BAR[d.status]   ?? "bg-blue-400";
+  const hasFile     = Boolean(d.path);
+
+  const openFile = (mode) => {
+    if (!hasFile) return;
+    openSignedDrawingFile(d, token, mode).catch(() => {
+      onToast?.("Could not open this file. Please try again.", "error");
+    });
+  };
 
   const actions = onDelete ? {
     onEditMetadata: () => onEditMetadata(d),
@@ -25,35 +33,28 @@ export default memo(function FileCard({ d, viewMode, onDelete, onEditMetadata, o
     onViewHistory: () => onViewHistory(d),
   } : null;
 
+  // 44×44px on mobile for Android touch compliance; compact on desktop
+  const iconButton = "h-11 w-11 md:h-auto md:w-auto md:p-1.5 flex items-center justify-center rounded-lg hover:bg-surface-container-low active:bg-surface-container text-on-surface-variant hover:text-primary transition-colors touch-manipulation disabled:opacity-40 disabled:cursor-not-allowed";
+
   if (viewMode === "list") {
     return (
-      <div className="group flex items-center gap-3 px-4 py-2.5 rounded-xl hover:bg-surface-container transition-colors">
-        <span className={`px-1.5 py-0.5 rounded text-[10px] font-mono font-bold shrink-0 ${extStyle}`}>{ext}</span>
+      <div className="group flex items-center gap-3 px-4 py-2.5 rounded-xl hover:bg-surface-container active:bg-surface-container transition-colors touch-manipulation">
+        <span className={`px-1.5 py-0.5 rounded text-[11px] font-mono font-bold shrink-0 ${extStyle}`}>{ext}</span>
         <div className="flex-1 min-w-0">
           <p className="text-[13px] font-bold text-primary font-mono leading-tight">{d.number}</p>
           <p className="text-[11px] text-on-surface-variant truncate">{d.title}</p>
         </div>
         <span className="font-mono text-[11px] text-on-surface-variant hidden sm:block shrink-0">Rev {d.rev || "—"}</span>
         {d.issueDate && <span className="text-[11px] text-on-surface-variant hidden lg:block shrink-0">{d.issueDate}</span>}
-        <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold hidden md:block shrink-0 ${statusPill}`}>{statusLabel}</span>
+        <span className={`px-2 py-0.5 rounded-full text-[11px] font-semibold hidden md:block shrink-0 ${statusPill}`}>{statusLabel}</span>
 
-        <div className="flex items-center gap-0.5 shrink-0">
-          <a
-            href={resolveUrl(d.path)} target="_blank" rel="noreferrer"
-            onClick={anchorClick(resolveUrl(d.path))}
-            className="p-2 md:p-1.5 rounded-lg hover:bg-surface-container-low text-on-surface-variant hover:text-primary transition-colors"
-            title="View"
-          >
+        <div className="flex items-center gap-1 shrink-0">
+          <button type="button" onClick={() => openFile("view")} disabled={!hasFile} className={iconButton} aria-label="View drawing" title="View">
             <Eye size={14} />
-          </a>
-          <a
-            href={resolveUrl(d.path)} download={filename}
-            onClick={anchorClick(resolveUrl(d.path))}
-            className="p-2 md:p-1.5 rounded-lg hover:bg-surface-container-low text-on-surface-variant hover:text-primary transition-colors"
-            title="Download"
-          >
+          </button>
+          <button type="button" onClick={() => openFile("download")} disabled={!hasFile} className={iconButton} aria-label="Download drawing" title="Download">
             <Download size={14} />
-          </a>
+          </button>
           {(actions || historyOnly) && <FileMenu {...(actions || historyOnly)} />}
         </div>
       </div>
@@ -61,14 +62,14 @@ export default memo(function FileCard({ d, viewMode, onDelete, onEditMetadata, o
   }
 
   return (
-    <div className="bg-white border border-border-slate rounded-xl overflow-hidden shadow-card hover:shadow-card-md transition-all duration-150 cursor-default flex flex-col">
+    <div className="bg-surface-container-lowest border border-border-slate rounded-xl overflow-hidden shadow-card hover:shadow-card-md active:shadow-card transition-all duration-150 cursor-default flex flex-col">
       <div className={`h-1.5 shrink-0 ${statusBar}`} />
 
       <div className="p-4 flex flex-col flex-1">
         <div className="flex items-start justify-between gap-1.5 mb-3">
-          <span className={`px-2 py-1 rounded-lg text-[10px] font-mono font-bold shrink-0 ${extStyle}`}>{ext}</span>
+          <span className={`px-2 py-1 rounded-lg text-[11px] font-mono font-bold shrink-0 ${extStyle}`}>{ext}</span>
           <div className="flex items-center gap-1 min-w-0">
-            <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold shrink-0 ${statusPill}`}>{statusLabel}</span>
+            <span className={`px-2 py-0.5 rounded-full text-[11px] font-semibold shrink-0 ${statusPill}`}>{statusLabel}</span>
             {(actions || historyOnly) && <FileMenu {...(actions || historyOnly)} />}
           </div>
         </div>
@@ -79,28 +80,18 @@ export default memo(function FileCard({ d, viewMode, onDelete, onEditMetadata, o
         <div className="flex items-center justify-between mt-auto">
           <div className="flex flex-col gap-0.5">
             <span className="font-mono text-[11px] text-on-surface-variant">Rev {d.rev || "—"}</span>
-            {d.issueDate && <span className="text-[10px] text-on-surface-variant">{d.issueDate}</span>}
+            {d.issueDate && <span className="text-[11px] text-on-surface-variant">{d.issueDate}</span>}
           </div>
-          <div className="flex items-center gap-0.5">
-            <a
-              href={resolveUrl(d.path)} target="_blank" rel="noreferrer"
-              onClick={anchorClick(resolveUrl(d.path))}
-              className="p-2 md:p-1.5 rounded-lg hover:bg-surface-container text-on-surface-variant hover:text-primary transition-colors"
-              title="View"
-            >
+          <div className="flex items-center gap-1">
+            <button type="button" onClick={() => openFile("view")} disabled={!hasFile} className={iconButton.replace("hover:bg-surface-container-low", "hover:bg-surface-container")} aria-label="View drawing" title="View">
               <Eye size={13} />
-            </a>
-            <a
-              href={resolveUrl(d.path)} download={filename}
-              onClick={anchorClick(resolveUrl(d.path))}
-              className="p-2 md:p-1.5 rounded-lg hover:bg-surface-container text-on-surface-variant hover:text-primary transition-colors"
-              title="Download"
-            >
+            </button>
+            <button type="button" onClick={() => openFile("download")} disabled={!hasFile} className={iconButton.replace("hover:bg-surface-container-low", "hover:bg-surface-container")} aria-label="Download drawing" title="Download">
               <Download size={13} />
-            </a>
+            </button>
           </div>
         </div>
       </div>
     </div>
   );
-})
+});

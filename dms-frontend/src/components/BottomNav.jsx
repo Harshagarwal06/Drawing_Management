@@ -5,8 +5,8 @@ const DIRECTOR_TABS = [
   { path: "/dashboard",    icon: "space_dashboard", label: "Home"     },
   { path: "/documents",    icon: "folder_open",     label: "Docs"     },
   { path: "/register",     icon: "table_rows",      label: "Register" },
-  { path: "/transmittals", icon: "outgoing_mail",   label: "Issue"    },
-  { path: "/analytics",    icon: "monitoring",      label: "Stats"    },
+  { path: "/transmittals", icon: "outgoing_mail",   label: "Send"         },
+  { path: "/analytics",    icon: "monitoring",      label: "Analytics"    },
 ];
 
 const RESTRICTED_TABS = [
