@@ -130,6 +130,17 @@ export default function App() {
   };
 
   const handleLogout = () => {
+    // Best-effort server-side revocation (bumps token_version, invalidating
+    // the JWT everywhere). Local state is cleared regardless — logout must
+    // never be blocked by a network failure.
+    const token = currentUser?.token;
+    if (token) {
+      fetch(`${API}/api/logout-all`, {
+        method: "POST",
+        headers: authHeaders(token),
+        keepalive: true,
+      }).catch(() => {});
+    }
     setCurrentUser(null);
     setLoadedProjectId(null);
     navigate("/login", { replace: true });
