@@ -303,3 +303,113 @@ describe('Token revocation (token_version)', () => {
     expect(after.status).toBe(401);
   });
 });
+
+describe('Transmittal PDF signed links', () => {
+  let p1TransmittalId;
+  let p2TransmittalId;
+  let limitedToken;
+
+  beforeAll(async () => {
+    const ins = db.prepare(`
+      INSERT INTO transmittals (number, drawing_ids, recipients, purpose, remarks, issued_at, project_id)
+      VALUES (?,?,?,?,?,?,?)
+    `);
+    p1TransmittalId = ins.run('TRN-901', '[]', '[]', 'For Information', '', '2026-07-02', 1).lastInsertRowid;
+    p2TransmittalId = ins.run('TRN-902', '[]', '[]', 'For Information', '', '2026-07-02', 2).lastInsertRowid;
+
+    await request(app)
+      .post('/api/users')
+      .set('Authorization', `Bearer ${directorToken}`)
+      .send({
+        username: 'pdf_limited_architect',
+        password: 'limited123',
+        name: 'PDF Limited Architect',
+        role: 'In House Architect',
+        allowedProjects: '[1]',
+      });
+    const limitedRes = await request(app)
+      .post('/api/login')
+      .send({ username: 'pdf_limited_architect', password: 'limited123' });
+    limitedToken = limitedRes.body.token;
+  });
+
+  it('pdf-url requires authentication', async () => {
+    const res = await request(app).get(`/api/transmittals/${p1TransmittalId}/pdf-url`);
+    expect(res.status).toBe(401);
+  });
+
+  it('pdf-url returns a sig link for an accessible transmittal', async () => {
+    const res = await request(app)
+      .get(`/api/transmittals/${p1TransmittalId}/pdf-url`)
+      .set('Authorization', `Bearer ${directorToken}`);
+    expect(res.status).toBe(200);
+    expect(res.body.url).toContain(`/api/transmittals/${p1TransmittalId}/pdf?sig=`);
+  });
+
+  it('pdf-url enforces project access', async () => {
+    const res = await request(app)
+      .get(`/api/transmittals/${p2TransmittalId}/pdf-url`)
+      .set('Authorization', `Bearer ${limitedToken}`);
+    expect(res.status).toBe(403);
+  });
+
+  it('the sig link downloads the PDF without any header', async () => {
+    const urlRes = await request(app)
+      .get(`/api/transmittals/${p1TransmittalId}/pdf-url`)
+      .set('Authorization', `Bearer ${directorToken}`);
+    const path = new URL(urlRes.body.url).pathname + new URL(urlRes.body.url).search;
+    const res = await request(app).get(path);
+    expect(res.status).toBe(200);
+    expect(res.headers['content-type']).toContain('application/pdf');
+  });
+
+  it('rejects the old ?token= session-JWT style (leak vector closed)', async () => {
+    const res = await request(app)
+      .get(`/api/transmittals/${p1TransmittalId}/pdf?token=${directorToken}`);
+    expect(res.status).toBe(401);
+  });
+
+  it('rejects a full session JWT passed as sig', async () => {
+    const res = await request(app)
+      .get(`/api/transmittals/${p1TransmittalId}/pdf?sig=${directorToken}`);
+    expect(res.status).toBe(401);
+  });
+
+  it('rejects a sig minted for a different transmittal', async () => {
+    const urlRes = await request(app)
+      .get(`/api/transmittals/${p1TransmittalId}/pdf-url`)
+      .set('Authorization', `Bearer ${directorToken}`);
+    const sig = new URL(urlRes.body.url).searchParams.get('sig');
+    const res = await request(app).get(`/api/transmittals/${p2TransmittalId}/pdf?sig=${sig}`);
+    expect(res.status).toBe(401);
+  });
+
+  it('rejects a sig replayed as Bearer against a different transmittal', async () => {
+    const urlRes = await request(app)
+      .get(`/api/transmittals/${p1TransmittalId}/pdf-url`)
+      .set('Authorization', `Bearer ${directorToken}`);
+    const sig = new URL(urlRes.body.url).searchParams.get('sig');
+    const res = await request(app)
+      .get(`/api/transmittals/${p2TransmittalId}/pdf?sig=${sig}`)
+      .set('Authorization', `Bearer ${sig}`);
+    expect(res.status).toBe(401);
+  });
+
+  it('rejects a sig token used as a Bearer on other API endpoints', async () => {
+    const urlRes = await request(app)
+      .get(`/api/transmittals/${p1TransmittalId}/pdf-url`)
+      .set('Authorization', `Bearer ${directorToken}`);
+    const sig = new URL(urlRes.body.url).searchParams.get('sig');
+    const res = await request(app)
+      .get('/api/projects')
+      .set('Authorization', `Bearer ${sig}`);
+    expect(res.status).toBe(401);
+  });
+
+  it('still accepts a normal Bearer header on /pdf', async () => {
+    const res = await request(app)
+      .get(`/api/transmittals/${p1TransmittalId}/pdf`)
+      .set('Authorization', `Bearer ${directorToken}`);
+    expect(res.status).toBe(200);
+  });
+});
