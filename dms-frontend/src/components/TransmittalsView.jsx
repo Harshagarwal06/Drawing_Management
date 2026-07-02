@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { openExternal } from "../utils/native";
+import { openTransmittalPdf } from "../utils/signedFiles";
 
 const TRUNCATE_AT = 5; // show first N drawings, rest behind "+X more"
 
@@ -35,8 +35,6 @@ function SkeletonCard() {
     </div>
   );
 }
-
-const API = import.meta.env.VITE_API_URL;
 
 export default function TransmittalsView({ transmittals = [], drawings = [], loading = false, token = "" }) {
   const drawingMap = Object.fromEntries(drawings.map(d => [d.id, d]));
@@ -208,7 +206,7 @@ export default function TransmittalsView({ transmittals = [], drawings = [], loa
                       })}
                     </div>
                     <button
-                      onClick={() => openExternal(`${API}/api/transmittals/${t.id}/pdf?token=${token}`)}
+                      onClick={() => openTransmittalPdf(t, token).catch(err => console.error("PDF link failed:", err))}
                       className="mt-1 inline-flex items-center gap-1.5 text-[11px] font-medium text-primary hover:underline w-fit"
                     >
                       <span className="material-symbols-outlined text-[14px]">download</span>
@@ -281,7 +279,7 @@ function MobileTransmittals({ transmittals, drawingMap, token }) {
                   {recipients.map(r => (typeof r === "string" ? r : r.name)).join(", ")}
                 </span>
                 <button
-                  onClick={() => openExternal(`${API}/api/transmittals/${t.id}/pdf?token=${token}`)}
+                  onClick={() => openTransmittalPdf(t, token).catch(err => console.error("PDF link failed:", err))}
                   className="inline-flex items-center gap-1 text-[12px] font-semibold text-primary shrink-0"
                 >
                   <span className="material-symbols-outlined text-[16px]">picture_as_pdf</span>PDF
