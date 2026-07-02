@@ -22,6 +22,7 @@
     "@capacitor/filesystem": "^6.0.4",
     "@capacitor/preferences": "^6.0.4",
     "@capacitor/share": "^6.0.4",
+    "capacitor-secure-storage-plugin": "^0.10.0",
     "lucide-react": "^1.15.0",
     "react": "^19.2.6",
     "react-dom": "^19.2.6",

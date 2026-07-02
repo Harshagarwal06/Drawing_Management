@@ -1,27 +1,44 @@
 import { Preferences } from "@capacitor/preferences";
+import { SecureStoragePlugin } from "capacitor-secure-storage-plugin";
 import { isNative } from "./native";
 
 /* Async key/value store for the session blob.
 
    - Web: plain localStorage (unchanged behaviour — the web app is unaffected).
-   - Native (Capacitor): the value lives in the OS-level Preferences store
-     (app-private SharedPreferences on Android) instead of the WebView's
-     localStorage, so injected page scripts can't read it directly.
+   - Native (Capacitor): the value lives in Keystore-backed encrypted storage
+     (AndroidKeyStore-encrypted SharedPreferences on Android, Keychain on iOS)
+     so the token is unreadable even on a rooted / forensically imaged device.
 
-   On native, getStored also performs a one-time migration: if a value is still
-   sitting in the old localStorage location (an existing logged-in app session),
-   it's copied into Preferences and removed from localStorage so the user isn't
-   forced to log in again after upgrading. */
+   On native, getStored migrates from older storage locations exactly once:
+   Preferences (previous release) and WebView localStorage (release before
+   that). A found value is copied into secure storage and removed from its
+   old home, so existing logged-in users aren't forced to log in again. */
+
+async function secureGet(key) {
+  try {
+    const { value } = await SecureStoragePlugin.get({ key });
+    return value ?? null;
+  } catch {
+    return null; // the plugin rejects when the key doesn't exist
+  }
+}
 
 export async function getStored(key) {
   if (!isNative()) return localStorage.getItem(key);
 
-  const { value } = await Preferences.get({ key });
-  if (value != null) return value;
+  const secure = await secureGet(key);
+  if (secure != null) return secure;
+
+  const { value: pref } = await Preferences.get({ key });
+  if (pref != null) {
+    await SecureStoragePlugin.set({ key, value: pref });
+    await Preferences.remove({ key });
+    return pref;
+  }
 
   const legacy = localStorage.getItem(key);
   if (legacy != null) {
-    await Preferences.set({ key, value: legacy });
+    await SecureStoragePlugin.set({ key, value: legacy });
     localStorage.removeItem(key);
     return legacy;
   }
@@ -33,7 +50,7 @@ export async function setStored(key, value) {
     localStorage.setItem(key, value);
     return;
   }
-  await Preferences.set({ key, value });
+  await SecureStoragePlugin.set({ key, value });
 }
 
 export async function removeStored(key) {
@@ -41,5 +58,9 @@ export async function removeStored(key) {
     localStorage.removeItem(key);
     return;
   }
-  await Preferences.remove({ key });
+  try {
+    await SecureStoragePlugin.remove({ key });
+  } catch {
+    // the plugin rejects when the key is already absent — that's fine
+  }
 }
