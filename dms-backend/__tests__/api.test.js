@@ -638,4 +638,15 @@ describe('Transmittal PDF signed links', () => {
       .set('Authorization', `Bearer ${sig}`);
     expect(res.status).toBe(401);
   });
+
+  it('rejects a sig replayed as Bearer against a different transmittal', async () => {
+    const urlRes = await request(app)
+      .get(`/api/transmittals/${p1TransmittalId}/pdf-url`)
+      .set('Authorization', `Bearer ${directorToken}`);
+    const sig = new URL(urlRes.body.url).searchParams.get('sig');
+    const res = await request(app)
+      .get(`/api/transmittals/${p2TransmittalId}/pdf?sig=${sig}`)
+      .set('Authorization', `Bearer ${sig}`);
+    expect(res.status).toBe(401);
+  });
 });

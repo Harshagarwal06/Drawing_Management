@@ -482,12 +482,19 @@ const PDF_SIG_SCOPE = 'transmittal-pdf';
 
 function verifyTransmittalPdf(req, res, next) {
   const auth = req.headers.authorization;
-  const tokenStr = auth?.startsWith('Bearer ') ? auth.slice(7) : req.query.sig;
+  const fromBearer = Boolean(auth?.startsWith('Bearer '));
+  const tokenStr = fromBearer ? auth.slice(7) : req.query.sig;
   if (!tokenStr) return res.status(401).json({ error: 'Unauthorized — no token provided' });
   try {
     const decoded = jwt.verify(tokenStr, JWT_SECRET);
     if (!isTokenCurrent(decoded)) return res.status(401).json({ error: 'Session ended — please log in again' });
-    if (!auth && (decoded.scope !== PDF_SIG_SCOPE || String(decoded.tid) !== String(req.params.id)))
+    // A scoped sig is honoured on any transport, but must be bound to THIS
+    // transmittal (blocks replay against other ids, even as a Bearer header).
+    // An unscoped token (a full session JWT) is only accepted as a Bearer
+    // header — never via ?sig=, so session tokens can't leak into URLs.
+    const validSig = decoded.scope === PDF_SIG_SCOPE && String(decoded.tid) === String(req.params.id);
+    const sessionBearer = fromBearer && !decoded.scope;
+    if (!validSig && !sessionBearer)
       return res.status(401).json({ error: 'Invalid file link — please reopen it from the app.' });
     req.user = decoded;
     next();
