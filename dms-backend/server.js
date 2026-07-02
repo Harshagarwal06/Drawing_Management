@@ -461,6 +461,9 @@ function verifyToken(req, res, next) {
   if (!auth?.startsWith('Bearer ')) return res.status(401).json({ error: 'Unauthorized — no token provided' });
   try {
     const decoded = jwt.verify(auth.slice(7), JWT_SECRET);
+    // Scoped tokens (e.g. transmittal-pdf sig links) are single-purpose and
+    // must never grant general API access, even within their short lifetime.
+    if (decoded.scope) return res.status(401).json({ error: 'Unauthorized — invalid token' });
     if (!isTokenCurrent(decoded)) return res.status(401).json({ error: 'Session ended — please log in again' });
     req.user = decoded;
     next();
