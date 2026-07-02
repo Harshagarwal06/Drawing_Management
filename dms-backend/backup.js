@@ -71,4 +71,29 @@ async function pruneOldBackups({ r2, bucket }) {
   }
 }
 
-module.exports = { backupKey, msUntilNextRun, runBackup, RETENTION_DAYS, BACKUP_PREFIX };
+/* Newest object under backups/, or null. Listing the bucket (rather than
+   in-memory state) keeps this correct across restarts. */
+async function findLatestBackup({ r2, bucket }) {
+  const listed = await r2.send(new ListObjectsV2Command({ Bucket: bucket, Prefix: BACKUP_PREFIX }));
+  const objs = listed.Contents || [];
+  if (objs.length === 0) return { latest: null, count: 0 };
+  const latest = objs.reduce((a, b) => (a.LastModified > b.LastModified ? a : b));
+  return { latest, count: objs.length };
+}
+
+async function getBackupStatus({ r2, bucket }) {
+  if (!r2 || !bucket) return { configured: false };
+  const { latest, count } = await findLatestBackup({ r2, bucket });
+  return {
+    configured: true,
+    count,
+    latestBackup: latest ? {
+      key: latest.Key,
+      sizeBytes: latest.Size,
+      lastModified: latest.LastModified.toISOString(),
+    } : null,
+    lastError,
+  };
+}
+
+module.exports = { backupKey, msUntilNextRun, runBackup, getBackupStatus, RETENTION_DAYS, BACKUP_PREFIX };

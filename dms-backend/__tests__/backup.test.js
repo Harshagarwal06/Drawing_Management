@@ -117,3 +117,37 @@ describe('retention pruning (via runBackup)', () => {
     expect(result.error).toBeNull(); // upload succeeded; prune failure is non-fatal
   });
 });
+
+const { getBackupStatus } = require('../backup');
+
+describe('getBackupStatus', () => {
+  it('reports configured:false when bucket is missing', async () => {
+    const status = await getBackupStatus({ r2: makeFakeR2(), bucket: undefined });
+    expect(status).toEqual({ configured: false });
+  });
+
+  it('reports count and newest backup from the bucket listing', async () => {
+    const r2 = makeFakeR2({
+      ListObjectsV2Command: () => ({
+        Contents: [
+          { Key: 'backups/dms-a.db.gz', LastModified: new Date('2026-07-01T22:00:00Z'), Size: 111 },
+          { Key: 'backups/dms-b.db.gz', LastModified: new Date('2026-07-02T22:00:00Z'), Size: 222 },
+        ],
+      }),
+    });
+    const status = await getBackupStatus({ r2, bucket: 'dms-backups' });
+    expect(status.configured).toBe(true);
+    expect(status.count).toBe(2);
+    expect(status.latestBackup).toEqual({
+      key: 'backups/dms-b.db.gz',
+      sizeBytes: 222,
+      lastModified: '2026-07-02T22:00:00.000Z',
+    });
+  });
+
+  it('reports null latestBackup for an empty bucket', async () => {
+    const status = await getBackupStatus({ r2: makeFakeR2(), bucket: 'dms-backups' });
+    expect(status.count).toBe(0);
+    expect(status.latestBackup).toBeNull();
+  });
+});
