@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { openTransmittalPdf } from "../utils/signedFiles";
 
 const TRUNCATE_AT = 5; // show first N drawings, rest behind "+X more"
 
@@ -35,7 +36,6 @@ function SkeletonCard() {
   );
 }
 
-const API = import.meta.env.VITE_API_URL;
 
 export default function TransmittalsView({ transmittals = [], drawings = [], loading = false, token = "" }) {
   const drawingMap = Object.fromEntries(drawings.map(d => [d.id, d]));
@@ -202,7 +202,7 @@ export default function TransmittalsView({ transmittals = [], drawings = [], loa
                       })}
                     </div>
                     <button
-                      onClick={() => window.open(`${API}/api/transmittals/${t.id}/pdf?token=${token}`, "_blank")}
+                      onClick={() => openTransmittalPdf(t, token).catch(() => window.alert("Could not open the transmittal PDF. Please try again."))}
                       className="mt-1 inline-flex items-center gap-1.5 text-[11px] font-medium text-primary hover:underline w-fit"
                     >
                       <span className="material-symbols-outlined text-[14px]">download</span>
