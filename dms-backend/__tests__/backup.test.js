@@ -151,3 +151,47 @@ describe('getBackupStatus', () => {
     expect(status.latestBackup).toBeNull();
   });
 });
+
+const { startBackupScheduler } = require('../backup');
+
+function putCalls(r2) {
+  return r2.send.mock.calls
+    .map(([cmd]) => cmd)
+    .filter((cmd) => cmd.constructor.name === 'PutObjectCommand');
+}
+
+describe('startBackupScheduler', () => {
+  const DAY = 24 * 60 * 60 * 1000;
+
+  it('does nothing when bucket is not configured', async () => {
+    const db = makeFakeDb();
+    await startBackupScheduler({ db, r2: null, bucket: undefined });
+    expect(db.backup).not.toHaveBeenCalled();
+  });
+
+  it('runs a catch-up backup when the bucket is empty', async () => {
+    const r2 = makeFakeR2(); // lists no Contents
+    await startBackupScheduler({ db: makeFakeDb(), r2, bucket: 'dms-backups' });
+    expect(putCalls(r2)).toHaveLength(1);
+  });
+
+  it('runs a catch-up backup when the newest backup is older than 24h', async () => {
+    const r2 = makeFakeR2({
+      ListObjectsV2Command: () => ({
+        Contents: [{ Key: 'backups/dms-x.db.gz', LastModified: new Date(Date.now() - 2 * DAY), Size: 1 }],
+      }),
+    });
+    await startBackupScheduler({ db: makeFakeDb(), r2, bucket: 'dms-backups' });
+    expect(putCalls(r2)).toHaveLength(1);
+  });
+
+  it('skips catch-up when the newest backup is fresh', async () => {
+    const r2 = makeFakeR2({
+      ListObjectsV2Command: () => ({
+        Contents: [{ Key: 'backups/dms-x.db.gz', LastModified: new Date(Date.now() - 60 * 60 * 1000), Size: 1 }],
+      }),
+    });
+    await startBackupScheduler({ db: makeFakeDb(), r2, bucket: 'dms-backups' });
+    expect(putCalls(r2)).toHaveLength(0);
+  });
+});

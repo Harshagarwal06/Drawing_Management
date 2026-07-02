@@ -96,4 +96,37 @@ async function getBackupStatus({ r2, bucket }) {
   };
 }
 
-module.exports = { backupKey, msUntilNextRun, runBackup, getBackupStatus, RETENTION_DAYS, BACKUP_PREFIX };
+/* Called once from server.js at boot. Catch-up covers deploys/restarts
+   that skipped a 2 a.m. slot, then a self-re-arming timer takes over. */
+async function startBackupScheduler(deps) {
+  if (!deps.r2 || !deps.bucket) {
+    console.log('💾 DB backups disabled — set R2_BACKUP_BUCKET to enable');
+    return;
+  }
+  console.log(`💾 Daily DB backups → bucket "${deps.bucket}" at 02:00 Asia/Dubai (22:00 UTC), ${RETENTION_DAYS}-day retention`);
+  try {
+    const { latest } = await findLatestBackup(deps);
+    const staleMs = 24 * 60 * 60 * 1000;
+    if (!latest || Date.now() - latest.LastModified.getTime() > staleMs) {
+      console.log('💾 No backup in the last 24h — running catch-up backup now');
+      await runBackup(deps);
+    }
+  } catch (err) {
+    lastError = err.message;
+    console.error(`❌ Backup catch-up check failed: ${err.message}`);
+  }
+  scheduleNextRun(deps);
+}
+
+function scheduleNextRun(deps) {
+  const timer = setTimeout(async () => {
+    await runBackup(deps);
+    scheduleNextRun(deps);
+  }, msUntilNextRun());
+  timer.unref(); // never hold the process open (clean test/shutdown exit)
+}
+
+module.exports = {
+  backupKey, msUntilNextRun, runBackup, getBackupStatus, startBackupScheduler,
+  RETENTION_DAYS, BACKUP_PREFIX,
+};
