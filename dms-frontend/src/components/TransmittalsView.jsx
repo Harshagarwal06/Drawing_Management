@@ -206,7 +206,7 @@ export default function TransmittalsView({ transmittals = [], drawings = [], loa
                       })}
                     </div>
                     <button
-                      onClick={() => openTransmittalPdf(t, token).catch(err => console.error("PDF link failed:", err))}
+                      onClick={() => openTransmittalPdf(t, token).catch(() => window.alert("Could not open the transmittal PDF. Please try again."))}
                       className="mt-1 inline-flex items-center gap-1.5 text-[11px] font-medium text-primary hover:underline w-fit"
                     >
                       <span className="material-symbols-outlined text-[14px]">download</span>
@@ -279,7 +279,7 @@ function MobileTransmittals({ transmittals, drawingMap, token }) {
                   {recipients.map(r => (typeof r === "string" ? r : r.name)).join(", ")}
                 </span>
                 <button
-                  onClick={() => openTransmittalPdf(t, token).catch(err => console.error("PDF link failed:", err))}
+                  onClick={() => openTransmittalPdf(t, token).catch(() => window.alert("Could not open the transmittal PDF. Please try again."))}
                   className="inline-flex items-center gap-1 text-[12px] font-semibold text-primary shrink-0"
                 >
                   <span className="material-symbols-outlined text-[16px]">picture_as_pdf</span>PDF

@@ -1,25 +1,29 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { drawingFileEndpoint, revisionFileEndpoint, openSignedDrawingFile, transmittalPdfEndpoint, openTransmittalPdf } from "./signedFiles";
 
+const isNativeMock = vi.fn(() => false);
+const openExternalMock = vi.fn();
 vi.mock("./native", () => ({
-  isNative: () => false,
-  openExternal: vi.fn(),
+  isNative: () => isNativeMock(),
+  openExternal: (url) => openExternalMock(url),
 }));
 
+beforeEach(() => {
+  isNativeMock.mockReturnValue(false);
+  openExternalMock.mockClear();
+  vi.stubGlobal("fetch", vi.fn(async () => ({
+    ok: true,
+    json: async () => ({ url: "https://signed.example/file.pdf", filename: "file.pdf", expiresAt: "2026-06-27T00:05:00.000Z" }),
+  })));
+  vi.spyOn(window, "open").mockReturnValue({ location: { href: "" }, close: vi.fn() });
+});
+
+afterEach(() => {
+  vi.restoreAllMocks();
+  vi.unstubAllGlobals();
+});
+
 describe("signed file helpers", () => {
-  beforeEach(() => {
-    vi.stubGlobal("fetch", vi.fn(async () => ({
-      ok: true,
-      json: async () => ({ url: "https://signed.example/file.pdf", filename: "file.pdf", expiresAt: "2026-06-27T00:05:00.000Z" }),
-    })));
-    vi.spyOn(window, "open").mockReturnValue({ location: { href: "" }, close: vi.fn() });
-  });
-
-  afterEach(() => {
-    vi.restoreAllMocks();
-    vi.unstubAllGlobals();
-  });
-
   it("builds drawing and revision signed-url endpoints", () => {
     expect(drawingFileEndpoint({ id: 42 }, "download")).toBe("/api/drawings/42/file-url?mode=download");
     expect(revisionFileEndpoint({ id: 42 }, { id: 7 }, "view")).toBe("/api/drawing-revisions/7/file-url?mode=view");
@@ -46,5 +50,15 @@ describe("signed file helpers", () => {
       { headers: { Authorization: "Bearer token-123" } },
     );
     expect(window.open).toHaveBeenCalledWith("about:blank", "_blank", "noopener");
+  });
+});
+
+describe("signed file helpers on native", () => {
+  beforeEach(() => isNativeMock.mockReturnValue(true));
+
+  it("opens the signed URL via the in-app browser without a popup", async () => {
+    await openTransmittalPdf({ id: 9 }, "token-123");
+    expect(openExternalMock).toHaveBeenCalledWith("https://signed.example/file.pdf");
+    expect(window.open).not.toHaveBeenCalled();
   });
 });
