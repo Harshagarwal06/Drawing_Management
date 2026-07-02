@@ -18,11 +18,21 @@ async function secureGet(key) {
   try {
     const { value } = await SecureStoragePlugin.get({ key });
     return value ?? null;
-  } catch {
-    return null; // the plugin rejects when the key doesn't exist
+  } catch (err) {
+    // The plugin rejects when the key doesn't exist — the normal case. It can
+    // also reject on genuine Keystore faults (key invalidated by a device
+    // credential change, corrupted store); both fall through to "no session",
+    // which forces a re-login — safe either way, but keep the fault visible.
+    if (!/does not exist/i.test(err?.message ?? "")) {
+      console.warn("Secure storage read failed:", err);
+    }
+    return null;
   }
 }
 
+// Note: the migration below is not concurrency-safe (two interleaved calls
+// could migrate the same value twice — harmless but redundant). The app calls
+// getStored once from a single mount effect; keep it that way.
 export async function getStored(key) {
   if (!isNative()) return localStorage.getItem(key);
 
