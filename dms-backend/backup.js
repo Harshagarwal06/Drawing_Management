@@ -25,4 +25,49 @@ function msUntilNextRun(now = new Date()) {
   return next.getTime() - now.getTime();
 }
 
-module.exports = { backupKey, msUntilNextRun, RETENTION_DAYS, BACKUP_PREFIX };
+/* Last failure message since boot — surfaced by getBackupStatus */
+let lastError = null;
+
+/* One backup cycle: snapshot → gzip → upload → prune. Never throws —
+   a failed backup must never take down the server. Returns
+   { key, error } so callers/tests can inspect the outcome. */
+async function runBackup({ db, r2, bucket }) {
+  if (!r2 || !bucket) return { key: null, error: 'not configured' };
+  const tmpFile = path.join(os.tmpdir(), `dms-backup-${Date.now()}.db`);
+  try {
+    await db.backup(tmpFile); // better-sqlite3 online backup — safe while serving requests
+    const gz  = zlib.gzipSync(fs.readFileSync(tmpFile));
+    const key = backupKey();
+    await r2.send(new PutObjectCommand({
+      Bucket: bucket, Key: key, Body: gz, ContentType: 'application/gzip',
+    }));
+    console.log(`💾 Backup uploaded: ${key} (${gz.length} bytes)`);
+    lastError = null;
+    await pruneOldBackups({ r2, bucket });
+    return { key, error: null };
+  } catch (err) {
+    lastError = err.message;
+    console.error(`❌ Backup failed: ${err.message}`);
+    return { key: null, error: err.message };
+  } finally {
+    fs.rmSync(tmpFile, { force: true });
+  }
+}
+
+/* Delete backups older than RETENTION_DAYS. Failures are non-fatal —
+   an extra old file beats a missing new one. */
+async function pruneOldBackups({ r2, bucket }) {
+  try {
+    const listed = await r2.send(new ListObjectsV2Command({ Bucket: bucket, Prefix: BACKUP_PREFIX }));
+    const cutoff = Date.now() - RETENTION_DAYS * 24 * 60 * 60 * 1000;
+    const stale  = (listed.Contents || []).filter((o) => o.LastModified.getTime() < cutoff);
+    for (const obj of stale) {
+      await r2.send(new DeleteObjectCommand({ Bucket: bucket, Key: obj.Key }));
+      console.log(`🗑️  Pruned old backup: ${obj.Key}`);
+    }
+  } catch (err) {
+    console.warn(`⚠️  Backup prune failed: ${err.message}`);
+  }
+}
+
+module.exports = { backupKey, msUntilNextRun, runBackup, RETENTION_DAYS, BACKUP_PREFIX };

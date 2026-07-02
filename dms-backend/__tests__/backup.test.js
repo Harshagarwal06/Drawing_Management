@@ -1,5 +1,5 @@
 const fs = require('fs');
-const { backupKey, msUntilNextRun } = require('../backup');
+const { backupKey, msUntilNextRun, runBackup } = require('../backup');
 
 describe('backupKey', () => {
   it('formats key as backups/dms-<ISO stamp>Z.db.gz with no colons', () => {
@@ -22,5 +22,66 @@ describe('msUntilNextRun', () => {
   it('rolls to tomorrow when current time is exactly 22:00 UTC', () => {
     const now = new Date('2026-07-03T22:00:00.000Z');
     expect(msUntilNextRun(now)).toBe(24 * 60 * 60 * 1000);
+  });
+});
+
+/* Fake better-sqlite3 db: online backup writes a snapshot file */
+function makeFakeDb() {
+  return { backup: jest.fn(async (dest) => fs.writeFileSync(dest, 'fake-sqlite-content')) };
+}
+
+/* Fake S3 client: routes by command class name, records calls */
+function makeFakeR2(overrides = {}) {
+  return {
+    send: jest.fn(async (cmd) => {
+      const name = cmd.constructor.name;
+      if (overrides[name]) return overrides[name](cmd);
+      if (name === 'ListObjectsV2Command') return { Contents: [] };
+      return {};
+    }),
+  };
+}
+
+describe('runBackup', () => {
+  it('snapshots the db, gzips, and uploads to the backup bucket', async () => {
+    const db = makeFakeDb();
+    const r2 = makeFakeR2();
+    const result = await runBackup({ db, r2, bucket: 'dms-backups' });
+
+    expect(db.backup).toHaveBeenCalledTimes(1);
+    const put = r2.send.mock.calls
+      .map(([cmd]) => cmd)
+      .find((cmd) => cmd.constructor.name === 'PutObjectCommand');
+    expect(put).toBeDefined();
+    expect(put.input.Bucket).toBe('dms-backups');
+    expect(put.input.Key).toMatch(/^backups\/dms-.*\.db\.gz$/);
+    expect(put.input.ContentType).toBe('application/gzip');
+    expect(result.key).toBe(put.input.Key);
+    expect(result.error).toBeNull();
+  });
+
+  it('removes the temp snapshot file after a successful run', async () => {
+    const db = makeFakeDb();
+    await runBackup({ db, r2: makeFakeR2(), bucket: 'dms-backups' });
+    const tmpFile = db.backup.mock.calls[0][0];
+    expect(fs.existsSync(tmpFile)).toBe(false);
+  });
+
+  it('captures upload failure without throwing and still removes the temp file', async () => {
+    const db = makeFakeDb();
+    const r2 = makeFakeR2({
+      PutObjectCommand: () => { throw new Error('R2 unreachable'); },
+    });
+    const result = await runBackup({ db, r2, bucket: 'dms-backups' });
+    expect(result.error).toBe('R2 unreachable');
+    const tmpFile = db.backup.mock.calls[0][0];
+    expect(fs.existsSync(tmpFile)).toBe(false);
+  });
+
+  it('is a no-op when bucket is not configured', async () => {
+    const db = makeFakeDb();
+    const result = await runBackup({ db, r2: makeFakeR2(), bucket: undefined });
+    expect(db.backup).not.toHaveBeenCalled();
+    expect(result.error).toBe('not configured');
   });
 });
