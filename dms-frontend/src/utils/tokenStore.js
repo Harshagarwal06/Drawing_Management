@@ -70,7 +70,11 @@ export async function removeStored(key) {
   }
   try {
     await SecureStoragePlugin.remove({ key });
-  } catch {
-    // the plugin rejects when the key is already absent — that's fine
+  } catch (err) {
+    // The plugin rejects when the key is already absent — that's fine. Log
+    // anything else (genuine Keystore faults) but never block a logout.
+    if (!/does not exist/i.test(err?.message ?? "")) {
+      console.warn("Secure storage remove failed:", err);
+    }
   }
 }
