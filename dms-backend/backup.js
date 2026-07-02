@@ -1,10 +1,11 @@
 /* ── Automated DB backups to a private R2 bucket ─────────────────────
    Daily snapshot of dms.db → gzip → R2_BACKUP_BUCKET, 30-day retention.
    Spec: docs/superpowers/specs/2026-07-03-db-backups-design.md          */
-const fs   = require('fs');
-const os   = require('os');
-const path = require('path');
-const zlib = require('zlib');
+const fs     = require('fs');
+const os     = require('os');
+const path   = require('path');
+const zlib   = require('zlib');
+const crypto = require('crypto');
 const { PutObjectCommand, ListObjectsV2Command, DeleteObjectCommand } = require('@aws-sdk/client-s3');
 
 const RETENTION_DAYS     = 30;
@@ -33,7 +34,7 @@ let lastError = null;
    { key, error } so callers/tests can inspect the outcome. */
 async function runBackup({ db, r2, bucket }) {
   if (!r2 || !bucket) return { key: null, error: 'not configured' };
-  const tmpFile = path.join(os.tmpdir(), `dms-backup-${Date.now()}.db`);
+  const tmpFile = path.join(os.tmpdir(), `dms-backup-${crypto.randomUUID()}.db`);
   try {
     await db.backup(tmpFile); // better-sqlite3 online backup — safe while serving requests
     const gz  = zlib.gzipSync(fs.readFileSync(tmpFile));
