@@ -100,7 +100,7 @@ async function getBackupStatus({ r2, bucket }) {
    that skipped a 2 a.m. slot, then a self-re-arming timer takes over. */
 async function startBackupScheduler(deps) {
   if (!deps.r2 || !deps.bucket) {
-    console.log('💾 DB backups disabled — set R2_BACKUP_BUCKET to enable');
+    console.log('💾 DB backups disabled — set R2_BACKUP_BUCKET (and R2 credentials) to enable');
     return;
   }
   console.log(`💾 Daily DB backups → bucket "${deps.bucket}" at 02:00 Asia/Dubai (22:00 UTC), ${RETENTION_DAYS}-day retention`);

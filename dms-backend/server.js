@@ -1577,7 +1577,8 @@ if (process.env.NODE_ENV !== 'test') {
     console.log(`\n🚀 DMS Backend running → http://localhost:${PORT}`);
     console.log(`   CORS origin: ${CORS_ORIGIN}\n`);
   });
-  startBackupScheduler({ db, r2, bucket: R2_BACKUP_BUCKET }); // fire-and-forget; logs its own status
+  startBackupScheduler({ db, r2, bucket: R2_BACKUP_BUCKET }) // fire-and-forget; logs its own status
+    .catch((err) => console.error('❌ Backup scheduler failed to start:', err.message));
 }
 
 module.exports = { app, db };
