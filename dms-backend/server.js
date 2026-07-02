@@ -469,18 +469,27 @@ function verifyToken(req, res, next) {
   }
 }
 
-/* ── JWT auth for PDF download (accepts ?token= query param) ─────── */
-function verifyTokenForDownload(req, res, next) {
+/* ── Short-lived signed links for transmittal PDFs ────────────────
+   The PDF opens in a browser tab / Android Custom Tab, where an
+   Authorization header can't be sent. Instead of putting the 7-day
+   session JWT in the URL (it leaks into history and access logs),
+   /api/transmittals/:id/pdf-url mints a 2-minute token scoped to a
+   single transmittal, and /pdf accepts only that (or a Bearer header). */
+const PDF_SIG_SCOPE = 'transmittal-pdf';
+
+function verifyTransmittalPdf(req, res, next) {
   const auth = req.headers.authorization;
-  const tokenStr = auth?.startsWith('Bearer ') ? auth.slice(7) : req.query.token;
+  const tokenStr = auth?.startsWith('Bearer ') ? auth.slice(7) : req.query.sig;
   if (!tokenStr) return res.status(401).json({ error: 'Unauthorized — no token provided' });
   try {
     const decoded = jwt.verify(tokenStr, JWT_SECRET);
     if (!isTokenCurrent(decoded)) return res.status(401).json({ error: 'Session ended — please log in again' });
+    if (!auth && (decoded.scope !== PDF_SIG_SCOPE || String(decoded.tid) !== String(req.params.id)))
+      return res.status(401).json({ error: 'Invalid file link — please reopen it from the app.' });
     req.user = decoded;
     next();
   } catch {
-    res.status(401).json({ error: 'Invalid or expired token — please log in again' });
+    res.status(401).json({ error: 'Expired or invalid link — please reopen it from the app.' });
   }
 }
 
@@ -592,11 +601,11 @@ const loginLimiter = rateLimit({
   message: { error: 'Too many failed login attempts — please wait 15 minutes before trying again.' },
 });
 
-/* Apply verifyToken to all /api/* routes except login, health, and tokenized PDF downloads */
+/* Apply verifyToken to all /api/* routes except login, health, and signed PDF downloads */
 app.use('/api', (req, res, next) => {
   if (req.path === '/login'  && req.method === 'POST') return next();
   if (req.path === '/health' && (req.method === 'GET' || req.method === 'HEAD')) return next();
-  if (/^\/transmittals\/\d+\/pdf$/.test(req.path) && req.method === 'GET' && req.query.token) return next();
+  if (/^\/transmittals\/\d+\/pdf$/.test(req.path) && req.method === 'GET' && req.query.sig) return next();
   verifyToken(req, res, next);
 });
 
@@ -1385,8 +1394,27 @@ app.post('/ack/:token', ackLimiter, (req, res) => {
   });
 });
 
+/* ── GET /api/transmittals/:id/pdf-url — mint a short-lived PDF link ── */
+app.get('/api/transmittals/:id/pdf-url', (req, res) => {
+  try {
+    const t = db.prepare('SELECT id, project_id FROM transmittals WHERE id = ?').get(req.params.id);
+    if (!t) return res.status(404).json({ error: 'Transmittal not found.' });
+    if (!ensureProjectAccess(req, res, t.project_id)) return;
+    const sig = jwt.sign(
+      { id: req.user.id, role: req.user.role, allowedProjects: req.user.allowedProjects,
+        tv: req.user.tv ?? 0, scope: PDF_SIG_SCOPE, tid: t.id },
+      JWT_SECRET,
+      { expiresIn: '2m' }
+    );
+    res.json({ url: `${publicBaseUrl(req)}/api/transmittals/${t.id}/pdf?sig=${sig}` });
+  } catch (err) {
+    console.error('❌ GET /api/transmittals/:id/pdf-url error:', err);
+    res.status(500).json({ error: 'Failed to create PDF link.' });
+  }
+});
+
 /* ── GET /api/transmittals/:id/pdf ───────────────────────────────── */
-app.get('/api/transmittals/:id/pdf', verifyTokenForDownload, (req, res) => {
+app.get('/api/transmittals/:id/pdf', verifyTransmittalPdf, (req, res) => {
   try {
     const t = db.prepare('SELECT * FROM transmittals WHERE id = ?').get(req.params.id);
     if (!t) return res.status(404).json({ error: 'Transmittal not found.' });
