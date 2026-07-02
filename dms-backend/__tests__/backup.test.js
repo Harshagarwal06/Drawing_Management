@@ -85,3 +85,35 @@ describe('runBackup', () => {
     expect(result.error).toBe('not configured');
   });
 });
+
+describe('retention pruning (via runBackup)', () => {
+  const DAY = 24 * 60 * 60 * 1000;
+
+  it('deletes only backups older than 30 days', async () => {
+    const oldKey    = 'backups/dms-old.db.gz';
+    const recentKey = 'backups/dms-recent.db.gz';
+    const r2 = makeFakeR2({
+      ListObjectsV2Command: () => ({
+        Contents: [
+          { Key: oldKey,    LastModified: new Date(Date.now() - 31 * DAY), Size: 100 },
+          { Key: recentKey, LastModified: new Date(Date.now() - 5 * DAY),  Size: 100 },
+        ],
+      }),
+    });
+    await runBackup({ db: makeFakeDb(), r2, bucket: 'dms-backups' });
+
+    const deletedKeys = r2.send.mock.calls
+      .map(([cmd]) => cmd)
+      .filter((cmd) => cmd.constructor.name === 'DeleteObjectCommand')
+      .map((cmd) => cmd.input.Key);
+    expect(deletedKeys).toEqual([oldKey]);
+  });
+
+  it('prune failure does not fail the backup', async () => {
+    const r2 = makeFakeR2({
+      ListObjectsV2Command: () => { throw new Error('list failed'); },
+    });
+    const result = await runBackup({ db: makeFakeDb(), r2, bucket: 'dms-backups' });
+    expect(result.error).toBeNull(); // upload succeeded; prune failure is non-fatal
+  });
+});
