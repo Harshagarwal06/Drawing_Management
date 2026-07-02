@@ -14,6 +14,7 @@ const nodemailer   = require('nodemailer');
 const crypto       = require('crypto');
 const { S3Client, PutObjectCommand, DeleteObjectCommand } = require('@aws-sdk/client-s3');
 const helmet       = require('helmet');
+const { startBackupScheduler, getBackupStatus } = require('./backup');
 
 const app         = express();
 const PORT        = process.env.PORT        || 3000;
@@ -44,6 +45,7 @@ const R2_PUBLIC_URL      = (process.env.R2_PUBLIC_URL || '').replace(/\/+$/, '')
 const CLOUDFLARE_ACCT_ID = process.env.CLOUDFLARE_ACCOUNT_ID;
 const R2_KEY_ID          = process.env.R2_ACCESS_KEY_ID;
 const R2_SECRET          = process.env.R2_SECRET_ACCESS_KEY;
+const R2_BACKUP_BUCKET   = process.env.R2_BACKUP_BUCKET; // private bucket for DB backups
 
 const R2_CONFIGURED = !!(R2_BUCKET && R2_PUBLIC_URL && CLOUDFLARE_ACCT_ID && R2_KEY_ID && R2_SECRET);
 
@@ -56,6 +58,7 @@ console.log(`  CLOUDFLARE_ACCOUNT_ID : ${CLOUDFLARE_ACCT_ID ? '✅ set' : '❌ N
 console.log(`  R2_ACCESS_KEY_ID      : ${R2_KEY_ID         ? '✅ set' : '❌ NOT SET'}`);
 console.log(`  R2_SECRET_ACCESS_KEY  : ${R2_SECRET         ? '✅ set' : '❌ NOT SET'}`);
 console.log(`  Storage mode          : ${R2_CONFIGURED ? '☁️  Cloudflare R2' : '⛔ UNCONFIGURED — uploads will be rejected'}`);
+console.log(`  R2_BACKUP_BUCKET      : ${process.env.R2_BACKUP_BUCKET ? '✅ set' : '❌ NOT SET — DB backups disabled'}`);
 console.log('=======================================');
 console.log('');
 
@@ -486,6 +489,16 @@ app.get('/api/health', (req, res) => {
     res.json({ status: 'ok', db: 'connected', timestamp: new Date().toISOString() });
   } catch {
     res.status(503).json({ status: 'error', db: 'disconnected' });
+  }
+});
+
+/* ── GET /api/admin/backup-status — Director-only backup monitoring ─ */
+app.get('/api/admin/backup-status', requireDirector, async (req, res) => {
+  try {
+    res.json(await getBackupStatus({ r2, bucket: R2_BACKUP_BUCKET }));
+  } catch (err) {
+    console.error('❌ Backup status failed:', err.message);
+    res.status(500).json({ error: 'Failed to read backup status.' });
   }
 });
 
@@ -1564,6 +1577,7 @@ if (process.env.NODE_ENV !== 'test') {
     console.log(`\n🚀 DMS Backend running → http://localhost:${PORT}`);
     console.log(`   CORS origin: ${CORS_ORIGIN}\n`);
   });
+  startBackupScheduler({ db, r2, bucket: R2_BACKUP_BUCKET }); // fire-and-forget; logs its own status
 }
 
 module.exports = { app, db };
