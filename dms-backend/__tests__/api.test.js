@@ -5,6 +5,7 @@ const jwt = require('jsonwebtoken');
 process.env.NODE_ENV = 'test';
 process.env.JWT_SECRET = 'test-secret-key-for-ci';
 process.env.DB_PATH = ':memory:';
+delete process.env.R2_BACKUP_BUCKET; // hermetic: backup-status tests assume unconfigured
 
 const { app, db } = require('../server');
 
@@ -411,5 +412,27 @@ describe('Transmittal PDF signed links', () => {
       .get(`/api/transmittals/${p1TransmittalId}/pdf`)
       .set('Authorization', `Bearer ${directorToken}`);
     expect(res.status).toBe(200);
+  });
+});
+
+describe('GET /api/admin/backup-status', () => {
+  it('rejects unauthenticated requests', async () => {
+    const res = await request(app).get('/api/admin/backup-status');
+    expect(res.status).toBe(401);
+  });
+
+  it('rejects non-Director roles', async () => {
+    const res = await request(app)
+      .get('/api/admin/backup-status')
+      .set('Authorization', `Bearer ${teamToken}`);
+    expect(res.status).toBe(403);
+  });
+
+  it('reports configured:false for Director when R2_BACKUP_BUCKET is unset', async () => {
+    const res = await request(app)
+      .get('/api/admin/backup-status')
+      .set('Authorization', `Bearer ${directorToken}`);
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ configured: false });
   });
 });

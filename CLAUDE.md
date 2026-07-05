@@ -169,6 +169,11 @@ const isProjectTeam = activeRole === "Project Team";
 | `DELETE` | `/api/users/:id` | Director | Remove user (cannot delete self) |
 | `PATCH`  | `/api/login` (self) | Any | Change own password |
 
+### Admin
+| Method | Endpoint | Auth | Description |
+|--------|----------|------|-------------|
+| `GET`  | `/api/admin/backup-status` | Director | Backup health: newest backup, count, last error. Daily DB backup to private R2 bucket at 02:00 Dubai, 30-day retention. Restore: see `docs/RESTORE.md` |
+
 ---
 
 ## Database schema (SQLite)
@@ -338,6 +343,7 @@ R2_PUBLIC_URL
 CLOUDFLARE_ACCOUNT_ID
 R2_ACCESS_KEY_ID
 R2_SECRET_ACCESS_KEY
+R2_BACKUP_BUCKET     # Private R2 bucket for daily DB backups (backups disabled if unset)
 SMTP_HOST            # Optional
 SMTP_PORT
 SMTP_USER
