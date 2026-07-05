@@ -58,7 +58,7 @@ console.log(`  CLOUDFLARE_ACCOUNT_ID : ${CLOUDFLARE_ACCT_ID ? '✅ set' : '❌ N
 console.log(`  R2_ACCESS_KEY_ID      : ${R2_KEY_ID         ? '✅ set' : '❌ NOT SET'}`);
 console.log(`  R2_SECRET_ACCESS_KEY  : ${R2_SECRET         ? '✅ set' : '❌ NOT SET'}`);
 console.log(`  Storage mode          : ${R2_CONFIGURED ? '☁️  Cloudflare R2' : '⛔ UNCONFIGURED — uploads will be rejected'}`);
-console.log(`  R2_BACKUP_BUCKET      : ${process.env.R2_BACKUP_BUCKET ? '✅ set' : '❌ NOT SET — DB backups disabled'}`);
+console.log(`  R2_BACKUP_BUCKET      : ${!process.env.R2_BACKUP_BUCKET ? '❌ NOT SET — DB backups disabled' : R2_CONFIGURED ? '✅ set' : '⚠️  set, but R2 credentials missing — DB backups disabled'}`);
 console.log('=======================================');
 console.log('');
 

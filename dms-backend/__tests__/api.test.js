@@ -5,6 +5,7 @@ const jwt = require('jsonwebtoken');
 process.env.NODE_ENV = 'test';
 process.env.JWT_SECRET = 'test-secret-key-for-ci';
 process.env.DB_PATH = ':memory:';
+delete process.env.R2_BACKUP_BUCKET; // hermetic: backup-status tests assume unconfigured
 
 const { app, db } = require('../server');
 
