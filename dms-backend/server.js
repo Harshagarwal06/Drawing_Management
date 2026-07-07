@@ -12,7 +12,8 @@ const Database     = require('better-sqlite3');
 const PDFDocument  = require('pdfkit');
 const nodemailer   = require('nodemailer');
 const crypto       = require('crypto');
-const { S3Client, PutObjectCommand, DeleteObjectCommand } = require('@aws-sdk/client-s3');
+const { S3Client, PutObjectCommand, DeleteObjectCommand, GetObjectCommand } = require('@aws-sdk/client-s3');
+const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
 const helmet       = require('helmet');
 const { startBackupScheduler, getBackupStatus } = require('./backup');
 
@@ -46,6 +47,7 @@ const CLOUDFLARE_ACCT_ID = process.env.CLOUDFLARE_ACCOUNT_ID;
 const R2_KEY_ID          = process.env.R2_ACCESS_KEY_ID;
 const R2_SECRET          = process.env.R2_SECRET_ACCESS_KEY;
 const R2_BACKUP_BUCKET   = process.env.R2_BACKUP_BUCKET; // private bucket for DB backups
+const R2_SIGNED_URL_TTL_SECONDS = Math.max(60, parseInt(process.env.R2_SIGNED_URL_TTL_SECONDS || '300', 10));
 
 const R2_CONFIGURED = !!(R2_BUCKET && R2_PUBLIC_URL && CLOUDFLARE_ACCT_ID && R2_KEY_ID && R2_SECRET);
 
@@ -70,6 +72,71 @@ const r2 = R2_CONFIGURED ? new S3Client({
     secretAccessKey: R2_SECRET,
   },
 }) : null;
+
+/* ── R2 object helpers ───────────────────────────────────────────── */
+function extractR2Key(filePath) {
+  if (!filePath) return '';
+  const raw = String(filePath).trim();
+  if (!raw) return '';
+
+  if (R2_PUBLIC_URL && raw.startsWith(`${R2_PUBLIC_URL}/`)) {
+    return decodeURIComponent(raw.slice(R2_PUBLIC_URL.length + 1).replace(/^\/+/, ''));
+  }
+
+  try {
+    const url = new URL(raw);
+    return decodeURIComponent(url.pathname.replace(/^\/+/, ''));
+  } catch {
+    return raw.replace(/^\/+/, '');
+  }
+}
+
+function fileNameFromPath(filePath) {
+  const key = extractR2Key(filePath);
+  const name = key.split('/').filter(Boolean).pop() || 'drawing-file';
+  try {
+    return decodeURIComponent(name);
+  } catch {
+    return name;
+  }
+}
+
+function normalizeFileMode(mode) {
+  return mode === 'download' ? 'download' : 'view';
+}
+
+function contentDispositionFor(mode, filename) {
+  const disposition = normalizeFileMode(mode) === 'download' ? 'attachment' : 'inline';
+  const safeName = String(filename || 'drawing-file').replace(/[\r\n"]/g, '_');
+  return `${disposition}; filename="${safeName}"`;
+}
+
+async function createSignedR2Url(filePath, mode = 'view') {
+  if (!r2) {
+    const err = new Error('File storage is not configured.');
+    err.status = 503;
+    throw err;
+  }
+  const key = extractR2Key(filePath);
+  if (!key) {
+    const err = new Error('File is not available.');
+    err.status = 404;
+    throw err;
+  }
+
+  const filename = fileNameFromPath(filePath);
+  const command = new GetObjectCommand({
+    Bucket: R2_BUCKET,
+    Key: key,
+    ResponseContentDisposition: contentDispositionFor(mode, filename),
+  });
+  const url = await getSignedUrl(r2, command, { expiresIn: R2_SIGNED_URL_TTL_SECONDS });
+  return {
+    url,
+    filename,
+    expiresAt: new Date(Date.now() + R2_SIGNED_URL_TTL_SECONDS * 1000).toISOString(),
+  };
+}
 
 /* ── R2 delete helper ───────────────────────────────────────────── */
 async function deleteFromR2(filePath) {
@@ -464,6 +531,73 @@ function requireProjectAccess(req, res, next) {
   }
 }
 
+/* ── Project access checks for records looked up by their own id ──
+   (the project id comes from the DB row, not the request params) ── */
+function parseProjectId(value) {
+  const id = Number.parseInt(value, 10);
+  return Number.isInteger(id) && id > 0 ? id : null;
+}
+
+function parseAllowedProjects(user) {
+  const allowed = user?.allowedProjects ?? user?.allowed_projects;
+  if (allowed === '*') return '*';
+  if (Array.isArray(allowed)) return allowed.map(Number).filter(Number.isInteger);
+  try {
+    const parsed = JSON.parse(allowed || '[]');
+    return Array.isArray(parsed) ? parsed.map(Number).filter(Number.isInteger) : [];
+  } catch {
+    return null;
+  }
+}
+
+function userCanAccessProject(user, projectId) {
+  const allowed = parseAllowedProjects(user);
+  if (allowed === '*') return true;
+  if (!allowed) return false;
+  return allowed.includes(Number(projectId));
+}
+
+function ensureProjectAccess(req, res, projectId) {
+  const id = parseProjectId(projectId);
+  if (!id) {
+    res.status(400).json({ error: 'Valid projectId is required.' });
+    return false;
+  }
+  const allowed = parseAllowedProjects(req.user);
+  if (!allowed) {
+    res.status(403).json({ error: 'Invalid project access configuration.' });
+    return false;
+  }
+  if (userCanAccessProject(req.user, id)) return true;
+  res.status(403).json({ error: 'Access denied — you do not have access to this project.' });
+  return false;
+}
+
+function loadDrawingForRequest(req, res, id) {
+  const drawing = db.prepare('SELECT * FROM drawings WHERE id = ?').get(id);
+  if (!drawing) {
+    res.status(404).json({ error: 'Drawing not found.' });
+    return null;
+  }
+  if (!ensureProjectAccess(req, res, drawing.project_id)) return null;
+  return drawing;
+}
+
+function loadRevisionForRequest(req, res, id) {
+  const revision = db.prepare(`
+    SELECT r.*, d.project_id, d.number AS drawing_number
+    FROM drawing_revisions r
+    JOIN drawings d ON d.id = r.drawing_id
+    WHERE r.id = ?
+  `).get(id);
+  if (!revision) {
+    res.status(404).json({ error: 'Revision not found.' });
+    return null;
+  }
+  if (!ensureProjectAccess(req, res, revision.project_id)) return null;
+  return revision;
+}
+
 /* ── Upload rate limiter — max 20 uploads per 15 min per IP ─────── */
 const uploadLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
@@ -855,6 +989,30 @@ app.get('/api/drawings/:id/revisions', (req, res) => {
   } catch (err) {
     console.error('❌ GET /api/drawings/:id/revisions error:', err);
     res.status(500).json({ error: 'Failed to fetch revisions.' });
+  }
+});
+
+/* ── GET /api/drawings/:id/file-url ─────────────────────────────── */
+app.get('/api/drawings/:id/file-url', async (req, res) => {
+  try {
+    const drawing = loadDrawingForRequest(req, res, req.params.id);
+    if (!drawing) return;
+    res.json(await createSignedR2Url(drawing.path, normalizeFileMode(req.query.mode)));
+  } catch (err) {
+    console.error('❌ GET /api/drawings/:id/file-url error:', err);
+    res.status(err.status || 500).json({ error: err.status ? err.message : 'Failed to create file URL.' });
+  }
+});
+
+/* ── GET /api/drawing-revisions/:id/file-url ────────────────────── */
+app.get('/api/drawing-revisions/:id/file-url', async (req, res) => {
+  try {
+    const revision = loadRevisionForRequest(req, res, req.params.id);
+    if (!revision) return;
+    res.json(await createSignedR2Url(revision.path, normalizeFileMode(req.query.mode)));
+  } catch (err) {
+    console.error('❌ GET /api/drawing-revisions/:id/file-url error:', err);
+    res.status(err.status || 500).json({ error: err.status ? err.message : 'Failed to create file URL.' });
   }
 });
 

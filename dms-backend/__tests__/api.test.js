@@ -12,6 +12,9 @@ const { app, db } = require('../server');
 let directorToken;
 let architectToken;
 let teamToken;
+let projectOneDrawingId;
+let projectTwoDrawingId;
+let projectTwoRevisionId;
 
 beforeAll(async () => {
   // Login as each role to get tokens
@@ -29,6 +32,26 @@ beforeAll(async () => {
     .post('/api/login')
     .send({ username: 'team', password: 'team123' });
   teamToken = teamRes.body.token;
+
+  const drawingInsert = db.prepare(`
+    INSERT INTO drawings (number,title,discipline,rev,status,issue_date,originator,transmittals,path,project_id,folder_path)
+    VALUES (?,?,?,?,?,?,?,0,?,?,?)
+  `);
+  projectOneDrawingId = drawingInsert.run(
+    'FILEURL-P1-001', 'Accessible Project Drawing', 'Architecture', 'A', 'S1',
+    '2026-07-07', 'QA', 'https://public.example.com/project-one.pdf', 1, ''
+  ).lastInsertRowid;
+  projectTwoDrawingId = drawingInsert.run(
+    'FILEURL-P2-001', 'Restricted Project Drawing', 'Architecture', 'A', 'S1',
+    '2026-07-07', 'QA', 'https://public.example.com/project-two.pdf', 2, ''
+  ).lastInsertRowid;
+  projectTwoRevisionId = db.prepare(`
+    INSERT INTO drawing_revisions (drawing_id, rev, status, title, discipline, originator, path, uploaded_by, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    projectTwoDrawingId, '0', 'S1', 'Restricted Revision', 'Architecture', 'QA',
+    'https://public.example.com/project-two-rev0.pdf', 'QA', '2026-07-07'
+  ).lastInsertRowid;
 });
 
 afterAll(() => {
@@ -434,5 +457,34 @@ describe('GET /api/admin/backup-status', () => {
       .set('Authorization', `Bearer ${directorToken}`);
     expect(res.status).toBe(200);
     expect(res.body).toEqual({ configured: false });
+  });
+});
+
+describe('Signed drawing file URLs', () => {
+  it('requires auth for signed drawing file URLs', async () => {
+    const res = await request(app).get(`/api/drawings/${projectOneDrawingId}/file-url?mode=view`);
+    expect(res.status).toBe(401);
+  });
+
+  it('enforces project access for signed drawing file URLs', async () => {
+    const res = await request(app)
+      .get(`/api/drawings/${projectTwoDrawingId}/file-url?mode=view`)
+      .set('Authorization', `Bearer ${teamToken}`);
+    expect(res.status).toBe(403);
+  });
+
+  it('enforces project access for signed revision file URLs', async () => {
+    const res = await request(app)
+      .get(`/api/drawing-revisions/${projectTwoRevisionId}/file-url?mode=download`)
+      .set('Authorization', `Bearer ${teamToken}`);
+    expect(res.status).toBe(403);
+  });
+
+  it('reports unconfigured storage instead of minting a URL when R2 is unset', async () => {
+    const res = await request(app)
+      .get(`/api/drawings/${projectOneDrawingId}/file-url?mode=view`)
+      .set('Authorization', `Bearer ${directorToken}`);
+    expect(res.status).toBe(503);
+    expect(res.body.error).toMatch(/storage/i);
   });
 });

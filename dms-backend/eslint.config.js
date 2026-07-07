@@ -21,6 +21,7 @@ module.exports = [
         exports: 'readonly',
         setImmediate: 'readonly',
         fetch: 'readonly',
+        URL: 'readonly',
       },
     },
     rules: {
