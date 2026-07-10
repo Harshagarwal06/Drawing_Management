@@ -312,8 +312,6 @@ export default function DocumentsView({
   const addInputRef      = useRef(null);
   const renameInputRef   = useRef(null);
   const subInputRef      = useRef(null);
-  const mobileToolbarRef = useRef(null); // scroll anchor (mobile) — see nav effect
-  const contentCardRef   = useRef(null); // scroll anchor (desktop) — see nav effect
 
   useEffect(() => {
     if (!activeProject?.id || !token) return;
@@ -325,18 +323,6 @@ export default function DocumentsView({
 
   /* Loading is derived: true until the active project's tree has landed */
   const treeLoading = !activeProject?.id || !token || treeProjectId !== activeProject.id;
-
-  // On opening a folder, anchor the folder list just under the sticky toolbar so
-  // every folder lands in the same spot (project stats card scrolled off) — not
-  // jumping to the very top, and not keeping an arbitrary offset that makes the
-  // layout appear to "shift" when folder counts differ. At the root we leave the
-  // scroll alone so the stats card stays visible.
-  useEffect(() => {
-    if (segments.length === 0) return;
-    const desktop = window.matchMedia("(min-width: 768px)").matches;
-    const el = desktop ? contentCardRef.current : mobileToolbarRef.current;
-    el?.scrollIntoView({ block: "start", behavior: "auto" });
-  }, [segments]);
 
   useEffect(() => { if (addingFolder)         addInputRef.current?.focus();    }, [addingFolder]);
   useEffect(() => { if (renamingIdx !== null)  renameInputRef.current?.focus(); }, [renamingIdx]);
@@ -605,8 +591,7 @@ export default function DocumentsView({
       </div>
 
       {/* ── Mobile toolbar (flat, outside card) ── */}
-      {/* scroll-mt clears the sticky top app bar when this is the nav scroll anchor */}
-      <div ref={mobileToolbarRef} className="md:hidden space-y-3 scroll-mt-[64px]">
+      <div className="md:hidden space-y-3">
         {/* Row 1: Breadcrumb + view toggle */}
         <div className="flex items-center gap-1">
           <nav className="flex items-center gap-1 flex-1 min-w-0 flex-wrap">
@@ -727,11 +712,8 @@ export default function DocumentsView({
       </div>
 
       {/* ── Desktop + shared content card ── */}
-      {/* min-h keeps the card from violently collapsing/expanding as folders with
-          different item counts swap in, so navigation feels calm instead of jumpy.
-          It also guarantees enough scrollable height to anchor the toolbar to the
-          top. scroll-mt clears the desktop sticky header when this is the anchor. */}
-      <div ref={contentCardRef} className="md:bg-white md:border md:border-border-slate md:rounded-xl overflow-hidden min-h-[70vh] md:scroll-mt-[88px]">
+      {/* A stable minimum height keeps folder changes from collapsing the layout. */}
+      <div className="md:bg-white md:border md:border-border-slate md:rounded-xl overflow-hidden min-h-[70vh]">
 
         {/* Desktop-only toolbar */}
         <div className="hidden md:flex flex-col sm:flex-row sm:items-center gap-x-3 gap-y-2 px-5 py-3 border-b border-border-slate flex-wrap">
