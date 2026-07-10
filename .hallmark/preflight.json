@@ -1,0 +1,7 @@
+{
+  "framework": "React 19 with Vite",
+  "styling": "Tailwind CSS 3",
+  "fonts": ["Outfit", "Space Grotesk"],
+  "motion": "motion-cut",
+  "spacing": "Tailwind plus local utility values"
+}

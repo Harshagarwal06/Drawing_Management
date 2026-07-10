@@ -63,7 +63,8 @@ export default function TransmittalsView({ transmittals = [], drawings = [], loa
       {/* Header — desktop only (mobile shows the title in the app bar) */}
       <div className="hidden md:flex flex-col md:flex-row md:items-end justify-between gap-4">
         <div>
-          <h2 className="font-headline-lg text-headline-lg font-bold text-on-surface tracking-tight mb-1">Transmittals</h2>
+          <p className="workspace-eyebrow mb-3">Issue register</p>
+          <h2 className="workspace-heading text-headline-lg mb-1">Transmittals</h2>
           <p className="font-body-md text-body-md text-on-surface-variant max-w-2xl">All issued document transmittals for this project.</p>
         </div>
         <div className="flex items-center gap-2">
@@ -79,7 +80,7 @@ export default function TransmittalsView({ transmittals = [], drawings = [], loa
           {[1,2,3].map(i => <SkeletonCard key={i} />)}
         </div>
       ) : transmittals.length === 0 ? (
-        <div className="flex flex-col items-center justify-center h-64 gap-4 text-on-surface-variant bg-surface border border-outline-variant rounded-xl shadow-card">
+        <div className="workspace-panel flex flex-col items-center justify-center h-64 gap-4 text-on-surface-variant rounded-xl">
           <div className="w-16 h-16 rounded-2xl bg-surface-container border border-outline-variant flex items-center justify-center">
             <span className="material-symbols-outlined text-[32px] text-outline">send_and_archive</span>
           </div>
@@ -107,7 +108,7 @@ export default function TransmittalsView({ transmittals = [], drawings = [], loa
             const hiddenCount    = allDrawings.length - TRUNCATE_AT;
 
             return (
-              <div key={t.id} className="bg-surface border border-outline-variant rounded-xl p-5 shadow-card hover:shadow-card-md transition-shadow">
+              <div key={t.id} className="workspace-panel rounded-xl p-5 transition-colors">
                 <div className="flex flex-col md:flex-row md:items-start gap-4">
 
                   {/* Left: number + purpose + date */}

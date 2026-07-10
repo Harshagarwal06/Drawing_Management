@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { Outlet, useLocation } from "react-router-dom";
+import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import ErrorBoundary from "./ErrorBoundary";
 import Sidebar from "./Sidebar";
 import BottomNav from "./BottomNav";
@@ -22,7 +22,9 @@ export default function AppShell({
   onRefresh,
 }) {
   const { pathname } = useLocation();
+  const navigate = useNavigate();
   const isDocuments  = pathname === "/documents";
+  const [commandOpen, setCommandOpen] = useState(false);
 
   /* Extended FAB hides on scroll-down, reappears on scroll-up (M3, v2 spec). */
   const [fabVisible, setFabVisible] = useState(true);
@@ -55,9 +57,30 @@ export default function AppShell({
     "/transmittals": { icon: "add", label: "New Transmittal", onClick: onNewTransmittal },
   };
   const fab = !isRestricted ? FAB_BY_ROUTE[pathname] : undefined;
+  const commandItems = [
+    ...(isDirector ? [
+      { label: "Open dashboard", hint: "Overview and project activity", path: "/dashboard", icon: "space_dashboard" },
+      { label: "Open drawing register", hint: "Search every drawing", path: "/register", icon: "table_rows" },
+      { label: "Open transmittals", hint: "Issue and track packages", path: "/transmittals", icon: "outgoing_mail" },
+      { label: "Open analytics", hint: "Review document status", path: "/analytics", icon: "monitoring" },
+    ] : []),
+    { label: "Open documents", hint: "Browse project files", path: "/documents", icon: "folder_open" },
+    { label: "Open settings", hint: "Account and workspace settings", path: "/settings", icon: "settings" },
+  ];
+
+  useEffect(() => {
+    const onKeyDown = (event) => {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
+        event.preventDefault();
+        setCommandOpen(open => !open);
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
 
   return (
-    <div className="bg-background text-on-surface font-outfit min-h-screen flex">
+    <div className="workspace-shell bg-background text-on-surface font-outfit min-h-screen flex">
 
       <Sidebar
         isDirector={isDirector}
@@ -81,13 +104,25 @@ export default function AppShell({
         />
 
         {/* ── Desktop Top App Bar ── */}
-        <header className="hidden md:flex bg-glass-surface/80 backdrop-blur-md border-b border-border-slate sticky top-0 z-40 h-topbar-safe pt-safe items-center justify-between px-10 gap-6">
+        <header className="workspace-topbar hidden md:flex backdrop-blur-md border-b border-border-slate sticky top-0 z-40 h-topbar-safe pt-safe items-center justify-between px-10 gap-6">
 
-          {/* Spacer — page-level views provide their own scoped search */}
-          <div className="flex-1" />
+          <div className="flex-1 min-w-0">
+            <p className="workspace-eyebrow">Unique Drawings / Workspace</p>
+          </div>
 
           {/* Utility icons */}
           <div className="flex items-center gap-1 shrink-0">
+
+            <button
+              type="button"
+              onClick={() => setCommandOpen(true)}
+              className="hidden lg:inline-flex h-9 items-center gap-2 px-3 mr-2 text-[12px] text-on-surface-variant hover:text-on-surface bg-surface border border-border-slate rounded-md transition-colors"
+              aria-label="Open quick navigation"
+            >
+              <span className="material-symbols-outlined text-[17px]">search</span>
+              <span>Quick navigation</span>
+              <kbd className="workspace-kbd px-1.5 py-0.5 text-[10px] leading-none">⌘ K</kbd>
+            </button>
 
             {/* Project selector — hidden on /documents (workspace bar handles it there) */}
             {!isDocuments && (
@@ -136,7 +171,7 @@ export default function AppShell({
 
         {/* ── Page content rendered by child route ── */}
         {/* pb-24 clears the mobile bottom nav; desktop resets to 40px */}
-        <main className="flex-1 p-4 pb-24 md:p-[40px] md:pb-[40px] overflow-x-hidden bg-surface-container-low md:bg-transparent">
+        <main className="workspace-main flex-1 p-4 pb-24 md:p-[40px] md:pb-[40px] overflow-x-hidden">
           <PullToRefresh onRefresh={onRefresh}>
             <ErrorBoundary>
               <Outlet />
@@ -159,6 +194,71 @@ export default function AppShell({
       )}
 
       <BottomNav isDirector={isDirector} />
+
+      {commandOpen && (
+        <CommandPalette
+          items={commandItems}
+          onClose={() => setCommandOpen(false)}
+          onNavigate={(path) => { navigate(path); setCommandOpen(false); }}
+        />
+      )}
+    </div>
+  );
+}
+
+function CommandPalette({ items, onClose, onNavigate }) {
+  const [query, setQuery] = useState("");
+  const [activeIndex, setActiveIndex] = useState(0);
+  const inputRef = useRef(null);
+  const filtered = items.filter((item) => `${item.label} ${item.hint}`.toLowerCase().includes(query.toLowerCase()));
+
+  useEffect(() => {
+    inputRef.current?.focus();
+  }, []);
+
+  const onKeyDown = (event) => {
+    if (event.key === "Escape") onClose();
+    if (event.key === "ArrowDown") { event.preventDefault(); setActiveIndex(i => Math.min(i + 1, Math.max(filtered.length - 1, 0))); }
+    if (event.key === "ArrowUp") { event.preventDefault(); setActiveIndex(i => Math.max(i - 1, 0)); }
+    if (event.key === "Enter" && filtered[activeIndex]) onNavigate(filtered[activeIndex].path);
+  };
+
+  return (
+    <div className="command-scrim fixed inset-0 z-[100] flex items-start justify-center px-4 pt-[14vh]" onMouseDown={onClose}>
+      <section className="command-panel w-full max-w-xl rounded-xl overflow-hidden" role="dialog" aria-modal="true" aria-label="Quick navigation" onMouseDown={event => event.stopPropagation()}>
+        <div className="flex items-center gap-3 px-4 border-b border-border-slate">
+          <span className="material-symbols-outlined text-[20px] text-primary">search</span>
+          <input
+            ref={inputRef}
+            value={query}
+            onChange={event => { setQuery(event.target.value); setActiveIndex(0); }}
+            onKeyDown={onKeyDown}
+            placeholder="Search workspace"
+            className="h-14 flex-1 min-w-0 bg-transparent text-[14px] text-on-surface placeholder:text-on-surface-variant outline-none"
+          />
+          <kbd className="workspace-kbd px-1.5 py-1 text-[10px] leading-none">ESC</kbd>
+        </div>
+        <div className="p-2 max-h-[min(24rem,60vh)] overflow-y-auto custom-scrollbar">
+          {filtered.length ? filtered.map((item, index) => (
+            <button
+              type="button"
+              key={item.path}
+              onMouseEnter={() => setActiveIndex(index)}
+              onClick={() => onNavigate(item.path)}
+              className={`w-full flex items-center gap-3 rounded-lg px-3 py-3 text-left transition-colors ${index === activeIndex ? "bg-primary-fixed text-on-surface" : "text-on-surface-variant hover:bg-surface-container-low"}`}
+            >
+              <span className="material-symbols-outlined text-[19px] text-primary">{item.icon}</span>
+              <span className="flex-1 min-w-0">
+                <span className="block text-[13px] font-semibold">{item.label}</span>
+                <span className="block mt-0.5 text-[11px] text-on-surface-variant">{item.hint}</span>
+              </span>
+              <span className="material-symbols-outlined text-[16px]">arrow_forward</span>
+            </button>
+          )) : (
+            <p className="px-3 py-8 text-center text-[13px] text-on-surface-variant">No workspace area matches that search.</p>
+          )}
+        </div>
+      </section>
     </div>
   );
 }

@@ -1,14 +1,91 @@
+@import url("./tokens.css");
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
+  html,
   body {
-    background-color: #f6f6ff;
-    @apply text-on-surface font-outfit antialiased;
+    overflow-x: clip;
+  }
+
+  body {
+    background-color: var(--color-paper);
+    color: var(--color-ink);
+    font-family: var(--font-body);
+    @apply antialiased;
     -webkit-tap-highlight-color: transparent;
   }
+
+  button,
+  input,
+  select,
+  textarea {
+    font: inherit;
+  }
+
+  button:focus-visible,
+  a:focus-visible,
+  input:focus-visible,
+  select:focus-visible,
+  textarea:focus-visible {
+    outline: 2px solid var(--color-focus);
+    outline-offset: 2px;
+  }
 }
+
+/* Shared workspace composition — cool paper, visible rules, restrained depth. */
+.workspace-shell { background: var(--color-paper); }
+.workspace-topbar {
+  background: color-mix(in oklch, var(--color-paper) 92%, transparent);
+  border-color: var(--color-rule);
+}
+.workspace-main { background: var(--color-paper); }
+.workspace-eyebrow {
+  color: var(--color-ink-muted);
+  font: 500 var(--text-xs)/1 var(--font-mono);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.workspace-heading {
+  color: var(--color-ink);
+  font-family: var(--font-display);
+  font-weight: 600;
+  letter-spacing: -0.03em;
+}
+.workspace-panel {
+  background: var(--color-paper-raised);
+  border: 1px solid var(--color-rule);
+  box-shadow: var(--shadow-panel);
+}
+.workspace-panel:hover { border-color: var(--color-rule-strong); }
+.workspace-kbd {
+  font-family: var(--font-mono);
+  border: 1px solid var(--color-rule-strong);
+  border-radius: var(--radius-input);
+  color: var(--color-ink-muted);
+}
+.command-scrim { background: var(--color-scrim); }
+.command-panel {
+  background: var(--color-paper-raised);
+  border: 1px solid var(--color-rule-strong);
+  box-shadow: var(--shadow-dialog);
+}
+.login-context {
+  background: var(--color-graphite);
+  color: var(--color-graphite-ink);
+}
+.login-context-rule { border-color: var(--color-graphite-rule); }
+.login-context-mark {
+  color: var(--color-accent-soft);
+  font: 500 var(--text-xs)/1 var(--font-mono);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.login-input:focus { border-color: var(--color-accent); box-shadow: 0 0 0 3px var(--color-accent-soft); }
+.login-context-copy { color: var(--color-graphite-muted); }
+.login-context-icon { color: var(--color-accent-soft); }
 
 /* iOS safe areas (Capacitor shell) — env() resolves to 0 in regular browsers */
 .pt-safe { padding-top: env(safe-area-inset-top, 0px); }

@@ -118,8 +118,9 @@ export default function Dashboard({
       <div className="hidden md:block space-y-8">
       {/* Page Header */}
       <div>
-        <h2 className="font-space-grotesk font-semibold text-headline-lg text-on-surface">Project Dashboard</h2>
-        <p className="font-body-md text-on-surface-variant mt-1">Real-time status overview of project documentation and delivery.</p>
+        <p className="workspace-eyebrow mb-3">Project control centre</p>
+        <h2 className="workspace-heading text-headline-lg">Project Dashboard</h2>
+        <p className="font-body-md text-on-surface-variant mt-2">A clear view of document status, recent work, and delivery risk.</p>
       </div>
 
       {/* Metric Cards — hero spans left 2×2 block; Transmittals+Pending fill row-1 right; Overdue fills row-2 right */}
@@ -127,7 +128,7 @@ export default function Dashboard({
 
         {/* Hero: Total Drawings — spans 2 cols × 2 rows on desktop */}
         <div
-          className="col-span-2 lg:col-span-2 lg:row-span-2 bg-surface border border-border-slate rounded-xl p-5 shadow-card hover:shadow-card-md transition-shadow duration-200 cursor-pointer group focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 outline-none"
+          className="workspace-panel col-span-2 lg:col-span-2 lg:row-span-2 rounded-xl p-5 transition-colors duration-200 cursor-pointer group focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 outline-none"
           onClick={() => navigate("/register")}
           role="button"
           tabIndex={0}
@@ -198,7 +199,7 @@ export default function Dashboard({
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 md:gap-8">
 
         {/* Chart (Discipline Breakdown) */}
-        <div className="lg:col-span-8 bg-surface border border-border-slate rounded-xl p-5 md:p-8 flex flex-col lg:h-[460px]">
+        <div className="workspace-panel lg:col-span-8 rounded-xl p-5 md:p-8 flex flex-col lg:h-[460px]">
           <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-3 mb-6 md:mb-8">
             <div>
               <h3 className="font-headline-md text-headline-md text-on-surface">Drawings by Discipline</h3>
@@ -267,7 +268,7 @@ export default function Dashboard({
         </div>
 
         {/* Activity Feed — timeline style (desktop) / compact list (mobile) */}
-        <div className="lg:col-span-4 bg-surface border border-border-slate rounded-xl flex flex-col lg:h-[460px]">
+        <div className="workspace-panel lg:col-span-4 rounded-xl flex flex-col lg:h-[460px]">
           <div className="p-4 md:p-6 border-b border-border-slate">
             <h3 className="font-headline-md text-headline-md text-on-surface">Activity Feed</h3>
             <p className="hidden md:block font-body-sm text-on-surface-variant">Recent project events and updates.</p>
@@ -374,7 +375,7 @@ export default function Dashboard({
       </div>
 
       {/* Latest Drawing Revisions Table */}
-      <div className="bg-surface border border-border-slate rounded-xl overflow-hidden">
+      <div className="workspace-panel rounded-xl overflow-hidden">
         <div className="p-5 md:p-6 border-b border-border-slate flex justify-between items-center gap-3">
           <div>
             <h3 className="font-headline-md text-headline-md text-on-surface">Latest Drawing Revisions</h3>
@@ -431,7 +432,7 @@ function MetricCard({
 }) {
   return (
     <div
-      className={`${mobileTileBg || "bg-surface"} md:bg-surface border border-border-slate p-3.5 md:p-5 rounded-xl shadow-card hover:shadow-card-md transition-shadow duration-200 flex flex-col md:flex-row items-start gap-2.5 md:gap-4 outline-none ${onClick ? "cursor-pointer focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2" : ""} ${className}`}
+      className={`${mobileTileBg || "bg-surface"} md:bg-surface border border-border-slate p-3.5 md:p-5 rounded-xl transition-colors duration-200 flex flex-col md:flex-row items-start gap-2.5 md:gap-4 outline-none ${onClick ? "cursor-pointer focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2" : ""} ${className}`}
       onClick={onClick}
       role={onClick ? "button" : undefined}
       tabIndex={onClick ? 0 : undefined}

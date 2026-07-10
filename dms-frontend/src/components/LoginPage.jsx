@@ -51,165 +51,62 @@ export default function LoginPage({ onLogin }) {
   };
 
   return (
-    <div className="min-h-screen flex bg-background">
-
-      {/* ═══════════════════════ LEFT PANEL ═══════════════════════ */}
-      <div
-        className="hidden lg:flex lg:w-1/2 relative overflow-hidden flex-col justify-between p-12"
-        style={{ background: "linear-gradient(145deg, #0a0f1e 0%, #111827 35%, #1a1060 70%, #1B3A6B 100%)" }}
-      >
-        {/* Blueprint grid */}
-        <div
-          className="absolute inset-0 pointer-events-none"
-          style={{
-            backgroundImage: `
-              linear-gradient(rgba(99,102,241,0.10) 1px, transparent 1px),
-              linear-gradient(90deg, rgba(99,102,241,0.10) 1px, transparent 1px)
-            `,
-            backgroundSize: "48px 48px",
-          }}
-        />
-        {/* Axis cross-hairs at intersections (decorative) */}
-        <div
-          className="absolute inset-0 pointer-events-none opacity-30"
-          style={{
-            backgroundImage: `radial-gradient(circle, rgba(139,92,246,0.25) 1px, transparent 1px)`,
-            backgroundSize: "48px 48px",
-          }}
-        />
-
-        {/* Soft glow blobs */}
-        <div className="absolute -top-24 -right-24 w-[480px] h-[480px] rounded-full bg-primary/20 blur-[140px] pointer-events-none" />
-        <div className="absolute bottom-0 -left-16 w-72 h-72 rounded-full bg-violet-600/10 blur-[100px] pointer-events-none" />
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[320px] h-[320px] rounded-full bg-indigo-500/5 blur-[80px] pointer-events-none" />
-
-        {/* Logo + wordmark */}
-        <div className="relative z-10 flex items-center gap-3">
-          <img src="/logo.png" alt="Unique Properties" className="h-10 w-auto object-contain drop-shadow-lg" />
+    <div className="min-h-screen grid lg:grid-cols-[minmax(0,1.05fr)_minmax(26rem,0.95fr)] bg-background">
+      <aside className="login-context hidden lg:flex flex-col min-h-screen px-12 py-10 xl:px-16">
+        <div className="flex items-center gap-3">
+          <img src="/logo.png" alt="Unique Properties" className="h-10 w-auto object-contain bg-white rounded-sm p-1" />
           <div>
-            <p
-              className="font-bold text-[17px] leading-tight"
-              style={{
-                background: "linear-gradient(90deg, #F4A223 0%, #C9A06A 45%, #93c5fd 100%)",
-                WebkitBackgroundClip: "text",
-                WebkitTextFillColor: "transparent",
-                backgroundClip: "text",
-              }}
-            >
-              Unique Properties
-            </p>
-            <p className="text-slate-500 text-[11px] tracking-wide">Enterprise Management</p>
+            <p className="font-space-grotesk text-[17px] font-semibold tracking-tight">Unique Properties</p>
+            <p className="login-context-mark mt-1">Document control workspace</p>
           </div>
         </div>
 
-        {/* Headline + features */}
-        <div className="relative z-10 space-y-8 my-auto">
-          {/* Status badge */}
-          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/8 border border-white/15 backdrop-blur-sm w-fit">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse shrink-0" />
-            <span className="text-[11px] font-medium text-white/75 tracking-wide">Enterprise Drawing Management</span>
-          </div>
+        <div className="my-auto max-w-xl">
+          <p className="login-context-mark mb-5">One source of record</p>
+          <h1 className="font-space-grotesk text-[clamp(2.6rem,4vw,4.6rem)] font-semibold tracking-[-0.045em] leading-[0.98]">Drawings, clear and controlled.</h1>
+          <p className="login-context-copy mt-6 max-w-lg text-[15px] leading-7">A focused workspace for issuing, reviewing, and locating the latest project documentation without losing the history behind it.</p>
 
-          {/* Hero headline */}
-          <div className="space-y-3">
-            <h1 className="text-[40px] font-extrabold text-white leading-[1.15] tracking-tight">
-              Every drawing.<br />
-              Every revision.<br />
-              <span
-                style={{
-                  background: "linear-gradient(90deg, #F4A223 0%, #93c5fd 100%)",
-                  WebkitBackgroundClip: "text",
-                  WebkitTextFillColor: "transparent",
-                  backgroundClip: "text",
-                }}
-              >
-                Under control.
-              </span>
-            </h1>
-            <p className="text-slate-400 text-[14px] leading-relaxed max-w-[380px]">
-              Manage drawings, revisions, approvals, and transmittals for your construction projects — in one secure, role-based workspace.
-            </p>
-          </div>
-
-          {/* Feature rows */}
-          <div className="space-y-2.5">
+          <div className="mt-10 border-y login-context-rule divide-y login-context-rule">
             {FEATURES.map(({ Icon, title, desc }) => (
-              <div
-                key={title}
-                className="flex items-start gap-3.5 p-4 rounded-xl border border-white/10 backdrop-blur-sm"
-                style={{ background: "rgba(255,255,255,0.04)" }}
-              >
-                <div className="w-8 h-8 rounded-lg bg-primary/25 border border-primary/20 flex items-center justify-center shrink-0 mt-0.5">
-                  <Icon size={15} className="text-blue-300" />
-                </div>
-                <div className="min-w-0">
-                  <p className="text-white text-[13px] font-semibold leading-tight">{title}</p>
-                  <p className="text-slate-400 text-[11px] leading-relaxed mt-0.5">{desc}</p>
+              <div key={title} className="grid grid-cols-[2.25rem_minmax(0,1fr)] gap-4 py-5">
+                <Icon size={18} className="login-context-icon mt-0.5" />
+                <div>
+                  <p className="text-[14px] font-semibold text-on-primary">{title}</p>
+                  <p className="login-context-copy mt-1 text-[12px] leading-5">{desc}</p>
                 </div>
               </div>
             ))}
           </div>
         </div>
 
-        {/* Bottom security line */}
-        <div className="relative z-10 flex items-center gap-2">
-          <ShieldCheck size={13} className="text-slate-600 shrink-0" />
-          <p className="text-slate-600 text-[11px]">
-            JWT authentication · Role-based access control · SSL encrypted
-          </p>
+        <div className="login-context-copy flex items-center gap-2 pt-8">
+          <ShieldCheck size={14} className="shrink-0" />
+          <p className="text-[11px]">Authenticated access with role-based project visibility.</p>
         </div>
-      </div>
+      </aside>
 
-      {/* ═══════════════════════ RIGHT PANEL ══════════════════════ */}
-      <div className="w-full lg:w-1/2 flex items-center justify-center px-6 py-10 lg:p-12 bg-background">
-        <div className="w-full max-w-[360px]">
-
-          {/* Mobile-only logo (left panel hidden on mobile) */}
-          <div className="flex flex-col items-center mb-8 lg:hidden">
-            <img src="/logo.png" alt="Unique Properties" className="h-20 w-auto object-contain mb-4" />
-            <h1
-              className="font-bold text-[18px]"
-              style={{
-                background: "linear-gradient(90deg, #F4A223 0%, #C9A06A 50%, #1B6ABF 100%)",
-                WebkitBackgroundClip: "text",
-                WebkitTextFillColor: "transparent",
-                backgroundClip: "text",
-              }}
-            >
-              Unique Properties
-            </h1>
-            <p className="text-[12px] text-on-surface-variant mt-1">Enterprise Drawing Management</p>
+      <main className="flex items-center justify-center px-5 py-10 sm:px-8 lg:px-14 xl:px-20">
+        <div className="w-full max-w-[25rem]">
+          <div className="flex items-center gap-3 mb-10 lg:hidden">
+            <img src="/logo.png" alt="Unique Properties" className="h-12 w-auto object-contain" />
+            <div>
+              <p className="font-space-grotesk font-semibold text-on-surface">Unique Properties</p>
+              <p className="workspace-eyebrow mt-1">Document control workspace</p>
+            </div>
           </div>
 
-          {/* ── Login card ── */}
-          <div className="bg-surface rounded-2xl border border-outline-variant shadow-card-lg overflow-hidden">
+          <div className="mb-8">
+            <p className="workspace-eyebrow">Secure access</p>
+            <h2 className="workspace-heading mt-3 text-[clamp(2rem,3vw,2.65rem)] leading-none">Sign in to your workspace</h2>
+            <p className="mt-3 text-[14px] leading-6 text-on-surface-variant">Use your assigned account to continue to your project documents.</p>
+          </div>
 
-            {/* Top gradient accent */}
-            <div className="h-[3px] bg-gradient-to-r from-[#F4A223] via-primary to-indigo-500" />
-
-            <div className="p-8">
-
-              {/* Desktop card header */}
-              <div className="hidden lg:flex flex-col items-center mb-7">
-                <div className="w-11 h-11 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center mb-3">
-                  <img src="/logo.png" alt="" className="h-7 w-auto object-contain" />
-                </div>
-                <h2 className="text-[16px] font-bold text-on-surface">Secure Project Workspace</h2>
-                <p className="text-[12px] text-on-surface-variant mt-0.5">Sign in to access your projects</p>
-              </div>
-
-              {/* Mobile card header */}
-              <div className="lg:hidden mb-6">
-                <h2 className="text-[20px] font-bold text-on-surface">Sign in</h2>
-                <p className="text-[13px] text-on-surface-variant mt-0.5">Secure Project Workspace</p>
-              </div>
-
-              {/* ── Form ── */}
-              <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="workspace-panel rounded-xl p-5 sm:p-7">
+            <form onSubmit={handleSubmit} className="space-y-5">
 
                 {/* Error banner */}
                 {error && (
-                  <div className="bg-status-rose-bg border border-status-rose-text/20 text-status-rose-text text-[12px] font-medium p-3 rounded-xl text-center">
+                  <div className="bg-status-rose-bg border border-status-rose-text/20 text-status-rose-text text-[12px] font-medium p-3 rounded-md text-center">
                     {error}
                   </div>
                 )}
@@ -230,7 +127,7 @@ export default function LoginPage({ onLogin }) {
                       onChange={e => setUsername(e.target.value)}
                       placeholder="username"
                       autoComplete="username"
-                      className="w-full bg-surface-container-low border border-outline-variant rounded-xl pl-9 pr-4 py-2.5 text-[14px] text-on-surface placeholder:text-on-surface-variant focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
+                      className="login-input w-full h-11 bg-surface-container-low border border-outline-variant rounded-md pl-9 pr-4 text-[14px] text-on-surface placeholder:text-on-surface-variant outline-none transition-[border-color,box-shadow]"
                     />
                   </div>
                 </div>
@@ -251,7 +148,7 @@ export default function LoginPage({ onLogin }) {
                       onChange={e => setPassword(e.target.value)}
                       placeholder="••••••••"
                       autoComplete="current-password"
-                      className="w-full bg-surface-container-low border border-outline-variant rounded-xl pl-9 pr-10 py-2.5 text-[14px] text-on-surface placeholder:text-on-surface-variant focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
+                      className="login-input w-full h-11 bg-surface-container-low border border-outline-variant rounded-md pl-9 pr-10 text-[14px] text-on-surface placeholder:text-on-surface-variant outline-none transition-[border-color,box-shadow]"
                     />
                     <button
                       type="button"
@@ -269,7 +166,7 @@ export default function LoginPage({ onLogin }) {
                 <button
                   type="submit"
                   disabled={loading}
-                  className="w-full mt-1 bg-primary text-white font-semibold text-[14px] py-3 rounded-xl hover:bg-primary-container transition-all duration-200 shadow-card flex justify-center items-center gap-2 disabled:opacity-60 active:scale-[0.98]"
+                  className="w-full mt-1 h-11 bg-primary text-on-primary font-semibold text-[14px] rounded-md hover:bg-primary-container transition-colors duration-200 flex justify-center items-center gap-2 disabled:opacity-60 active:translate-y-px"
                 >
                   {loading ? (
                     <><Loader2 className="w-4 h-4 animate-spin" />Authenticating…</>
@@ -277,25 +174,14 @@ export default function LoginPage({ onLogin }) {
                     <>Enter Workspace<ArrowRight size={15} /></>
                   )}
                 </button>
-              </form>
-
-              {/* Security line */}
-              <div className="flex items-center justify-center gap-1.5 mt-5 pt-5 border-t border-outline-variant">
-                <ShieldCheck size={12} className="text-on-surface-variant shrink-0" />
-                <p className="text-[11px] text-on-surface-variant text-center leading-tight">
-                  Secured with JWT authentication · Role-based access control
-                </p>
-              </div>
-            </div>
+            </form>
           </div>
 
-          {/* Bottom note */}
-          <p className="text-center text-[11px] text-on-surface-variant mt-4">
-            Enterprise instance · Unique Properties v2.2
+          <p className="mt-5 text-[11px] leading-5 text-on-surface-variant">
+            Access is role-aware and scoped to the projects assigned to your account.
           </p>
         </div>
-      </div>
-
+      </main>
     </div>
   );
 }
