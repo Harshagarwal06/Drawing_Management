@@ -132,7 +132,7 @@ export default function Sidebar({
         <div className="mt-auto pt-4 border-t border-border-slate space-y-1">
           <div className="px-4 pb-2 flex items-center gap-1.5">
             <span className="w-1.5 h-1.5 rounded-full bg-status-emerald-text shrink-0" />
-            <span className="text-[10px] font-semibold text-on-surface-variant/50 uppercase tracking-widest">DrawVault · v2.2</span>
+            <span className="text-[10px] font-semibold text-on-surface-variant/50 uppercase tracking-widest">Unique Drawings</span>
           </div>
           <NavLink
             to="/settings"
