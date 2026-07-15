@@ -5,7 +5,7 @@ import { API, nextRev } from "./constants";
 import useModalClose from "./useModalClose";
 
 export default function NewRevisionModal({ drawing, token, projectId, onSuccess, onClose }) {
-  const { handleBackdrop } = useModalClose(onClose);
+  const { handleBackdrop, panelRef } = useModalClose(onClose);
   const [title,      setTitle]      = useState(drawing.title      ?? "");
   const [revision,   setRevision]   = useState(nextRev(drawing.rev));
   const [file,       setFile]       = useState(null);
@@ -49,14 +49,14 @@ export default function NewRevisionModal({ drawing, token, projectId, onSuccess,
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[9990] flex items-center justify-center p-4"
-      style={{ background: "rgba(0,0,0,0.45)" }}
+      className="fixed inset-0 z-[400] flex items-center justify-center p-4"
+      style={{ background: "var(--color-scrim)" }}
       onClick={handleBackdrop}
       role="dialog"
       aria-modal="true"
       aria-label="Upload new revision"
     >
-      <div className="bg-white rounded-2xl shadow-xl border border-border-slate w-full max-w-md overflow-hidden">
+      <div ref={panelRef} className="bg-white rounded-2xl shadow-xl border border-border-slate w-full max-w-md overflow-hidden">
         <div className="h-1 bg-primary" />
         <div className="px-6 py-4 border-b border-border-slate">
           <h2 className="text-[15px] font-semibold text-on-surface">Upload New Revision</h2>

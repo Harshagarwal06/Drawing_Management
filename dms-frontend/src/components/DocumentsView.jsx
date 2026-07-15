@@ -170,7 +170,7 @@ function ProjectWorkspaceBar({
   const activeIdx = Math.max(0, projects.findIndex(p => p.id === activeProject?.id));
 
   return (
-    <div className="bg-white border border-border-slate rounded-xl px-5 py-3.5 shadow-sm">
+    <div className="hidden md:block bg-white border border-border-slate rounded-xl px-5 py-3.5 shadow-sm">
       <div className="flex items-center gap-4 flex-wrap xl:flex-nowrap">
         <div className="flex items-center gap-2.5 flex-1 min-w-0">
           <span
@@ -504,7 +504,7 @@ export default function DocumentsView({
         pendingApprovals={pendingApprovals}
       />
 
-      <div>
+      <div className="hidden md:block">
         <h1 className="text-[22px] md:text-headline-lg font-semibold text-on-surface">Documents</h1>
         <p className="text-body-md text-on-surface-variant mt-0.5">
           Organize drawings, folders, revisions, and files.
@@ -516,13 +516,13 @@ export default function DocumentsView({
         {/* Card header: breadcrumb + toolbar */}
         <div className="flex flex-col sm:flex-row sm:items-center gap-x-3 gap-y-2 px-5 py-3 border-b border-border-slate flex-wrap">
           <nav className="flex items-center gap-1 flex-1 min-w-0 flex-wrap">
-            <button onClick={navigateRoot} className="p-1 rounded-md text-on-surface-variant hover:text-primary hover:bg-surface-container transition-colors shrink-0" title="Root" aria-label="Go to root folder">
+            <button onClick={navigateRoot} className="mobile-touch-target grid place-items-center rounded-md text-on-surface-variant hover:text-primary hover:bg-surface-container transition-colors shrink-0" title="Root" aria-label="Go to root folder">
               <Home size={14} />
             </button>
             <ChevronRight size={13} className="text-outline shrink-0" />
             <button
               onClick={navigateRoot}
-              className={`px-1.5 py-0.5 rounded text-[12px] font-medium transition-colors leading-none ${
+              className={`min-h-11 px-1.5 py-0.5 rounded text-[12px] font-medium transition-colors leading-none whitespace-nowrap ${
                 segments.length === 0
                   ? "text-on-surface font-semibold pointer-events-none"
                   : "text-on-surface-variant hover:text-on-surface hover:bg-surface-container"
@@ -537,7 +537,7 @@ export default function DocumentsView({
                   <ChevronRight size={13} className="text-outline shrink-0" />
                   <button
                     onClick={() => !isLast && navigateTo(i + 1)}
-                    className={`px-1.5 py-0.5 rounded text-[12px] font-medium transition-colors leading-none ${
+                    className={`min-h-11 px-1.5 py-0.5 rounded text-[12px] font-medium transition-colors leading-none whitespace-nowrap ${
                       isLast
                         ? "text-on-surface font-semibold pointer-events-none"
                         : "text-on-surface-variant hover:text-on-surface hover:bg-surface-container"
@@ -558,10 +558,10 @@ export default function DocumentsView({
                 value={localSearch}
                 onChange={e => setLocalSearch(e.target.value)}
                 placeholder="Search in this folder…"
-                className="pl-8 pr-7 py-1.5 text-[12px] w-full sm:w-[200px] bg-surface-container-low border border-border-slate rounded-lg text-on-surface placeholder:text-on-surface-variant focus:outline-none focus:ring-1 focus:ring-primary/20 focus:border-primary transition-all"
+                className="min-h-11 pl-9 pr-11 py-2 text-[12px] w-full sm:w-[220px] bg-surface-container-low border border-border-slate rounded-lg text-on-surface placeholder:text-on-surface-variant focus:outline-none focus:ring-1 focus:ring-primary/20 focus:border-primary transition-colors"
               />
               {localSearch && (
-                <button onClick={() => setLocalSearch("")} className="absolute right-2 top-1/2 -translate-y-1/2 text-on-surface-variant hover:text-on-surface transition-colors" aria-label="Clear search">
+                <button onClick={() => setLocalSearch("")} className="absolute right-0 top-1/2 -translate-y-1/2 mobile-touch-target grid place-items-center text-on-surface-variant hover:text-on-surface transition-colors" aria-label="Clear search">
                   <X size={12} />
                 </button>
               )}
@@ -570,7 +570,7 @@ export default function DocumentsView({
             <div className="flex items-center bg-surface-container-low border border-border-slate rounded-lg p-0.5 shrink-0">
               <button
                 onClick={() => setViewMode("grid")}
-                className={`p-1.5 rounded-md transition-colors ${viewMode === "grid" ? "bg-white shadow-sm text-primary" : "text-on-surface-variant hover:text-on-surface"}`}
+                className={`mobile-touch-target grid place-items-center rounded-md transition-colors ${viewMode === "grid" ? "bg-white shadow-sm text-primary" : "text-on-surface-variant hover:text-on-surface"}`}
                 title="Grid view"
                 aria-label="Grid view"
               >
@@ -578,7 +578,7 @@ export default function DocumentsView({
               </button>
               <button
                 onClick={() => setViewMode("list")}
-                className={`p-1.5 rounded-md transition-colors ${viewMode === "list" ? "bg-white shadow-sm text-primary" : "text-on-surface-variant hover:text-on-surface"}`}
+                className={`mobile-touch-target grid place-items-center rounded-md transition-colors ${viewMode === "list" ? "bg-white shadow-sm text-primary" : "text-on-surface-variant hover:text-on-surface"}`}
                 title="List view"
                 aria-label="List view"
               >
@@ -589,7 +589,7 @@ export default function DocumentsView({
             {!isProjectTeam && (
               <button
                 onClick={() => setAddingFolder(true)}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border-slate bg-white hover:bg-surface-container text-[12px] font-medium text-on-surface-variant transition-colors shrink-0"
+                className="min-h-11 min-w-11 flex items-center gap-1.5 px-3 py-2 rounded-lg border border-border-slate bg-white hover:bg-surface-container text-[12px] font-medium text-on-surface-variant transition-colors shrink-0"
                 title="New Folder"
               >
                 <FolderPlus size={13} />
@@ -600,7 +600,7 @@ export default function DocumentsView({
             {onUpload && (
               <button
                 onClick={() => onUpload(currentFolderPath)}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary text-white hover:bg-primary-container text-[12px] font-medium shadow-sm transition-all active:scale-[0.98] shrink-0"
+                className="min-h-11 min-w-11 flex items-center gap-1.5 px-3 py-2 rounded-lg bg-primary text-white hover:bg-primary-container text-[12px] font-medium shadow-sm transition-colors shrink-0"
                 title="Upload Here"
               >
                 <Upload size={13} />
@@ -645,7 +645,7 @@ export default function DocumentsView({
             )}
           </div>
         ) : (
-          <div className="p-5 space-y-6">
+          <div className="p-3 sm:p-5 space-y-6">
 
             {/* ── Folders section ── */}
             {(filteredSubfolderEntries.length > 0 || addingFolder) && (
@@ -699,8 +699,8 @@ export default function DocumentsView({
                             }}
                             className="flex-1 bg-transparent text-[13px] font-medium text-on-surface outline-none"
                           />
-                          <button onClick={() => renameFolder(originalIdx)} className="p-0.5 text-primary"><Check size={13} /></button>
-                          <button onClick={() => setRenamingIdx(null)} className="p-0.5 text-on-surface-variant"><X size={13} /></button>
+                          <button onClick={() => renameFolder(originalIdx)} className="mobile-touch-target grid place-items-center text-primary" aria-label="Save folder name"><Check size={16} /></button>
+                          <button onClick={() => setRenamingIdx(null)} className="mobile-touch-target grid place-items-center text-on-surface-variant" aria-label="Cancel folder rename"><X size={16} /></button>
                         </div>
                       );
                     }
@@ -721,8 +721,8 @@ export default function DocumentsView({
                             }}
                             className="flex-1 bg-transparent text-[13px] font-medium text-on-surface placeholder:text-outline outline-none"
                           />
-                          <button onClick={() => commitSubfolder(originalIdx)} className="p-0.5 text-primary"><Check size={13} /></button>
-                          <button onClick={() => { setAddingSubIdx(null); setNewSubVal(""); }} className="p-0.5 text-on-surface-variant"><X size={13} /></button>
+                          <button onClick={() => commitSubfolder(originalIdx)} className="mobile-touch-target grid place-items-center text-primary" aria-label="Create subfolder"><Check size={16} /></button>
+                          <button onClick={() => { setAddingSubIdx(null); setNewSubVal(""); }} className="mobile-touch-target grid place-items-center text-on-surface-variant" aria-label="Cancel subfolder"><X size={16} /></button>
                         </div>
                       );
                     }
@@ -757,8 +757,8 @@ export default function DocumentsView({
                         }}
                         className="flex-1 bg-transparent text-[13px] font-medium text-on-surface placeholder:text-outline outline-none"
                       />
-                      <button onClick={addFolder} className="p-0.5 text-primary"><Check size={13} /></button>
-                      <button onClick={() => { setAddingFolder(false); setNewFolderVal(""); }} className="p-0.5 text-on-surface-variant"><X size={13} /></button>
+                      <button onClick={addFolder} className="mobile-touch-target grid place-items-center text-primary" aria-label="Create folder"><Check size={16} /></button>
+                      <button onClick={() => { setAddingFolder(false); setNewFolderVal(""); }} className="mobile-touch-target grid place-items-center text-on-surface-variant" aria-label="Cancel new folder"><X size={16} /></button>
                     </div>
                   )}
                 </div>
@@ -905,7 +905,7 @@ export default function DocumentsView({
 
       {/* ── Local toast ── */}
       {localToast && createPortal(
-        <div className={`fixed bottom-6 left-1/2 -translate-x-1/2 z-[9999] px-5 py-3 rounded-xl shadow-xl text-[13px] font-medium flex items-center gap-2 border whitespace-nowrap ${
+        <div className={`fixed bottom-[calc(5rem+env(safe-area-inset-bottom,0px))] md:bottom-6 left-1/2 -translate-x-1/2 z-[500] max-w-[calc(100%-2rem)] px-5 py-3 rounded-xl shadow-xl text-[13px] font-medium flex items-center gap-2 border ${
           localToast.type === "success"
             ? "bg-status-emerald-bg text-status-emerald-text border-status-emerald-text/20"
             : localToast.type === "error"

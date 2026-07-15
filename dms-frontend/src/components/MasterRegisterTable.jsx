@@ -117,33 +117,34 @@ export default function MasterRegisterTable({
         </div>
 
         {/* ── Contextual Action Bar ── */}
-        <div className="flex items-center gap-2 shrink-0 flex-wrap">
+        <div className="grid grid-cols-3 sm:flex items-center gap-2 shrink-0">
           {onNewTransmittal && (
             <button
               onClick={onNewTransmittal}
-              className="bg-white border border-border-slate text-on-surface-variant hover:bg-surface-container-low px-3 sm:px-4 py-2 rounded-lg flex items-center gap-2 text-[14px] font-medium transition-colors active:scale-[0.98]"
+              className="min-h-11 bg-white border border-border-slate text-on-surface-variant hover:bg-surface-container-low px-3 sm:px-4 py-2 rounded-lg flex items-center justify-center gap-2 text-[13px] font-medium transition-colors"
               title="New Transmittal"
             >
-              <span className="material-symbols-outlined text-[17px]">send</span>
-              <span className="hidden sm:inline">New Transmittal</span>
+              <span className="material-symbols-outlined text-[17px]" aria-hidden="true">send</span>
+              <span className="sm:hidden">Issue</span>
+              <span className="hidden sm:inline">Transmittal</span>
             </button>
           )}
           <button
             onClick={handleExport}
-            className="bg-white border border-border-slate text-on-surface-variant hover:bg-surface-container-low px-3 sm:px-4 py-2 rounded-lg flex items-center gap-2 text-[14px] font-medium transition-colors active:scale-[0.98]"
+            className="min-h-11 bg-white border border-border-slate text-on-surface-variant hover:bg-surface-container-low px-3 sm:px-4 py-2 rounded-lg flex items-center justify-center gap-2 text-[13px] font-medium transition-colors"
             title="Export"
           >
             <span className="material-symbols-outlined text-[17px]">ios_share</span>
-            <span className="hidden sm:inline">Export</span>
+            <span>Export</span>
           </button>
           {!isRestricted && (
             <button
               onClick={onNewEntry}
-              className="bg-primary text-white rounded-lg hover:bg-primary-container px-3 sm:px-4 py-2 font-medium flex items-center gap-2 text-[14px] transition-colors active:scale-[0.98]"
+              className="min-h-11 bg-primary text-white rounded-lg hover:bg-primary-container px-3 sm:px-4 py-2 font-medium flex items-center justify-center gap-2 text-[13px] transition-colors"
               title="Upload to Project"
             >
               <span className="material-symbols-outlined text-[17px]">upload</span>
-              <span className="hidden sm:inline">Upload to Project</span>
+              <span>Upload</span>
             </button>
           )}
         </div>
@@ -156,14 +157,14 @@ export default function MasterRegisterTable({
         <div className="relative flex-1 min-w-[140px] sm:min-w-[200px] max-w-xs">
           <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant text-[18px]">search</span>
           <input
-            className="w-full bg-surface-container-low border border-border-slate rounded-lg pl-9 pr-8 py-2 text-on-surface text-[14px] placeholder:text-on-surface-variant focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/20 transition-all"
+            className="w-full min-h-11 bg-surface-container-low border border-border-slate rounded-lg pl-9 pr-11 py-2 text-on-surface text-[14px] placeholder:text-on-surface-variant focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/20 transition-colors"
             placeholder="Search drawings…"
             type="text"
             value={search}
             onChange={e => onSearch?.(e.target.value)}
           />
           {search && (
-            <button onClick={() => onSearch?.("")} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-on-surface-variant hover:text-on-surface transition-colors" aria-label="Clear search">
+            <button onClick={() => onSearch?.("")} className="absolute right-0 top-1/2 -translate-y-1/2 mobile-touch-target grid place-items-center text-on-surface-variant hover:text-on-surface transition-colors" aria-label="Clear search">
               <span className="material-symbols-outlined text-[16px]">close</span>
             </button>
           )}
@@ -173,7 +174,7 @@ export default function MasterRegisterTable({
         <div className="relative">
           <button
             onClick={() => setDiscOpen(o => !o)}
-            className={`flex items-center gap-1.5 px-3 py-2 rounded-lg border text-[13px] font-medium transition-colors ${
+            className={`min-h-11 flex items-center gap-1.5 px-3 py-2 rounded-lg border text-[13px] font-medium transition-colors ${
               filterDisc !== "All"
                 ? "bg-primary/10 border-primary/30 text-primary"
                 : "bg-white border-border-slate text-on-surface-variant hover:bg-surface-container-low"
@@ -204,12 +205,12 @@ export default function MasterRegisterTable({
         </div>
 
         {/* Status pills */}
-        <div className="flex overflow-x-auto items-center gap-1.5 pb-1">
+        <div className="scrollbar-hide flex overflow-x-auto items-center gap-1.5 pb-1">
           {STATUS_FILTERS.map(pill => (
             <button
               key={pill.value}
               onClick={() => onFilterStat?.(pill.value)}
-              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-full border text-[11px] font-semibold whitespace-nowrap transition-colors ${
+              className={`min-h-11 flex items-center gap-1.5 px-3 py-2 rounded-full border text-[12px] font-semibold whitespace-nowrap transition-colors ${
                 filterStat === pill.value
                   ? "bg-primary/10 border-primary/30 text-primary"
                   : "bg-white border-border-slate text-on-surface-variant hover:bg-surface-container-low"
@@ -233,8 +234,34 @@ export default function MasterRegisterTable({
         )}
       </div>
 
-      {/* ── Table ── */}
-      <div className="bg-white border border-border-slate rounded-xl overflow-hidden">
+      {/* ── Phone card register ── */}
+      <div className="md:hidden space-y-3" aria-label="Drawing register results">
+        {loading ? (
+          Array.from({ length: 4 }).map((_, index) => <div key={index} className="h-44 rounded-xl border border-border-slate bg-surface animate-pulse" />)
+        ) : drawings.length === 0 ? (
+          <div className="workspace-panel min-h-52 flex flex-col items-center justify-center gap-3 p-6 text-center text-on-surface-variant">
+            <span className="material-symbols-outlined text-[36px]" aria-hidden="true">folder_open</span>
+            <p className="text-[14px]">{activeFilters > 0 ? "No drawings match your filters." : "No drawings uploaded yet."}</p>
+            {activeFilters > 0 && (
+              <button type="button" onClick={() => { onSearch?.(""); onFilterStat?.("All"); onFilterDisc?.("All"); }} className="min-h-11 px-4 rounded-md text-primary font-semibold">Clear filters</button>
+            )}
+          </div>
+        ) : drawings.map(drawing => (
+          <MobileDrawingCard
+            key={drawing.id}
+            drawing={drawing}
+            isRestricted={isRestricted}
+            onView={() => handleView(drawing)}
+            onDownload={() => handleDownload(drawing)}
+            onVoid={() => handleVoidClick(drawing)}
+          />
+        ))}
+
+        <MobilePagination page={page} total={total} totalPages={totalPages} shown={drawings.length} onPageChange={onPageChange} />
+      </div>
+
+      {/* ── Desktop table ── */}
+      <div className="hidden md:block bg-white border border-border-slate rounded-xl overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left min-w-[900px]">
 
@@ -425,16 +452,17 @@ function RowMenu({ d, isRestricted, onView, onDownload, onVoid }) {
       <button
         ref={btnRef}
         onClick={handleClick}
-        className="p-1.5 rounded-lg text-on-surface-variant hover:text-on-surface hover:bg-surface-container transition-colors"
+        className="mobile-touch-target grid place-items-center rounded-lg text-on-surface-variant hover:text-on-surface hover:bg-surface-container transition-colors"
         title="More actions"
+        aria-label={`More actions for ${d.number}`}
       >
         <MoreVertical size={15} />
       </button>
 
       {open && createPortal(
         <div
-          style={{ position: "fixed", top: menuPos.top, left: menuPos.left, zIndex: 9999 }}
-          className="w-44 bg-white border border-border-slate rounded-xl shadow-lg py-1 overflow-hidden"
+          style={{ position: "fixed", top: menuPos.top, left: menuPos.left }}
+          className="z-[400] w-44 bg-white border border-border-slate rounded-xl shadow-lg py-1 overflow-hidden"
         >
           <DropItem icon={<Eye size={14} />}      label="View"     onClick={() => { onView();     setOpen(false); }} disabled={!d.path} />
           <DropItem icon={<Download size={14} />} label="Download" onClick={() => { onDownload(); setOpen(false); }} disabled={!d.path} />
@@ -474,10 +502,58 @@ function PagBtn({ onClick, disabled, icon }) {
     <button
       onClick={onClick}
       disabled={disabled}
-      className="w-8 h-8 rounded-lg flex items-center justify-center bg-white border border-border-slate text-on-surface-variant hover:bg-surface-container-low disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+      className="w-11 h-11 rounded-lg flex items-center justify-center bg-white border border-border-slate text-on-surface-variant hover:bg-surface-container-low disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
     >
       <span className="material-symbols-outlined text-[18px]">{icon}</span>
     </button>
+  );
+}
+
+function MobileDrawingCard({ drawing, isRestricted, onView, onDownload, onVoid }) {
+  const status = STATUS_MAP[drawing.status] || { label: drawing.status, pillCls: "bg-surface-container text-on-surface-variant", dot: "bg-on-surface-variant" };
+  return (
+    <article className="workspace-panel p-4">
+      <div className="flex items-start gap-3">
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <h2 className="font-mono text-[14px] font-semibold text-primary break-all">{drawing.number}</h2>
+            <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold ${status.pillCls}`}>
+              <span className={`h-1.5 w-1.5 rounded-full ${status.dot}`} />
+              {status.label}
+            </span>
+          </div>
+          <p className="mt-2 text-[15px] font-semibold leading-5 text-on-surface">{drawing.title || "Untitled drawing"}</p>
+        </div>
+        <RowMenu d={drawing} isRestricted={isRestricted} onView={onView} onDownload={onDownload} onVoid={onVoid} />
+      </div>
+
+      <dl className="mt-4 grid grid-cols-2 gap-x-4 gap-y-3 text-[12px] tabular-data">
+        <div><dt className="text-on-surface-variant">Drawing type</dt><dd className="mt-0.5 font-medium text-on-surface">{drawing.discipline || "—"}</dd></div>
+        <div><dt className="text-on-surface-variant">Revision</dt><dd className="mt-0.5 font-mono font-semibold text-on-surface">Rev {drawing.rev || "—"}</dd></div>
+        <div><dt className="text-on-surface-variant">Issue date</dt><dd className="mt-0.5 text-on-surface">{drawing.issueDate || "—"}</dd></div>
+        <div><dt className="text-on-surface-variant">Originator</dt><dd className="mt-0.5 truncate text-on-surface">{drawing.originator || "—"}</dd></div>
+      </dl>
+
+      <div className="mt-4 grid grid-cols-2 gap-2 border-t border-border-slate pt-3">
+        <button type="button" disabled={!drawing.path} onClick={onView} className="min-h-11 rounded-md border border-border-slate text-[13px] font-semibold text-on-surface disabled:opacity-40">Open</button>
+        <button type="button" disabled={!drawing.path} onClick={onDownload} className="min-h-11 rounded-md border border-border-slate text-[13px] font-semibold text-on-surface disabled:opacity-40">Download</button>
+      </div>
+    </article>
+  );
+}
+
+function MobilePagination({ page, total, totalPages, shown, onPageChange }) {
+  return (
+    <div className="flex items-center justify-between gap-3 py-2">
+      <p className="text-[12px] text-on-surface-variant tabular-data">{shown ? `${(page - 1) * 8 + 1}–${(page - 1) * 8 + shown} of ${total}` : "No results"}</p>
+      {totalPages > 1 && (
+        <div className="flex items-center gap-2">
+          <PagBtn onClick={() => onPageChange?.(page - 1)} disabled={page <= 1} icon="chevron_left" />
+          <span className="min-w-14 text-center text-[12px] font-semibold text-on-surface tabular-data">{page} / {totalPages}</span>
+          <PagBtn onClick={() => onPageChange?.(page + 1)} disabled={page >= totalPages} icon="chevron_right" />
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -500,7 +576,7 @@ function TypeItem({ label, active, onClick, isGroup = false, indent = false }) {
         : <span className={`material-symbols-outlined text-[13px] text-primary ${active ? "opacity-100" : "opacity-0"}`}>check</span>
       }
       {label}
-      {isGroup && !active && <span className="ml-auto text-[9px] text-outline uppercase tracking-wider">all</span>}
+      {isGroup && !active && <span className="ml-auto text-[10px] text-outline uppercase tracking-wider">all</span>}
     </button>
   );
 }

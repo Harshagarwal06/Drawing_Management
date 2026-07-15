@@ -6,7 +6,7 @@ import FolderPicker from "./FolderPicker";
 import useModalClose from "./useModalClose";
 
 export default function MoveFolderModal({ drawing, token, tree, onSuccess, onClose }) {
-  const { handleBackdrop } = useModalClose(onClose);
+  const { handleBackdrop, panelRef } = useModalClose(onClose);
   const [selectedPath, setSelectedPath] = useState(drawing.folderPath ?? "");
   const [loading, setLoading] = useState(false);
   const [error,   setError]   = useState("");
@@ -34,14 +34,14 @@ export default function MoveFolderModal({ drawing, token, tree, onSuccess, onClo
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[9990] flex items-center justify-center p-4"
-      style={{ background: "rgba(0,0,0,0.45)" }}
+      className="fixed inset-0 z-[400] flex items-center justify-center p-4"
+      style={{ background: "var(--color-scrim)" }}
       onClick={handleBackdrop}
       role="dialog"
       aria-modal="true"
       aria-label="Move to folder"
     >
-      <div className="bg-white rounded-2xl shadow-xl border border-border-slate w-full max-w-sm overflow-hidden flex flex-col max-h-[80vh]">
+      <div ref={panelRef} className="bg-white rounded-2xl shadow-xl border border-border-slate w-full max-w-sm overflow-hidden flex flex-col max-h-[80dvh]">
         <div className="h-1 bg-primary shrink-0" />
         <div className="px-6 py-4 border-b border-border-slate shrink-0">
           <h2 className="text-[15px] font-semibold text-on-surface">Move to Folder</h2>

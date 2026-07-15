@@ -1,7 +1,8 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { X, Search, Send, Loader2, Plus, UserPlus } from "lucide-react";
 import FieldLabel from "./FieldLabel";
 import { TRANSMITTAL_PURPOSES } from "../constants";
+import useModalClose from "./documents/useModalClose";
 
 const STATUS_PILL = {
   S3:   { bg: "bg-status-emerald-bg", text: "text-status-emerald-text" },
@@ -13,11 +14,7 @@ const STATUS_PILL = {
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export default function TransmittalModal({ drawings, onClose, onSubmit }) {
-  useEffect(() => {
-    const h = e => { if (e.key === "Escape") onClose(); };
-    document.addEventListener("keydown", h);
-    return () => document.removeEventListener("keydown", h);
-  }, [onClose]);
+  const { handleBackdrop, panelRef } = useModalClose(onClose);
   const [selectedDrawings,   setSelectedDrawings]   = useState([]);
   const [selectedRecipients, setSelectedRecipients] = useState([]);
   const [recipientName,      setRecipientName]      = useState("");
@@ -77,8 +74,8 @@ export default function TransmittalModal({ drawings, onClose, onSubmit }) {
   const fieldBorder = key => errors[key] ? "border-status-rose-text" : "border-border-slate";
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.3)" }} onClick={e => { if (e.target === e.currentTarget) onClose(); }} role="dialog" aria-modal="true" aria-label="Create transmittal">
-      <div className="modal-enter bg-white rounded-2xl shadow-xl border border-border-slate w-full max-w-3xl overflow-hidden flex flex-col" style={{ maxHeight: "92vh" }}>
+    <div className="fixed inset-0 z-[400] flex items-center justify-center p-4" style={{ background: "var(--color-scrim)" }} onClick={handleBackdrop} role="dialog" aria-modal="true" aria-label="Create transmittal">
+      <div ref={panelRef} className="modal-enter bg-white rounded-2xl shadow-xl border border-border-slate w-full max-w-3xl max-h-[92dvh] overflow-hidden flex flex-col">
 
         {/* Header */}
         <div className="px-6 py-4 flex items-center justify-between shrink-0 bg-surface-container-low border-b border-border-slate">
@@ -86,14 +83,14 @@ export default function TransmittalModal({ drawings, onClose, onSubmit }) {
             <h2 className="text-[16px] font-semibold text-on-surface">Create Transmittal</h2>
             <p className="text-[12px] text-on-surface-variant mt-0.5">Issue drawings to project recipients</p>
           </div>
-          <button onClick={onClose} className="p-1.5 rounded-lg text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-colors" aria-label="Close">
+          <button onClick={onClose} className="mobile-touch-target grid place-items-center rounded-lg text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-colors" aria-label="Close">
             <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* Body */}
         <form onSubmit={handleSubmit} className="overflow-y-auto flex-1">
-          <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="p-4 sm:p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
 
             {/* LEFT — Drawing selection */}
             <div className="flex flex-col gap-3">
@@ -106,7 +103,7 @@ export default function TransmittalModal({ drawings, onClose, onSubmit }) {
                     placeholder="Filter drawings…"
                     value={drawingSearch}
                     onChange={e => setDrawingSearch(e.target.value)}
-                    className="text-[13px] flex-1 outline-none bg-transparent text-on-surface placeholder:text-on-surface-variant"
+                    className="min-h-11 text-[13px] flex-1 outline-none bg-transparent text-on-surface placeholder:text-on-surface-variant"
                   />
                   {selectedDrawings.length > 0 && (
                     <span className="text-[11px] font-semibold text-primary bg-primary/10 px-1.5 py-0.5 rounded-full shrink-0">
@@ -125,7 +122,7 @@ export default function TransmittalModal({ drawings, onClose, onSubmit }) {
                     return (
                       <label
                         key={d.id}
-                        className={`flex items-start gap-3 px-3 py-2.5 cursor-pointer border-b border-border-slate last:border-0 transition-colors ${
+                        className={`min-h-11 flex items-start gap-3 px-3 py-2.5 cursor-pointer border-b border-border-slate last:border-0 transition-colors ${
                           checked ? "bg-primary/5" : "hover:bg-surface-container-low"
                         }`}
                       >
@@ -151,10 +148,10 @@ export default function TransmittalModal({ drawings, onClose, onSubmit }) {
                 {/* Footer */}
                 <div className="flex items-center gap-3 px-3 py-2 border-t border-border-slate bg-surface-container-low">
                   <button type="button" onClick={() => { setSelectedDrawings(drawings.map(d => d.id)); setErrors(e => ({ ...e, drawings: "" })); }}
-                    className="text-[12px] text-primary hover:underline font-medium">Select all</button>
+                    className="min-h-11 text-[12px] text-primary hover:underline font-medium">Select all</button>
                   <span className="text-on-surface-variant text-[12px]">·</span>
                   <button type="button" onClick={() => setSelectedDrawings([])}
-                    className="text-[12px] text-on-surface-variant hover:underline">Clear</button>
+                    className="min-h-11 text-[12px] text-on-surface-variant hover:underline">Clear</button>
                 </div>
               </div>
               {errMsg("drawings")}
@@ -172,14 +169,14 @@ export default function TransmittalModal({ drawings, onClose, onSubmit }) {
                   <div className="flex flex-wrap gap-1.5 mb-2">
                     {selectedRecipients.map((r, i) => (
                       <span key={i} className="inline-flex items-center gap-1.5 bg-primary/10 text-primary text-[12px] font-medium px-2.5 py-1 rounded-full border border-primary/20">
-                        <span className="w-4 h-4 rounded-full bg-primary text-white flex items-center justify-center text-[8px] font-bold shrink-0">
+                        <span className="w-4 h-4 rounded-full bg-primary text-white flex items-center justify-center text-[10px] font-bold shrink-0">
                           {r.name.charAt(0).toUpperCase()}
                         </span>
                         <span className="max-w-[160px] truncate">{r.name} &lt;{r.email}&gt;</span>
                         <button
                           type="button"
                           onClick={() => removeRecipient(i)}
-                          className="ml-0.5 text-primary/60 hover:text-primary leading-none"
+                          className="mobile-touch-target grid place-items-center ml-0.5 text-primary/60 hover:text-primary leading-none"
                           aria-label="Remove recipient"
                         >×</button>
                       </span>
@@ -189,7 +186,7 @@ export default function TransmittalModal({ drawings, onClose, onSubmit }) {
 
                 {/* Input row */}
                 <div className={`border rounded-xl overflow-hidden ${errors.recipients ? "border-status-rose-text" : "border-border-slate"}`}>
-                  <div className="flex items-center gap-0 divide-x divide-border-slate">
+                  <div className="flex flex-col sm:flex-row items-stretch gap-0 divide-y sm:divide-y-0 sm:divide-x divide-border-slate">
                     <div className="flex items-center gap-2 px-3 py-2 flex-1 min-w-0">
                       <UserPlus className="w-3.5 h-3.5 text-on-surface-variant shrink-0" />
                       <input
@@ -214,7 +211,7 @@ export default function TransmittalModal({ drawings, onClose, onSubmit }) {
                     <button
                       type="button"
                       onClick={addRecipient}
-                      className="px-3 py-2 bg-primary/10 hover:bg-primary/20 text-primary transition-colors shrink-0 flex items-center gap-1.5"
+                      className="min-h-11 px-3 py-2 bg-primary/10 hover:bg-primary/20 text-primary transition-colors shrink-0 flex items-center justify-center gap-1.5"
                     >
                       <Plus className="w-3.5 h-3.5" />
                       <span className="text-[12px] font-semibold hidden sm:inline">Add</span>
@@ -258,24 +255,24 @@ export default function TransmittalModal({ drawings, onClose, onSubmit }) {
               {(selectedDrawings.length > 0 || selectedRecipients.length > 0 || purpose) && (
                 <div className="bg-primary/5 border border-primary/20 rounded-xl p-3 text-[12px] text-primary space-y-1">
                   <p className="font-semibold text-[13px] mb-1.5">Transmittal Summary</p>
-                  {selectedDrawings.length > 0  && <p>📐 <span className="font-medium">{selectedDrawings.length}</span> drawing{selectedDrawings.length !== 1 ? "s" : ""} selected</p>}
-                  {selectedRecipients.length > 0 && <p>👥 <span className="font-medium">{selectedRecipients.length}</span> recipient{selectedRecipients.length !== 1 ? "s" : ""}</p>}
-                  {purpose && <p>📋 Purpose: <span className="font-medium">{purpose}</span></p>}
+                  {selectedDrawings.length > 0  && <p><span className="font-medium">{selectedDrawings.length}</span> drawing{selectedDrawings.length !== 1 ? "s" : ""} selected</p>}
+                  {selectedRecipients.length > 0 && <p><span className="font-medium">{selectedRecipients.length}</span> recipient{selectedRecipients.length !== 1 ? "s" : ""}</p>}
+                  {purpose && <p>Purpose: <span className="font-medium">{purpose}</span></p>}
                 </div>
               )}
             </div>
           </div>
 
           {/* Footer */}
-          <div className="px-6 py-4 border-t border-border-slate bg-surface-container-low flex items-center justify-between gap-3 shrink-0">
+          <div className="sticky bottom-0 px-4 sm:px-6 py-4 border-t border-border-slate bg-surface-container-low flex items-center justify-between gap-3 shrink-0 safe-bottom">
             <p className="text-[12px] text-on-surface-variant hidden sm:block">A PDF cover sheet will be generated &amp; emailed to recipients.</p>
             <div className="flex items-center gap-2 ml-auto">
               <button type="button" onClick={onClose}
-                className="bg-white border border-border-slate text-on-surface-variant hover:bg-surface-container px-4 py-2 rounded-lg text-[14px] font-medium transition-colors">
+                className="min-h-11 bg-white border border-border-slate text-on-surface-variant hover:bg-surface-container px-4 py-2 rounded-lg text-[14px] font-medium transition-colors">
                 Cancel
               </button>
               <button type="submit" disabled={submitting}
-                className="bg-primary text-white rounded-lg hover:bg-primary-container px-5 py-2 font-medium text-[14px] flex items-center gap-2 disabled:opacity-60 transition-colors">
+                className="min-h-11 bg-primary text-white rounded-lg hover:bg-primary-container px-5 py-2 font-medium text-[14px] flex items-center gap-2 disabled:opacity-60 transition-colors whitespace-nowrap">
                 {submitting
                   ? <><Loader2 className="w-4 h-4 animate-spin" />Sending…</>
                   : <><Send className="w-4 h-4" />Send Transmittal</>}

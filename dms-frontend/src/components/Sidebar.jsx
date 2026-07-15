@@ -1,3 +1,4 @@
+import { useEffect, useRef } from "react";
 import { NavLink } from "react-router-dom";
 
 const DIRECTOR_NAV = [
@@ -18,6 +19,43 @@ export default function Sidebar({
   onMobileClose = () => {},
 }) {
   const navItems = isDirector ? DIRECTOR_NAV : RESTRICTED_NAV;
+  const closeRef = useRef(null);
+  const panelRef = useRef(null);
+  const openerRef = useRef(null);
+
+  useEffect(() => {
+    if (!mobileOpen) return undefined;
+    openerRef.current = document.activeElement;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    closeRef.current?.focus();
+    const onKeyDown = event => {
+      if (event.key === "Escape") {
+        onMobileClose();
+        return;
+      }
+      if (event.key !== "Tab") return;
+      const focusable = [...(panelRef.current?.querySelectorAll(
+        'a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])'
+      ) ?? [])];
+      if (!focusable.length) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", onKeyDown);
+      openerRef.current?.focus();
+    };
+  }, [mobileOpen, onMobileClose]);
 
   return (
     <>
@@ -26,17 +64,19 @@ export default function Sidebar({
         <div
           className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 md:hidden"
           onClick={onMobileClose}
+          aria-hidden="true"
         />
       )}
 
       {/* ── Sidebar panel ── */}
       <aside
+        ref={panelRef}
         className={`
-          flex flex-col h-screen bg-surface border-r border-border-slate w-[280px]
-          fixed left-0 top-0 z-50 p-4 gap-2
-          transition-transform duration-300 ease-in-out
-          ${mobileOpen ? "translate-x-0" : "-translate-x-full"}
-          md:translate-x-0
+          flex flex-col h-[100dvh] bg-surface border-r border-border-slate w-[280px]
+          fixed left-0 top-0 z-[400] p-4 gap-2 safe-top safe-bottom
+          transition-transform duration-300
+          ${mobileOpen ? "visible translate-x-0" : "invisible -translate-x-full"}
+          md:visible md:translate-x-0
         `}
       >
         {/* Logo + close button on mobile */}
@@ -48,11 +88,12 @@ export default function Sidebar({
           />
           {/* Close button — mobile only */}
           <button
+            ref={closeRef}
             onClick={onMobileClose}
-            className="md:hidden p-1.5 rounded-lg text-on-surface-variant hover:bg-surface-container transition-colors shrink-0"
+            className="mobile-touch-target md:hidden grid place-items-center rounded-lg text-on-surface-variant hover:bg-surface-container transition-colors shrink-0"
             aria-label="Close navigation"
           >
-            <span className="material-symbols-outlined text-[20px]">close</span>
+            <span className="material-symbols-outlined text-[20px]" aria-hidden="true">close</span>
           </button>
         </div>
 
@@ -64,7 +105,7 @@ export default function Sidebar({
               to={path}
               onClick={onMobileClose}
               className={({ isActive }) =>
-                `w-full flex items-center gap-3 px-4 py-3 rounded-lg text-[14px] transition-all duration-200 text-left no-underline ${
+                `w-full min-h-11 flex items-center gap-3 px-4 py-3 rounded-lg text-[14px] transition-colors duration-200 text-left no-underline ${
                   isActive
                     ? "text-primary font-bold bg-primary/10"
                     : "text-on-surface-variant font-medium hover:bg-surface-container"
@@ -76,6 +117,7 @@ export default function Sidebar({
                   <span
                     className="material-symbols-outlined text-[20px]"
                     style={isActive ? { fontVariationSettings: "'FILL' 1" } : undefined}
+                    aria-hidden="true"
                   >
                     {icon}
                   </span>
@@ -96,7 +138,7 @@ export default function Sidebar({
             to="/settings"
             onClick={onMobileClose}
             className={({ isActive }) =>
-              `w-full flex items-center gap-3 px-4 py-3 rounded-lg text-[14px] transition-all no-underline ${
+              `w-full min-h-11 flex items-center gap-3 px-4 py-3 rounded-lg text-[14px] transition-colors no-underline ${
                 isActive
                   ? "text-primary font-bold bg-primary/10"
                   : "text-on-surface-variant font-medium hover:bg-surface-container"
@@ -108,6 +150,7 @@ export default function Sidebar({
                 <span
                   className="material-symbols-outlined text-[20px]"
                   style={isActive ? { fontVariationSettings: "'FILL' 1" } : undefined}
+                  aria-hidden="true"
                 >
                   settings
                 </span>

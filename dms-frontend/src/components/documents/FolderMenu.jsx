@@ -16,8 +16,10 @@ export default function FolderMenu({ onAdd, onRename, onMove, onDelete }) {
         btnRef.current  && !btnRef.current.contains(e.target)
       ) setOpen(false);
     };
+    const onKeyDown = event => { if (event.key === "Escape") setOpen(false); };
     document.addEventListener("mousedown", close);
-    return () => document.removeEventListener("mousedown", close);
+    window.addEventListener("keydown", onKeyDown);
+    return () => { document.removeEventListener("mousedown", close); window.removeEventListener("keydown", onKeyDown); };
   }, [open]);
 
   const toggle = e => {
@@ -34,7 +36,7 @@ export default function FolderMenu({ onAdd, onRename, onMove, onDelete }) {
       <button
         ref={btnRef}
         onClick={toggle}
-        className="p-1.5 rounded-lg hover:bg-black/8 transition-colors opacity-0 group-hover:opacity-100 shrink-0"
+        className="mobile-touch-target grid place-items-center rounded-lg hover:bg-surface-container transition-colors opacity-100 md:opacity-0 md:group-hover:opacity-100 md:group-focus-within:opacity-100 shrink-0"
         aria-label="Folder actions"
       >
         <MoreVertical size={14} className="text-on-surface-variant" />
@@ -43,25 +45,25 @@ export default function FolderMenu({ onAdd, onRename, onMove, onDelete }) {
       {open && createPortal(
         <div
           ref={menuRef}
-          style={{ position: "fixed", top: pos.top, left: pos.left, zIndex: 9999 }}
-          className="w-44 bg-white border border-border-slate rounded-xl shadow-lg py-1 overflow-hidden"
+          style={{ position: "fixed", top: pos.top, left: pos.left }}
+          className="z-[400] w-44 bg-white border border-border-slate rounded-xl shadow-lg py-1 overflow-hidden"
           onClick={e => e.stopPropagation()}
         >
           {onAdd && (
             <button onClick={() => { onAdd(); setOpen(false); }}
-              className="w-full flex items-center gap-2 px-3 py-2 text-[12px] font-medium text-on-surface-variant hover:bg-surface-container-low transition-colors">
+              className="w-full min-h-11 flex items-center gap-2 px-3 py-2 text-[12px] font-medium text-on-surface-variant hover:bg-surface-container-low transition-colors">
               <FolderPlus size={13} /> Add subfolder
             </button>
           )}
           {onRename && (
             <button onClick={() => { onRename(); setOpen(false); }}
-              className="w-full flex items-center gap-2 px-3 py-2 text-[12px] font-medium text-on-surface-variant hover:bg-surface-container-low transition-colors">
+              className="w-full min-h-11 flex items-center gap-2 px-3 py-2 text-[12px] font-medium text-on-surface-variant hover:bg-surface-container-low transition-colors">
               <Pencil size={13} /> Rename
             </button>
           )}
           {onMove && (
             <button onClick={() => { onMove(); setOpen(false); }}
-              className="w-full flex items-center gap-2 px-3 py-2 text-[12px] font-medium text-on-surface-variant hover:bg-surface-container-low transition-colors">
+              className="w-full min-h-11 flex items-center gap-2 px-3 py-2 text-[12px] font-medium text-on-surface-variant hover:bg-surface-container-low transition-colors">
               <FolderInput size={13} /> Move to Folder
             </button>
           )}
@@ -69,7 +71,7 @@ export default function FolderMenu({ onAdd, onRename, onMove, onDelete }) {
             <>
               <div className="h-px bg-border-slate mx-2 my-1" />
               <button onClick={() => { onDelete(); setOpen(false); }}
-                className="w-full flex items-center gap-2 px-3 py-2 text-[12px] font-medium text-status-rose-text hover:bg-status-rose-bg transition-colors">
+                className="w-full min-h-11 flex items-center gap-2 px-3 py-2 text-[12px] font-medium text-status-rose-text hover:bg-status-rose-bg transition-colors">
                 <Trash2 size={13} /> Delete
               </button>
             </>

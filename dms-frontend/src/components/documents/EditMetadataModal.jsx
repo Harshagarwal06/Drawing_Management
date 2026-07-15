@@ -5,7 +5,7 @@ import { API } from "./constants";
 import useModalClose from "./useModalClose";
 
 export default function EditMetadataModal({ drawing, token, onSuccess, onClose }) {
-  const { handleBackdrop } = useModalClose(onClose);
+  const { handleBackdrop, panelRef } = useModalClose(onClose);
   const knownDisciplines = ["Architecture", "Structure", "Electrical", "Plumbing", "Fire", "HVAC", "Civil", "Interior"];
   const initIsOther      = !!drawing.discipline && !knownDisciplines.includes(drawing.discipline);
   const [number,           setNumber]           = useState(drawing.number     ?? "");
@@ -40,14 +40,14 @@ export default function EditMetadataModal({ drawing, token, onSuccess, onClose }
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[9990] flex items-center justify-center p-4"
-      style={{ background: "rgba(0,0,0,0.45)" }}
+      className="fixed inset-0 z-[400] flex items-center justify-center p-4"
+      style={{ background: "var(--color-scrim)" }}
       onClick={handleBackdrop}
       role="dialog"
       aria-modal="true"
       aria-label="Edit metadata"
     >
-      <div className="bg-white rounded-2xl shadow-xl border border-border-slate w-full max-w-lg overflow-hidden">
+      <div ref={panelRef} className="bg-white rounded-2xl shadow-xl border border-border-slate w-full max-w-lg overflow-hidden">
         <div className="h-1 bg-primary" />
         <div className="px-6 py-4 border-b border-border-slate">
           <h2 className="text-[15px] font-semibold text-on-surface">Edit Metadata</h2>

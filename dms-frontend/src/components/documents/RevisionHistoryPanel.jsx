@@ -7,7 +7,7 @@ import { API, resolveUrl, STATUS_PILL, STATUS_LABEL } from "./constants";
 if (!document.getElementById("dms-slide-right")) {
   const s = document.createElement("style");
   s.id = "dms-slide-right";
-  s.textContent = `@keyframes slideInRight { from { transform: translateX(100%); } to { transform: translateX(0); } }`;
+  s.textContent = `@keyframes slideInRight { from { transform: translateX(100%); } to { transform: translateX(0); } } @media (prefers-reduced-motion: reduce) { .revision-history-panel { animation: none !important; } }`;
   document.head.appendChild(s);
 }
 
@@ -44,12 +44,13 @@ export default function RevisionHistoryPanel({ drawing, token, onClose }) {
   return createPortal(
     <>
       <div
-        className="fixed inset-0 z-[9988] bg-black/30 backdrop-blur-[2px]"
+        className="fixed inset-0 z-[399] backdrop-blur-[2px]"
+        style={{ background: "var(--color-scrim)" }}
         onClick={onClose}
       />
 
-      <div className="fixed inset-y-0 right-0 z-[9989] w-full max-w-md bg-white border-l border-border-slate shadow-2xl flex flex-col animate-in slide-in-from-right"
-           style={{ animation: "slideInRight .2s ease-out" }}
+      <div className="revision-history-panel fixed inset-y-0 right-0 z-[400] h-[100dvh] w-full max-w-md bg-white border-l border-border-slate shadow-2xl flex flex-col safe-top safe-bottom"
+           style={{ animation: "slideInRight var(--dur-short) var(--ease-out)" }}
       >
         <div className="shrink-0 border-b border-border-slate px-5 py-4">
           <div className="flex items-center justify-between mb-1">
@@ -59,7 +60,8 @@ export default function RevisionHistoryPanel({ drawing, token, onClose }) {
             </h2>
             <button
               onClick={onClose}
-              className="p-1.5 rounded-lg text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-colors"
+              className="mobile-touch-target grid place-items-center rounded-lg text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-colors"
+              aria-label="Close revision history"
             >
               <X size={16} />
             </button>
@@ -136,17 +138,17 @@ export default function RevisionHistoryPanel({ drawing, token, onClose }) {
                             </span>
 
                             {isCurrent ? (
-                              <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider bg-status-emerald-bg text-status-emerald-text border border-status-emerald-text/20">
+                              <span className="px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-status-emerald-bg text-status-emerald-text border border-status-emerald-text/20">
                                 ✓ Current
                               </span>
                             ) : (
-                              <span className="px-1.5 py-0.5 rounded text-[9px] font-semibold uppercase tracking-wider bg-amber-50 text-amber-700 border border-amber-200">
+                              <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider bg-amber-50 text-amber-700 border border-amber-200">
                                 Superseded
                               </span>
                             )}
 
                             {rev.status && (
-                              <span className={`px-1.5 py-0.5 rounded-full text-[9px] font-semibold ${statusPill}`}>
+                              <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-semibold ${statusPill}`}>
                                 {statusLabel}
                               </span>
                             )}
@@ -170,14 +172,14 @@ export default function RevisionHistoryPanel({ drawing, token, onClose }) {
                                 href={resolveUrl(rev.path)}
                                 target="_blank"
                                 rel="noreferrer"
-                                className="flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium text-on-surface-variant hover:text-primary hover:bg-surface-container transition-colors"
+                                className="min-h-11 flex items-center gap-1 px-3 py-2 rounded-md text-[12px] font-medium text-on-surface-variant hover:text-primary hover:bg-surface-container transition-colors"
                               >
                                 <Eye size={12} /> View
                               </a>
                               <a
                                 href={resolveUrl(rev.path)}
                                 download={`${drawing.number}_Rev${rev.rev || "X"}.${ext.toLowerCase()}`}
-                                className="flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium text-on-surface-variant hover:text-primary hover:bg-surface-container transition-colors"
+                                className="min-h-11 flex items-center gap-1 px-3 py-2 rounded-md text-[12px] font-medium text-on-surface-variant hover:text-primary hover:bg-surface-container transition-colors"
                               >
                                 <Download size={12} /> Download
                               </a>

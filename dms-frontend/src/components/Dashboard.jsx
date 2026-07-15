@@ -4,10 +4,10 @@ import { useNavigate } from "react-router-dom";
 const API = import.meta.env.VITE_API_URL;
 
 const STATUS_META = {
-  S3:   { label: "For Construction", color: "#059669" },
-  S2:   { label: "For Approval",     color: "#d97706" },
-  S1:   { label: "For Information",  color: "#2563eb" },
-  VOID: { label: "Void",             color: "#dc2626" },
+  S3:   { label: "For Construction", color: "oklch(0.535 0.140 158)" },
+  S2:   { label: "For Approval",     color: "oklch(0.650 0.145 70)" },
+  S1:   { label: "For Information",  color: "oklch(0.570 0.170 252)" },
+  VOID: { label: "Void",             color: "oklch(0.550 0.190 25)" },
 };
 
 const STATUS_DISPLAY = {
@@ -75,7 +75,7 @@ export default function Dashboard({
     .slice(0, 5);
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6 md:space-y-8">
       {/* Page Header */}
       <div>
         <h2 className="font-semibold text-[22px] md:text-headline-lg text-on-surface">Project Dashboard</h2>
@@ -83,7 +83,7 @@ export default function Dashboard({
       </div>
 
       {/* Metric Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
         <MetricCard
           icon="architecture"
           title="TOTAL DRAWINGS"
@@ -127,13 +127,13 @@ export default function Dashboard({
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
 
         {/* Chart (Discipline Breakdown) */}
-        <div className="lg:col-span-8 bg-white border border-border-slate rounded-xl p-8 flex flex-col lg:h-[460px]">
-          <div className="flex justify-between items-center mb-8">
+        <div className="lg:col-span-8 bg-white border border-border-slate rounded-xl p-4 md:p-8 flex flex-col lg:h-[460px]">
+          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4 mb-6 md:mb-8">
             <div>
               <h4 className="font-headline-md text-headline-md text-on-surface">Drawings by Discipline</h4>
               <p className="font-body-sm text-on-surface-variant">Status breakdown per drawing type.</p>
             </div>
-            <div className="flex gap-2 flex-wrap justify-end">
+            <div className="grid grid-cols-2 sm:flex gap-2 flex-wrap">
               {Object.entries(STATUS_META).map(([code, { label, color }]) => (
                 <div key={code} className="flex items-center gap-2">
                   <div className="w-3 h-3 rounded-full" style={{ backgroundColor: color }} />
@@ -151,15 +151,15 @@ export default function Dashboard({
           ) : (
             <div className="flex-1 min-h-0 overflow-y-auto custom-scrollbar space-y-4">
               {discEntries.map(([disc, counts]) => (
-                <div key={disc} className="flex items-center gap-4">
-                  <span className="font-label-sm text-[12px] text-on-surface-variant w-32 shrink-0 truncate" title={disc}>{disc}</span>
+                <div key={disc} className="grid grid-cols-[5rem_1fr_2rem] sm:grid-cols-[8rem_1fr_2rem] items-center gap-3 sm:gap-4">
+                  <span className="font-label-sm text-[12px] text-on-surface-variant truncate" title={disc}>{disc}</span>
                   <div className="flex-1 flex h-6 rounded-md overflow-hidden bg-surface-container">
                     {Object.entries(STATUS_META).map(([code, { color }]) =>
                       counts[code] > 0 ? (
                         <div
                           key={code}
                           title={`${STATUS_META[code].label}: ${counts[code]}`}
-                          className="h-full transition-all"
+                          className="h-full"
                           style={{ width: `${(counts[code] / maxTotal) * 100}%`, backgroundColor: color, opacity: 0.85 }}
                         />
                       ) : null
@@ -238,7 +238,33 @@ export default function Dashboard({
             View Register
           </button>
         </div>
-        <div className="overflow-x-auto">
+        <div className="md:hidden divide-y divide-border-slate">
+          {latestDrawings.length === 0 ? (
+            <div className="flex flex-col items-center justify-center h-32 gap-3 text-on-surface-variant">
+              <span className="material-symbols-outlined text-[36px] opacity-25">folder_open</span>
+              <p className="font-body-sm text-body-sm">No drawings uploaded yet.</p>
+            </div>
+          ) : latestDrawings.map(drawing => {
+            const status = STATUS_DISPLAY[drawing.status] || { label: drawing.status, textCls: "text-on-surface-variant", bgCls: "bg-surface-container" };
+            return (
+              <article key={drawing.id} className="p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="font-mono text-[13px] font-semibold text-primary break-all">{drawing.number}</p>
+                    <h5 className="mt-1 text-[14px] font-semibold leading-5 text-on-surface">{drawing.title || "Untitled"}</h5>
+                  </div>
+                  <span className={`shrink-0 px-2.5 py-1 rounded-full text-[10px] font-semibold ${status.bgCls} ${status.textCls}`}>{status.label}</span>
+                </div>
+                <div className="mt-3 flex items-center gap-3 text-[12px] text-on-surface-variant tabular-data">
+                  <span className="font-mono text-on-surface">Rev {drawing.rev}</span>
+                  <span aria-hidden="true">·</span>
+                  <span>{drawing.issueDate ?? "No issue date"}</span>
+                </div>
+              </article>
+            );
+          })}
+        </div>
+        <div className="hidden md:block overflow-x-auto">
           {latestDrawings.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-32 gap-3 text-on-surface-variant">
               <span className="material-symbols-outlined text-[36px] opacity-25">folder_open</span>
@@ -280,7 +306,7 @@ export default function Dashboard({
 function MetricCard({ icon, badge, title, value, sub, iconBg, iconColor, onClick }) {
   return (
     <div
-      className={`bg-white border border-border-slate p-5 rounded-xl shadow-card hover:shadow-card-md transition-shadow duration-200 flex items-start gap-4 ${onClick ? "cursor-pointer focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 outline-none" : ""}`}
+      className={`bg-white border border-border-slate min-h-[132px] p-3 sm:p-5 rounded-xl shadow-card flex flex-col sm:flex-row items-start gap-3 sm:gap-4 ${onClick ? "cursor-pointer focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 outline-none" : ""}`}
       onClick={onClick}
       role={onClick ? "button" : undefined}
       tabIndex={onClick ? 0 : undefined}
@@ -290,14 +316,14 @@ function MetricCard({ icon, badge, title, value, sub, iconBg, iconColor, onClick
         <span className="material-symbols-outlined text-[22px]" style={{ fontVariationSettings: "'FILL' 0" }}>{icon}</span>
       </div>
       <div className="min-w-0">
-        <p className="font-label-sm text-[11px] text-on-surface-variant uppercase tracking-wider truncate">{title}</p>
+        <p className="font-label-sm text-[10px] sm:text-[11px] text-on-surface-variant uppercase tracking-wider line-clamp-2">{title}</p>
         <div className="flex items-center gap-2 mt-0.5">
           <h3 className="font-headline-md text-headline-md text-on-surface font-bold">{value}</h3>
           {badge && (
             <span className={`px-2 py-0.5 rounded-full font-label-sm text-[10px] ${badge.cls}`}>{badge.label}</span>
           )}
         </div>
-        {sub && <p className="font-body-sm text-[11px] text-on-surface-variant mt-0.5 truncate">{sub}</p>}
+        {sub && <p className="font-body-sm text-[11px] text-on-surface-variant mt-0.5 line-clamp-2">{sub}</p>}
       </div>
     </div>
   );

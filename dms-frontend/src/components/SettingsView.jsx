@@ -1,6 +1,8 @@
 import { useState, useEffect, useLayoutEffect, useRef, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { MoreVertical, KeyRound, UserX, Trash2, X, RotateCcw } from "lucide-react";
+import { isStandaloneMode } from "../pwa/install";
+import useModalClose from "./documents/useModalClose";
 
 const API = import.meta.env.VITE_API_URL;
 
@@ -19,7 +21,7 @@ function stripProjectCode(code, title) {
     if (/[a-z0-9]/i.test(title[i])) matched++;
     i++;
   }
-  const rest = title.slice(i).replace(/^[\s—–\-]+/, '').trim();
+  const rest = title.slice(i).replace(/^[\s—–-]+/, '').trim();
   return rest || title;
 }
 
@@ -65,13 +67,13 @@ function PortalDropdown({ anchorEl, onClose, children }) {
   return createPortal(
     <>
       <div
-        style={{ position: 'fixed', inset: 0, zIndex: 9998 }}
+        className="fixed inset-0 z-[399]"
         onClick={onClose}
       />
       <div
         ref={menuRef}
-        style={{ position: 'fixed', zIndex: 9999, width: MENU_W }}
-        className="bg-white border border-border-slate rounded-xl shadow-xl overflow-hidden py-1"
+        style={{ position: 'fixed', width: MENU_W }}
+        className="z-[400] bg-white border border-border-slate rounded-xl shadow-xl overflow-hidden py-1"
       >
         {children}
       </div>
@@ -95,7 +97,7 @@ function MenuItem({ icon: Icon, label, onClick, variant = 'default' }) {
   return (
     <button
       onClick={onClick}
-      className={`w-full flex items-center gap-2.5 px-4 py-2.5 text-[13px] font-medium transition-colors text-left ${styles[variant]}`}
+      className={`w-full min-h-11 flex items-center gap-2.5 px-4 py-2.5 text-[13px] font-medium transition-colors text-left ${styles[variant]}`}
     >
       <Icon size={14} className={`shrink-0 ${iconStyles[variant]}`} />
       {label}
@@ -354,6 +356,9 @@ export default function SettingsView({ currentUser, token, onUserUpdate }) {
 
   // Confirmation state for deactivate / remove
   const [confirmAction, setConfirmAction] = useState(null); // { type: 'deactivate'|'remove', user }
+  const closeRenameProject = useCallback(() => setRenamingProject(null), []);
+  const closeSlackProject = useCallback(() => setSlackProject(null), []);
+  const closeConfirmAction = useCallback(() => setConfirmAction(null), [setConfirmAction]);
 
   const handleDeactivate = async (u) => {
     try {
@@ -443,6 +448,28 @@ export default function SettingsView({ currentUser, token, onUserUpdate }) {
         </div>
       </Section>
 
+      <Section title="Install DrawVault" icon="install_mobile">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+          <div className="flex-1">
+            <p className="text-[14px] font-semibold text-on-surface">
+              {isStandaloneMode() ? "Installed on this device" : "Add DrawVault to this device"}
+            </p>
+            <p className="mt-1 text-[13px] leading-5 text-on-surface-variant">
+              Open the mobile website from your home screen. Project data and drawings still require an internet connection.
+            </p>
+          </div>
+          {!isStandaloneMode() && (
+            <button
+              type="button"
+              onClick={() => window.dispatchEvent(new CustomEvent("drawvault:show-install"))}
+              className="min-h-11 px-4 rounded-md border border-primary text-primary font-semibold text-[13px] whitespace-nowrap"
+            >
+              View install steps
+            </button>
+          )}
+        </div>
+      </Section>
+
       {/* ── Change Password ──────────────────────────────────────────── */}
       <Section title="Change Password" icon="lock">
         <form onSubmit={handlePwChange} className="space-y-4 max-w-sm">
@@ -455,7 +482,7 @@ export default function SettingsView({ currentUser, token, onUserUpdate }) {
           <Field label="New Password"         type="password" value={pwForm.newPassword}     onChange={v => setPwForm(p => ({ ...p, newPassword: v }))} />
           <Field label="Confirm New Password" type="password" value={pwForm.confirm}         onChange={v => setPwForm(p => ({ ...p, confirm: v }))} />
           <button type="submit" disabled={pwLoading}
-            className="bg-primary text-white rounded-lg hover:bg-primary-container px-5 py-2.5 font-medium text-[14px] transition-colors disabled:opacity-60">
+            className="min-h-11 bg-primary text-white rounded-lg hover:bg-primary-container px-5 py-2.5 font-medium text-[14px] transition-colors disabled:opacity-60">
             {pwLoading ? 'Updating…' : 'Update Password'}
           </button>
         </form>
@@ -487,7 +514,7 @@ export default function SettingsView({ currentUser, token, onUserUpdate }) {
 
           {/* Search + filter toolbar */}
           {!addOpen && (
-            <div className="flex gap-2 mb-4">
+            <div className="flex flex-col sm:flex-row gap-2 mb-4">
               <div className="relative flex-1">
                 <span className="material-symbols-outlined absolute left-2.5 top-1/2 -translate-y-1/2 text-on-surface-variant text-[16px]">search</span>
                 <input
@@ -495,7 +522,7 @@ export default function SettingsView({ currentUser, token, onUserUpdate }) {
                   value={userSearch}
                   onChange={e => setUserSearch(e.target.value)}
                   placeholder="Search users..."
-                  className="w-full pl-8 pr-3 py-2 text-[13px] bg-white border border-border-slate rounded-lg text-on-surface placeholder:text-on-surface-variant focus:outline-none focus:ring-1 focus:ring-primary/20 focus:border-primary transition-all"
+                  className="w-full min-h-11 pl-8 pr-3 py-2 text-[13px] bg-white border border-border-slate rounded-lg text-on-surface placeholder:text-on-surface-variant focus:outline-none focus:ring-1 focus:ring-primary/20 focus:border-primary transition-colors"
                 />
               </div>
               <select
@@ -531,7 +558,7 @@ export default function SettingsView({ currentUser, token, onUserUpdate }) {
                     <div key={u.id} className={!isLast ? 'border-b border-border-slate' : ''}>
 
                       {/* ── User row ── */}
-                      <div className={`flex items-center gap-2 px-4 py-2.5 transition-colors ${isDeactivated ? 'bg-surface-container-low opacity-60' : 'bg-white hover:bg-surface-container-low'}`}>
+                      <div className={`flex flex-wrap sm:flex-nowrap items-center gap-2 px-4 py-3 transition-colors ${isDeactivated ? 'bg-surface-container-low opacity-60' : 'bg-white hover:bg-surface-container-low'}`}>
 
                         {/* Avatar */}
                         <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white font-bold text-[12px] shrink-0 ${isDeactivated ? 'bg-on-surface-variant' : 'bg-primary'}`}>
@@ -543,14 +570,14 @@ export default function SettingsView({ currentUser, token, onUserUpdate }) {
                           <p className="text-[13px] font-medium text-on-surface leading-tight flex items-center gap-2">
                             {u.name}
                             {isDeactivated && (
-                              <span className="px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-status-rose-bg text-status-rose-text uppercase tracking-wide">Deactivated</span>
+                              <span className="px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-status-rose-bg text-status-rose-text uppercase tracking-wide">Deactivated</span>
                             )}
                           </p>
                           <p className="text-[11px] text-on-surface-variant">@{u.username}</p>
                         </div>
 
                         {/* Role dropdown — fixed width so project buttons stay in a straight column */}
-                        <div className="relative flex items-center gap-1.5 shrink-0 w-[160px]">
+                        <div className="relative order-3 sm:order-none ml-10 sm:ml-0 mt-1 sm:mt-0 flex items-center gap-1.5 shrink-0 w-[calc(100%-2.5rem)] sm:w-[160px]">
                           <select
                             value={u.role}
                             onChange={e => handleRoleChange(u.id, e.target.value, u.allowed_projects)}
@@ -598,7 +625,7 @@ export default function SettingsView({ currentUser, token, onUserUpdate }) {
                           ref={el => setBtnRef(u.id, el)}
                           disabled={isSelf}
                           onClick={() => menuOpenId === u.id ? closeMenu() : openMenu(u.id)}
-                          className="p-1 rounded-md text-on-surface-variant hover:bg-surface-container disabled:opacity-30 transition-colors shrink-0"
+                          className="order-2 sm:order-none mobile-touch-target grid place-items-center rounded-md text-on-surface-variant hover:bg-surface-container disabled:opacity-30 transition-colors shrink-0"
                           title="More actions"
                         >
                           <MoreVertical size={15} />
@@ -670,7 +697,7 @@ export default function SettingsView({ currentUser, token, onUserUpdate }) {
                               onChange={e => setResetPw(e.target.value)}
                               onKeyDown={e => e.key === 'Enter' && handleResetPassword(u.id)}
                               placeholder="New password (min 6 chars)"
-                              className="flex-1 bg-white border border-border-slate rounded-lg px-3 py-1.5 text-[13px] text-on-surface focus:outline-none focus:ring-1 focus:ring-primary/20 focus:border-primary transition-all"
+                              className="flex-1 min-h-11 bg-white border border-border-slate rounded-lg px-3 py-1.5 text-[13px] text-on-surface focus:outline-none focus:ring-1 focus:ring-primary/20 focus:border-primary transition-colors"
                             />
                             <button
                               onClick={() => handleResetPassword(u.id)}
@@ -731,7 +758,7 @@ export default function SettingsView({ currentUser, token, onUserUpdate }) {
           {addOpen && (
             <form onSubmit={handleAddUser} className="p-4 rounded-lg border border-border-slate bg-surface-container-low space-y-3">
               <p className="text-[14px] font-semibold text-on-surface mb-1">New User</p>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <Field label="Full Name" value={newUser.name}     onChange={v => setNewUser(p => ({ ...p, name: v }))} />
                 <Field label="Username"  value={newUser.username} onChange={v => setNewUser(p => ({ ...p, username: v }))} />
                 <Field label="Password"  type="password" value={newUser.password} onChange={v => setNewUser(p => ({ ...p, password: v }))} />
@@ -812,17 +839,19 @@ export default function SettingsView({ currentUser, token, onUserUpdate }) {
                   )}
                   <button
                     onClick={() => openSlackEditor(p)}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border-slate text-[12px] font-medium text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-colors"
+                    className="min-h-11 min-w-11 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg border border-border-slate text-[12px] font-medium text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-colors"
                     title="Configure Slack notifications"
+                    aria-label={`Configure Slack notifications for ${p.code}`}
                   >
-                    <span className="material-symbols-outlined text-[14px]">chat</span>
+                    <span className="material-symbols-outlined text-[14px]" aria-hidden="true">chat</span>
                     <span className="hidden sm:inline">Slack</span>
                   </button>
                   <button
                     onClick={() => { setRenamingProject(p); setRenameForm({ name: p.name, code: p.code }); setRenameMsg(null); }}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border-slate text-[12px] font-medium text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-colors"
+                    className="min-h-11 min-w-11 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg border border-border-slate text-[12px] font-medium text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-colors"
+                    aria-label={`Rename project ${p.code}`}
                   >
-                    <span className="material-symbols-outlined text-[14px]">edit</span>
+                    <span className="material-symbols-outlined text-[14px]" aria-hidden="true">edit</span>
                     <span className="hidden sm:inline">Rename</span>
                   </button>
                 </div>
@@ -833,13 +862,16 @@ export default function SettingsView({ currentUser, token, onUserUpdate }) {
       )}
 
       {/* ── Rename project modal ─────────────────────────────────────── */}
-      {renamingProject && createPortal(
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4" style={{ background: 'rgba(15,23,42,0.4)' }}>
-          <div className="bg-white rounded-2xl shadow-xl border border-border-slate w-full max-w-sm overflow-hidden">
+      {renamingProject && (
+        <SettingsModal
+          onClose={closeRenameProject}
+          ariaLabel="Rename project"
+          panelClassName="bg-white rounded-2xl shadow-xl border border-border-slate w-full max-w-sm overflow-hidden"
+        >
             <div className="px-6 py-4 border-b border-border-slate flex items-center justify-between">
               <h2 className="text-[15px] font-semibold text-on-surface">Rename Project</h2>
-              <button onClick={() => setRenamingProject(null)} className="text-on-surface-variant hover:text-on-surface transition p-1 rounded-lg hover:bg-surface-container">
-                <X size={16} />
+              <button onClick={closeRenameProject} className="mobile-touch-target grid place-items-center text-on-surface-variant hover:text-on-surface transition-colors rounded-lg hover:bg-surface-container" aria-label="Close rename project">
+                <X size={16} aria-hidden="true" />
               </button>
             </div>
             <form onSubmit={handleRenameProject} className="px-6 py-5 space-y-4">
@@ -866,31 +898,32 @@ export default function SettingsView({ currentUser, token, onUserUpdate }) {
                 />
               </div>
               <div className="flex gap-2 justify-end pt-1">
-                <button type="button" onClick={() => setRenamingProject(null)}
-                  className="px-4 py-2 rounded-lg border border-border-slate text-on-surface-variant hover:bg-surface-container font-medium text-[13px] transition-colors">
+                <button type="button" onClick={closeRenameProject}
+                  className="min-h-11 px-4 py-2 rounded-lg border border-border-slate text-on-surface-variant hover:bg-surface-container font-medium text-[13px] transition-colors">
                   Cancel
                 </button>
                 <button type="submit" disabled={renameLoading}
-                  className="px-4 py-2 rounded-lg bg-primary text-white hover:bg-primary-container font-medium text-[13px] transition-colors disabled:opacity-60">
+                  className="min-h-11 px-4 py-2 rounded-lg bg-primary text-white hover:bg-primary-container font-medium text-[13px] transition-colors disabled:opacity-60">
                   {renameLoading ? 'Saving…' : 'Save Changes'}
                 </button>
               </div>
             </form>
-          </div>
-        </div>,
-        document.body
+        </SettingsModal>
       )}
 
       {/* ── Slack webhook modal ──────────────────────────────────────── */}
-      {slackProject && createPortal(
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4" style={{ background: 'rgba(15,23,42,0.4)' }}>
-          <div className="bg-white rounded-2xl shadow-xl border border-border-slate w-full max-w-md overflow-hidden">
+      {slackProject && (
+        <SettingsModal
+          onClose={closeSlackProject}
+          ariaLabel="Slack notifications"
+          panelClassName="bg-white rounded-2xl shadow-xl border border-border-slate w-full max-w-md overflow-hidden"
+        >
             <div className="px-6 py-4 border-b border-border-slate flex items-center justify-between">
               <h2 className="text-[15px] font-semibold text-on-surface">
                 Slack Notifications — <span className="font-mono text-primary">{slackProject.code}</span>
               </h2>
-              <button onClick={() => setSlackProject(null)} aria-label="Close" className="text-on-surface-variant hover:text-on-surface transition p-1 rounded-lg hover:bg-surface-container">
-                <X size={16} />
+              <button onClick={closeSlackProject} aria-label="Close Slack notifications" className="mobile-touch-target grid place-items-center text-on-surface-variant hover:text-on-surface transition-colors rounded-lg hover:bg-surface-container">
+                <X size={16} aria-hidden="true" />
               </button>
             </div>
             <form onSubmit={handleSaveSlack} className="px-6 py-5 space-y-4">
@@ -931,28 +964,37 @@ export default function SettingsView({ currentUser, token, onUserUpdate }) {
                   )}
                 </div>
                 <div className="flex gap-2">
-                  <button type="button" onClick={() => setSlackProject(null)}
-                    className="px-4 py-2 rounded-lg border border-border-slate text-on-surface-variant hover:bg-surface-container font-medium text-[13px] transition-colors">
+                  <button type="button" onClick={closeSlackProject}
+                    className="min-h-11 px-4 py-2 rounded-lg border border-border-slate text-on-surface-variant hover:bg-surface-container font-medium text-[13px] transition-colors">
                     Cancel
                   </button>
                   <button type="submit" disabled={slackLoading || !slackUrl.trim()}
-                    className="px-4 py-2 rounded-lg bg-primary text-white hover:bg-primary-container font-medium text-[13px] transition-colors disabled:opacity-60">
+                    className="min-h-11 px-4 py-2 rounded-lg bg-primary text-white hover:bg-primary-container font-medium text-[13px] transition-colors disabled:opacity-60">
                     {slackLoading ? 'Saving…' : 'Save'}
                   </button>
                 </div>
               </div>
             </form>
-          </div>
-        </div>,
-        document.body
+        </SettingsModal>
       )}
 
       {/* ── Confirmation modal for deactivate / remove ── */}
-      {confirmAction && createPortal(
-        <div className="fixed inset-0 z-[10000] flex items-center justify-center">
-          <div className="absolute inset-0 bg-black/40" onClick={() => setConfirmAction(null)} />
-          <div className="relative bg-white rounded-2xl shadow-2xl border border-border-slate p-6 w-full max-w-sm mx-4">
-            <div className="flex items-center gap-3 mb-4">
+      {confirmAction && (
+        <SettingsModal
+          onClose={closeConfirmAction}
+          ariaLabel={confirmAction.type === 'remove' ? 'Remove user' : 'Deactivate user'}
+          panelClassName="relative bg-white rounded-2xl shadow-xl border border-border-slate p-6 w-full max-w-sm mx-4"
+          zClass="z-[500]"
+        >
+            <button
+              type="button"
+              onClick={closeConfirmAction}
+              className="mobile-touch-target absolute right-3 top-3 grid place-items-center rounded-lg text-on-surface-variant hover:bg-surface-container"
+              aria-label="Close confirmation"
+            >
+              <X size={16} aria-hidden="true" />
+            </button>
+            <div className="flex items-center gap-3 mb-4 pr-10">
               <div className={`w-10 h-10 rounded-full flex items-center justify-center ${confirmAction.type === 'remove' ? 'bg-red-100' : 'bg-amber-100'}`}>
                 {confirmAction.type === 'remove'
                   ? <Trash2 size={18} className="text-red-600" />
@@ -974,8 +1016,8 @@ export default function SettingsView({ currentUser, token, onUserUpdate }) {
             </p>
             <div className="flex gap-2 justify-end">
               <button
-                onClick={() => setConfirmAction(null)}
-                className="px-4 py-2 rounded-lg border border-border-slate text-on-surface-variant hover:bg-surface-container font-medium text-[13px] transition-colors"
+                onClick={closeConfirmAction}
+                className="min-h-11 px-4 py-2 rounded-lg border border-border-slate text-on-surface-variant hover:bg-surface-container font-medium text-[13px] transition-colors"
               >
                 Cancel
               </button>
@@ -987,16 +1029,14 @@ export default function SettingsView({ currentUser, token, onUserUpdate }) {
                   if (action === 'remove') handleRemove(u);
                   else handleDeactivate(u);
                 }}
-                className={`px-4 py-2 rounded-lg text-white font-medium text-[13px] transition-colors ${
+                className={`min-h-11 px-4 py-2 rounded-lg text-white font-medium text-[13px] transition-colors ${
                   confirmAction.type === 'remove' ? 'bg-red-600 hover:bg-red-700' : 'bg-amber-600 hover:bg-amber-700'
                 }`}
               >
                 {confirmAction.type === 'remove' ? 'Remove Permanently' : 'Deactivate'}
               </button>
             </div>
-          </div>
-        </div>,
-        document.body
+        </SettingsModal>
       )}
     </div>
   );
@@ -1006,10 +1046,10 @@ export default function SettingsView({ currentUser, token, onUserUpdate }) {
 
 function Section({ title, icon, children, headerAction }) {
   return (
-    <div className="bg-white border border-border-slate rounded-xl p-6">
+    <div className="bg-white border border-border-slate rounded-xl p-4 sm:p-6">
       <div className="flex items-center justify-between gap-2 mb-5">
         <div className="flex items-center gap-2">
-          <span className="material-symbols-outlined text-primary text-[20px]">{icon}</span>
+          <span className="material-symbols-outlined text-primary text-[20px]" aria-hidden="true">{icon}</span>
           <h2 className="text-[18px] font-semibold text-on-surface">{title}</h2>
         </div>
         {headerAction}
@@ -1027,8 +1067,28 @@ function Field({ label, type = 'text', value, onChange }) {
         type={type}
         value={value}
         onChange={e => onChange(e.target.value)}
-        className="w-full bg-white border border-border-slate rounded-lg px-3 py-2 text-[14px] text-on-surface focus:outline-none focus:ring-1 focus:ring-primary/20 focus:border-primary transition-all"
+        className="w-full min-h-11 bg-white border border-border-slate rounded-lg px-3 py-2 text-[14px] text-on-surface focus:outline-none focus:ring-1 focus:ring-primary/20 focus:border-primary transition-colors"
       />
     </div>
+  );
+}
+
+function SettingsModal({ onClose, ariaLabel, panelClassName, zClass = 'z-[400]', children }) {
+  const { panelRef, handleBackdrop } = useModalClose(onClose);
+
+  return createPortal(
+    <div
+      className={`fixed inset-0 ${zClass} flex items-center justify-center p-4`}
+      style={{ background: 'var(--color-scrim)' }}
+      role="dialog"
+      aria-modal="true"
+      aria-label={ariaLabel}
+      onClick={handleBackdrop}
+    >
+      <div ref={panelRef} className={panelClassName}>
+        {children}
+      </div>
+    </div>,
+    document.body
   );
 }

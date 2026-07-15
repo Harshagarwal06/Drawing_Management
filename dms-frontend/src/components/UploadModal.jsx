@@ -1,13 +1,10 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef } from "react";
 import { X, Upload, CheckCircle2, Loader2, FolderOpen } from "lucide-react";
 import Field from "./Field";
+import useModalClose from "./documents/useModalClose";
 
 export default function UploadModal({ onClose, onSubmit, initialFolder }) {
-  useEffect(() => {
-    const h = e => { if (e.key === "Escape") onClose(); };
-    document.addEventListener("keydown", h);
-    return () => document.removeEventListener("keydown", h);
-  }, [onClose]);
+  const { handleBackdrop, panelRef } = useModalClose(onClose);
   const [form, setForm] = useState({
     drawingNumber: "",
     title: "",
@@ -72,12 +69,12 @@ export default function UploadModal({ onClose, onSubmit, initialFolder }) {
   };
 
   const inputCls = (key) =>
-    `w-full border rounded-lg px-3 py-2.5 text-sm text-on-surface outline-none transition focus:ring-2 focus:ring-primary/20 focus:border-primary placeholder:text-on-surface-variant ${
+    `w-full min-h-11 border rounded-lg px-3 py-2.5 text-sm text-on-surface outline-none transition-colors focus:ring-2 focus:ring-primary/20 focus:border-primary placeholder:text-on-surface-variant ${
       errors[key] ? "border-status-rose-text bg-status-rose-bg" : "border-border-slate bg-white"
     }`;
 
   const dropZoneCls = [
-    "border-2 border-dashed rounded-xl p-5 text-center transition cursor-pointer group select-none",
+    "border-2 border-dashed rounded-xl p-5 text-center transition-colors cursor-pointer group select-none",
     dragging      ? "border-primary bg-primary/5 scale-[1.01]"
     : errors.file ? "border-status-rose-text bg-status-rose-bg"
     : file        ? "border-status-emerald-text bg-status-emerald-bg"
@@ -85,11 +82,11 @@ export default function UploadModal({ onClose, onSubmit, initialFolder }) {
   ].join(" ");
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(15,23,42,0.4)" }} onClick={e => { if (e.target === e.currentTarget) onClose(); }} role="dialog" aria-modal="true" aria-label="Upload drawing">
-      <div className="modal-enter bg-surface rounded-2xl shadow-card-lg border border-outline-variant w-full max-w-xl overflow-hidden">
+    <div className="fixed inset-0 z-[400] flex items-center justify-center p-4" style={{ background: "var(--color-scrim)" }} onClick={handleBackdrop} role="dialog" aria-modal="true" aria-label="Upload drawing">
+      <div ref={panelRef} className="modal-enter bg-surface rounded-2xl shadow-card-lg border border-outline-variant w-full max-w-xl max-h-[92dvh] overflow-hidden flex flex-col">
 
         {/* Header */}
-        <div className="px-6 py-4 border-b border-outline-variant flex items-center justify-between bg-surface-container-low">
+        <div className="px-4 sm:px-6 py-4 border-b border-outline-variant flex items-center justify-between bg-surface-container-low shrink-0">
           <div>
             <div className="flex items-center gap-3">
               <h2 className="text-base font-semibold text-on-surface">Upload Drawing</h2>
@@ -102,12 +99,12 @@ export default function UploadModal({ onClose, onSubmit, initialFolder }) {
             </div>
             <p className="text-xs text-on-surface-variant mt-0.5">Register a new drawing to the Master Drawing Register</p>
           </div>
-          <button onClick={onClose} className="text-on-surface-variant hover:text-on-surface transition p-1.5 rounded-lg hover:bg-surface-container" aria-label="Close">
+          <button onClick={onClose} className="mobile-touch-target grid place-items-center text-on-surface-variant hover:text-on-surface transition-colors rounded-lg hover:bg-surface-container" aria-label="Close">
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-6 space-y-5">
+        <form onSubmit={handleSubmit} className="overflow-y-auto p-4 sm:p-6 space-y-5">
 
           {/* Drop zone */}
           <div>
@@ -120,7 +117,10 @@ export default function UploadModal({ onClose, onSubmit, initialFolder }) {
             />
             <div
               className={dropZoneCls}
+              role="button"
+              tabIndex={0}
               onClick={() => fileInputRef.current.click()}
+              onKeyDown={event => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); fileInputRef.current.click(); } }}
               onDragOver={ev => { ev.preventDefault(); setDragging(true); }}
               onDragLeave={() => setDragging(false)}
               onDrop={handleDrop}
@@ -133,7 +133,8 @@ export default function UploadModal({ onClose, onSubmit, initialFolder }) {
                   <button
                     type="button"
                     onClick={ev => { ev.stopPropagation(); setFile(null); }}
-                    className="ml-1 text-emerald-400 hover:text-red-500 transition text-xl leading-none font-light"
+                    className="mobile-touch-target grid place-items-center ml-1 text-emerald-600 hover:text-red-500 transition-colors text-xl leading-none font-light"
+                    aria-label="Remove selected file"
                   >×</button>
                 </div>
               ) : (
@@ -159,7 +160,7 @@ export default function UploadModal({ onClose, onSubmit, initialFolder }) {
             />
           </Field>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Field errors={errors} label="Drawing Type" id="discipline" req>
               <select
                 id="discipline"
@@ -220,18 +221,18 @@ export default function UploadModal({ onClose, onSubmit, initialFolder }) {
             />
           </Field>
 
-          <div className="flex items-center justify-end gap-3 pt-2 border-t border-slate-100">
+          <div className="sticky bottom-0 -mx-4 sm:-mx-6 -mb-4 sm:-mb-6 px-4 sm:px-6 py-4 flex items-center justify-end gap-3 border-t border-border-slate bg-surface">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 text-sm font-medium text-slate-600 hover:text-slate-900 border border-slate-200 hover:border-slate-300 rounded-lg transition"
+              className="min-h-11 px-4 py-2 text-sm font-medium text-slate-600 hover:text-slate-900 border border-slate-200 hover:border-slate-300 rounded-lg transition-colors"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={submitting}
-              className="px-5 py-2 text-sm font-semibold text-white bg-primary hover:bg-primary-container rounded-lg transition flex items-center gap-2 disabled:opacity-60"
+              className="min-h-11 px-5 py-2 text-sm font-semibold text-white bg-primary hover:bg-primary-container rounded-lg transition-colors flex items-center gap-2 disabled:opacity-60"
             >
               {submitting ? (
                 <><Loader2 className="w-4 h-4 animate-spin" />Uploading…</>

@@ -19,6 +19,7 @@ import { OVERDUE_PURPOSES, MS_30_DAYS, MEP_SUBTYPES } from "./constants";
 
 const API      = import.meta.env.VITE_API_URL;
 const PER_PAGE = 8;
+const ACTIVE_PROJECT_KEY = "drawvault_active_project_id";
 
 function authHeaders(token) {
   return { Authorization: `Bearer ${token}` };
@@ -104,17 +105,23 @@ export default function App() {
 
   /* ── Auth handlers ── */
   const handleLogin = (user) => {
+    setDrawings([]);
+    setTransmittals([]);
     setCurrentUser(user);
     navigate("/dashboard", { replace: true });
   };
 
   const handleLogout = () => {
+    setDrawings([]);
+    setTransmittals([]);
     setCurrentUser(null);
     setLoadedProjectId(null);
     navigate("/login", { replace: true });
   };
 
   const handleUnauthorized = () => {
+    setDrawings([]);
+    setTransmittals([]);
     setCurrentUser(null);
     setLoadedProjectId(null);
     setToast({ msg: "Session expired — please log in again.", type: "error" });
@@ -129,8 +136,20 @@ export default function App() {
   useEffect(() => {
     if (!currentUser) return;
     fetchProjects(currentUser.token)
-      .then(data => { setProjects(data); if (data.length > 0) setActiveProject(data[0]); })
-      .catch(err => { if (err.status === 401) onAuthError(); });
+      .then(data => {
+        setProjects(data);
+        const storedId = Number(localStorage.getItem(ACTIVE_PROJECT_KEY));
+        const preferred = data.find(project => project.id === storedId) ?? data[0] ?? null;
+        setActiveProject(preferred);
+      })
+      .catch(err => {
+        if (err.status === 401) onAuthError();
+        else {
+          setProjects([]);
+          setActiveProject(null);
+          setToast({ msg: "Could not load projects. Reconnect and try again.", type: "error" });
+        }
+      });
   }, [currentUser]);
 
   /* ── Load drawings + transmittals when project changes ── */
@@ -141,9 +160,19 @@ export default function App() {
       fetchTransmittals(activeProject.id, currentUser.token),
     ])
       .then(([d, t]) => { setDrawings(d); setTransmittals(t); })
-      .catch(err => { if (err.status === 401) onAuthError(); })
+      .catch(err => {
+        if (err.status === 401) onAuthError();
+        else setToast({ msg: "Live project data could not be loaded. No stored drawing data is shown.", type: "error" });
+      })
       .finally(() => setLoadedProjectId(activeProject.id));
   }, [activeProject, currentUser]);
+
+  const handleProjectChange = project => {
+    setDrawings([]);
+    setTransmittals([]);
+    setActiveProject(project);
+    if (project?.id) localStorage.setItem(ACTIVE_PROJECT_KEY, String(project.id));
+  };
 
   /* Loading is derived: true while the active project's data hasn't landed yet */
   const drawingsLoading = !!activeProject && !!currentUser && loadedProjectId !== activeProject.id;
@@ -282,7 +311,7 @@ export default function App() {
     mobileNavOpen,
     setMobileNavOpen,
     onNewDrawing: () => { setModalFolder(""); setShowModal(true); },
-    onProjectChange: setActiveProject,
+    onProjectChange: handleProjectChange,
     onNewProject: () => setShowProjectModal(true),
   };
 
@@ -361,7 +390,7 @@ export default function App() {
                 onDeleteDrawing={!isRestricted ? handleDeleteDrawing : undefined}
                 projects={projects}
                 activeProject={activeProject}
-                onProjectChange={setActiveProject}
+                onProjectChange={handleProjectChange}
                 transmittals={transmittals}
                 isProjectTeam={isProjectTeam}
                 token={currentUser?.token}
@@ -403,7 +432,7 @@ export default function App() {
               const newProj  = await res.json();
               const allProjs = await fetchProjects(currentUser.token);
               setProjects(allProjs);
-              setActiveProject(newProj);
+              handleProjectChange(newProj);
               setShowProjectModal(false);
               setToast({ msg: `Project ${data.code} created.`, type: "success" });
             } else {

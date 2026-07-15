@@ -1,11 +1,147 @@
+@import url("./tokens.css");
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
+  html,
+  body,
+  #root {
+    min-height: 100%;
+  }
+
+  html,
   body {
-    background-color: #ffffff;
-    @apply text-on-surface font-outfit antialiased;
+    overflow-x: clip;
+  }
+
+  body {
+    margin: 0;
+    background-color: var(--color-paper);
+    color: var(--color-ink);
+    font-family: var(--font-body);
+    @apply antialiased;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  button,
+  input,
+  select,
+  textarea {
+    font: inherit;
+  }
+
+  button,
+  a,
+  [role="button"] {
+    touch-action: manipulation;
+  }
+
+  button:focus-visible,
+  a:focus-visible,
+  input:focus-visible,
+  select:focus-visible,
+  textarea:focus-visible,
+  [tabindex]:focus-visible {
+    outline: 2px solid var(--color-focus);
+    outline-offset: 2px;
+  }
+
+  ::selection {
+    background: var(--color-accent-soft);
+    color: var(--color-ink);
+  }
+}
+
+.workspace-shell,
+.workspace-main {
+  background: var(--color-paper);
+}
+
+.workspace-heading {
+  color: var(--color-ink);
+  font-family: var(--font-display);
+  font-weight: 700;
+  letter-spacing: -0.03em;
+}
+
+.workspace-panel {
+  background: var(--color-paper-raised);
+  border: 1px solid var(--color-rule);
+  border-radius: var(--radius-panel);
+  box-shadow: var(--shadow-panel);
+}
+
+.tabular-data {
+  font-variant-numeric: tabular-nums;
+}
+
+.safe-top {
+  padding-top: env(safe-area-inset-top, 0px);
+}
+
+.safe-bottom {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+.mobile-page-bottom {
+  padding-bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px));
+}
+
+.mobile-sheet {
+  max-height: min(88dvh, 46rem);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  background: var(--color-paper-raised);
+  border-radius: var(--radius-sheet) var(--radius-sheet) 0 0;
+  box-shadow: var(--shadow-sheet);
+}
+
+.pwa-banner {
+  background: var(--color-ink);
+  color: var(--color-paper-raised);
+}
+
+@media (max-width: 767px) {
+  input:not([type="checkbox"]):not([type="radio"]),
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+
+  .mobile-touch-target {
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  .mobile-dialog-shell {
+    align-items: flex-end !important;
+    padding: 0 !important;
+  }
+
+  .mobile-dialog-card {
+    width: 100% !important;
+    max-width: none !important;
+    max-height: 92dvh !important;
+    border-radius: var(--radius-sheet) var(--radius-sheet) 0 0 !important;
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  [role="dialog"][aria-modal="true"].fixed.inset-0.flex {
+    align-items: flex-end !important;
+    padding: 0 !important;
+  }
+
+  [role="dialog"][aria-modal="true"].fixed.inset-0.flex > div {
+    width: 100% !important;
+    max-width: none !important;
+    max-height: 92dvh !important;
+    border-radius: var(--radius-sheet) var(--radius-sheet) 0 0 !important;
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  [role="dialog"][aria-modal="true"] button {
+    min-height: 44px;
   }
 }
 
@@ -31,8 +167,19 @@
     scrollbar-width: none;
 }
 
-.modal-enter { animation: fadeIn 0.2s ease; }
+.modal-enter { animation: fadeIn var(--dur-short) var(--ease-out); }
 @keyframes fadeIn {
   from { opacity: 0; transform: scale(0.97); }
   to   { opacity: 1; transform: scale(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 150ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 150ms !important;
+  }
 }
