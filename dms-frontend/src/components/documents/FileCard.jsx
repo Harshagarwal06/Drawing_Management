@@ -40,16 +40,18 @@ export default memo(function FileCard({ d, viewMode, onDelete, onEditMetadata, o
           <a
             href={resolveUrl(d.path)} target="_blank" rel="noreferrer"
             onClick={e => e.stopPropagation()}
-            className="p-1.5 rounded-lg hover:bg-surface-container-low text-on-surface-variant hover:text-primary transition-colors"
+            className="mobile-touch-target grid place-items-center rounded-lg hover:bg-surface-container-low text-on-surface-variant hover:text-primary transition-colors"
             title="View"
+            aria-label={`Open ${d.number}`}
           >
             <Eye size={14} />
           </a>
           <a
             href={resolveUrl(d.path)} download={filename}
             onClick={e => e.stopPropagation()}
-            className="p-1.5 rounded-lg hover:bg-surface-container-low text-on-surface-variant hover:text-primary transition-colors"
+            className="mobile-touch-target grid place-items-center rounded-lg hover:bg-surface-container-low text-on-surface-variant hover:text-primary transition-colors"
             title="Download"
+            aria-label={`Download ${d.number}`}
           >
             <Download size={14} />
           </a>
@@ -60,7 +62,7 @@ export default memo(function FileCard({ d, viewMode, onDelete, onEditMetadata, o
   }
 
   return (
-    <div className="bg-white border border-border-slate rounded-xl overflow-hidden hover:shadow-md transition-all duration-150 cursor-default flex flex-col">
+    <div className="bg-white border border-border-slate rounded-xl overflow-hidden cursor-default flex flex-col">
       <div className={`h-1.5 shrink-0 ${statusBar}`} />
 
       <div className="p-4 flex flex-col flex-1">
@@ -83,15 +85,17 @@ export default memo(function FileCard({ d, viewMode, onDelete, onEditMetadata, o
           <div className="flex items-center gap-0.5">
             <a
               href={resolveUrl(d.path)} target="_blank" rel="noreferrer"
-              className="p-1.5 rounded-lg hover:bg-surface-container text-on-surface-variant hover:text-primary transition-colors"
+              className="mobile-touch-target grid place-items-center rounded-lg hover:bg-surface-container text-on-surface-variant hover:text-primary transition-colors"
               title="View"
+              aria-label={`Open ${d.number}`}
             >
               <Eye size={13} />
             </a>
             <a
               href={resolveUrl(d.path)} download={filename}
-              className="p-1.5 rounded-lg hover:bg-surface-container text-on-surface-variant hover:text-primary transition-colors"
+              className="mobile-touch-target grid place-items-center rounded-lg hover:bg-surface-container text-on-surface-variant hover:text-primary transition-colors"
               title="Download"
+              aria-label={`Download ${d.number}`}
             >
               <Download size={13} />
             </a>

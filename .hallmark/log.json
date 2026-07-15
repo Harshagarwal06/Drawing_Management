@@ -1,0 +1,10 @@
+[
+  {
+    "date": "2026-07-15",
+    "macrostructure": "Workbench",
+    "theme": "Cobalt",
+    "enrichment": "none",
+    "brief": "Responsive DrawVault mobile workspace and installable PWA support",
+    "scope": "app"
+  }
+]

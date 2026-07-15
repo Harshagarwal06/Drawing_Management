@@ -1,8 +1,8 @@
 const STATUS_META = {
-  S3:   { label: 'For Construction', color: '#34d399' },
-  S2:   { label: 'For Approval',     color: '#fbbf24' },
-  S1:   { label: 'For Information',  color: '#60a5fa' },
-  VOID: { label: 'Void',             color: '#f87171' },
+  S3:   { label: 'For Construction', color: 'oklch(0.535 0.140 158)' },
+  S2:   { label: 'For Approval',     color: 'oklch(0.650 0.145 70)' },
+  S1:   { label: 'For Information',  color: 'oklch(0.570 0.170 252)' },
+  VOID: { label: 'Void',             color: 'oklch(0.550 0.190 25)' },
 };
 
 function exportCSV(drawings) {
@@ -52,9 +52,9 @@ export default function AnalyticsView({ drawings, transmittals }) {
   const maxCount = Math.max(...months.map(m => m.count), 1);
 
   return (
-    <div className="max-w-[1400px] mx-auto space-y-8">
+    <div className="max-w-[1400px] mx-auto space-y-6 md:space-y-8">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="font-display-lg text-display-lg text-on-surface tracking-tight">Analytics</h1>
           <p className="font-body-md text-body-md text-on-surface-variant mt-1">Project-level metrics and breakdowns</p>
@@ -62,7 +62,7 @@ export default function AnalyticsView({ drawings, transmittals }) {
         {drawings.length > 0 && (
           <button
             onClick={() => exportCSV(drawings)}
-            className="flex items-center gap-1.5 px-4 py-2.5 bg-white border border-border-slate rounded-xl text-on-surface font-medium text-[13px] hover:bg-surface-container-low transition-colors shadow-sm"
+            className="min-h-11 flex items-center justify-center gap-1.5 px-4 py-2.5 bg-white border border-border-slate rounded-xl text-on-surface font-medium text-[13px] hover:bg-surface-container-low transition-colors shadow-sm"
           >
             <span className="material-symbols-outlined text-[18px]">download</span>
             Export CSV
@@ -73,7 +73,7 @@ export default function AnalyticsView({ drawings, transmittals }) {
       {/* KPI row */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {Object.entries(STATUS_META).map(([code, { label, color }]) => (
-          <div key={code} className="bg-white border border-border-slate rounded-xl p-5 shadow-sm">
+          <div key={code} className="bg-white border border-border-slate rounded-xl p-3 sm:p-5 shadow-sm">
             <div className="flex items-center gap-2 mb-1">
               <span className="w-2 h-2 rounded-full" style={{ backgroundColor: color }} />
               <span className="font-label-sm text-[10px] text-on-surface-variant uppercase tracking-wide">{label}</span>
@@ -98,7 +98,7 @@ export default function AnalyticsView({ drawings, transmittals }) {
                     <div
                       key={code}
                       title={`${STATUS_META[code].label}: ${statusCounts[code]}`}
-                      className="h-full transition-all"
+                      className="h-full"
                       style={{ width: `${(statusCounts[code] / total) * 100}%`, backgroundColor: color }}
                     />
                   ) : null
@@ -132,7 +132,7 @@ export default function AnalyticsView({ drawings, transmittals }) {
               <div className="flex items-end gap-1 h-32">
                 {months.map(m => (
                   <div key={m.key} className="flex-1 flex flex-col items-center gap-1 group">
-                    <span className="font-mono text-[9px] text-on-surface-variant opacity-0 group-hover:opacity-100 transition-opacity">{m.count || ''}</span>
+                    <span className="font-mono text-[10px] text-on-surface-variant">{m.count || ''}</span>
                     <div
                       className="w-full rounded-t-sm bg-primary/60 group-hover:bg-primary transition-colors"
                       style={{ height: `${(m.count / maxCount) * 100}%`, minHeight: m.count > 0 ? '4px' : '0' }}
@@ -143,7 +143,7 @@ export default function AnalyticsView({ drawings, transmittals }) {
               </div>
               <div className="flex gap-1 mt-2">
                 {months.map(m => (
-                  <div key={m.key} className="flex-1 text-center font-label-sm text-[8px] text-on-surface-variant truncate">{m.label}</div>
+                  <div key={m.key} className="flex-1 text-center font-label-sm text-[10px] text-on-surface-variant truncate">{m.label}</div>
                 ))}
               </div>
             </div>
@@ -173,8 +173,8 @@ export default function AnalyticsView({ drawings, transmittals }) {
                       <div
                         key={code}
                         title={`${STATUS_META[code].label}: ${counts[code]}`}
-                        className="h-full transition-all"
-                        style={{ width: `${(counts[code] / maxTotal) * 100}%`, backgroundColor: color + 'b3' }}
+                        className="h-full"
+                        style={{ width: `${(counts[code] / maxTotal) * 100}%`, backgroundColor: color }}
                       />
                     ) : null
                   )}
@@ -191,7 +191,7 @@ export default function AnalyticsView({ drawings, transmittals }) {
 
 function Card({ title, icon, children }) {
   return (
-    <div className="bg-white border border-border-slate rounded-xl p-6 shadow-sm">
+    <div className="bg-white border border-border-slate rounded-xl p-4 sm:p-6 shadow-sm">
       <div className="flex items-center gap-2 mb-5">
         <span className="material-symbols-outlined text-primary text-[20px]">{icon}</span>
         <h2 className="font-headline-sm text-headline-sm text-on-surface font-semibold">{title}</h2>

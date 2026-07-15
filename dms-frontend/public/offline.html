@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#f8f9fc" />
+    <title>DrawVault — Offline</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --paper: oklch(0.982 0.006 252);
+        --paper-raised: oklch(0.995 0.003 252);
+        --rule: oklch(0.884 0.012 252);
+        --ink: oklch(0.225 0.021 255);
+        --ink-muted: oklch(0.475 0.021 255);
+        --accent: oklch(0.515 0.215 260);
+        --accent-strong: oklch(0.455 0.220 260);
+        --accent-ink: oklch(0.985 0.003 252);
+        --focus: oklch(0.585 0.205 260);
+        font-family: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+        background: var(--paper);
+        color: var(--ink);
+      }
+      html, body { overflow-x: clip; }
+      body { margin: 0; min-height: 100dvh; display: grid; place-items: center; padding: 24px; box-sizing: border-box; }
+      main { width: min(100%, 440px); background: var(--paper-raised); border: 1px solid var(--rule); border-radius: 12px; padding: 28px; box-sizing: border-box; }
+      h1 { margin: 0; font-size: 28px; letter-spacing: -0.03em; }
+      p { margin: 12px 0 0; line-height: 1.6; color: var(--ink-muted); }
+      button { min-height: 44px; margin-top: 24px; border: 0; border-radius: 6px; padding: 0 18px; background: var(--accent); color: var(--accent-ink); font: inherit; font-weight: 700; cursor: pointer; }
+      button:hover { background: var(--accent-strong); }
+      button:active { background: var(--accent-strong); }
+      button:focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; }
+      button:disabled { opacity: 0.55; cursor: not-allowed; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>You’re offline</h1>
+      <p>DrawVault cannot load live drawings, transmittals, or project information without a connection. Reconnect before continuing.</p>
+      <button type="button" onclick="location.reload()">Try again</button>
+    </main>
+  </body>
+</html>
