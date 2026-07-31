@@ -19,7 +19,7 @@ function stripProjectCode(code, title) {
     if (/[a-z0-9]/i.test(title[i])) matched++;
     i++;
   }
-  const rest = title.slice(i).replace(/^[\s—–\-]+/, '').trim();
+  const rest = title.slice(i).replace(/^[\s—–-]+/, '').trim();
   return rest || title;
 }
 
