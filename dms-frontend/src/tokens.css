@@ -1,0 +1,62 @@
+/* Hallmark · macrostructure: Workbench · tone: restrained technical · anchor hue: cobalt · pre-emit critique: P5 H5 E4 S5 R5 V4 · theme: Cobalt · enrichment: none · contrast: pass (40–41) · nav: N4 · footer: none · slop: pass (42–49) · mobile: pass (34, 49–57) */
+:root {
+  --color-paper: oklch(0.982 0.006 252);
+  --color-paper-raised: oklch(0.995 0.003 252);
+  --color-paper-muted: oklch(0.952 0.010 252);
+  --color-rule: oklch(0.884 0.012 252);
+  --color-rule-strong: oklch(0.790 0.018 252);
+  --color-ink-muted: oklch(0.475 0.021 255);
+  --color-ink: oklch(0.225 0.021 255);
+  --color-accent: oklch(0.515 0.215 260);
+  --color-accent-ink: oklch(0.985 0.003 252);
+  --color-accent-strong: oklch(0.455 0.220 260);
+  --color-accent-soft: oklch(0.925 0.043 260);
+  --color-focus: oklch(0.585 0.205 260);
+  --color-success: oklch(0.535 0.140 158);
+  --color-warning: oklch(0.650 0.145 70);
+  --color-danger: oklch(0.550 0.190 25);
+  --color-scrim: oklch(0.170 0.018 255 / 0.56);
+
+  --font-display: "Space Grotesk", sans-serif;
+  --font-body: "IBM Plex Sans", sans-serif;
+  --font-mono: "IBM Plex Mono", monospace;
+
+  --text-xs: 0.75rem;
+  --text-sm: 0.875rem;
+  --text-base: 1rem;
+  --text-md: 1.25rem;
+  --text-lg: 1.5625rem;
+  --text-xl: 1.953rem;
+
+  --space-3xs: 0.125rem;
+  --space-2xs: 0.25rem;
+  --space-xs: 0.5rem;
+  --space-sm: 0.75rem;
+  --space-md: 1rem;
+  --space-lg: 1.5rem;
+  --space-xl: 2.5rem;
+  --space-2xl: 4rem;
+
+  --radius-control: 0.375rem;
+  --radius-panel: 0.625rem;
+  --radius-sheet: 0.875rem;
+
+  --shadow-panel: 0 1px 2px oklch(0.225 0.021 255 / 0.05);
+  --shadow-sheet: 0 -12px 32px oklch(0.225 0.021 255 / 0.14);
+  --shadow-dialog: 0 20px 56px oklch(0.225 0.021 255 / 0.18);
+
+  --z-base: 1;
+  --z-raised: 10;
+  --z-dropdown: 100;
+  --z-sticky: 200;
+  --z-modal: 400;
+  --z-toast: 500;
+  --z-tooltip: 600;
+
+  --dur-micro: 120ms;
+  --dur-short: 220ms;
+  --dur-long: 300ms;
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in: cubic-bezier(0.7, 0, 0.84, 0);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+}

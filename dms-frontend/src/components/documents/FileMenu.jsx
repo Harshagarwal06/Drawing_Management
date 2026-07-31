@@ -21,8 +21,10 @@ export default function FileMenu({ onEditMetadata, onRename, onMove, onSupersede
         btnRef.current  && !btnRef.current.contains(e.target)
       ) setOpen(false);
     };
+    const onKeyDown = event => { if (event.key === "Escape") setOpen(false); };
     document.addEventListener("mousedown", close);
-    return () => document.removeEventListener("mousedown", close);
+    window.addEventListener("keydown", onKeyDown);
+    return () => { document.removeEventListener("mousedown", close); window.removeEventListener("keydown", onKeyDown); };
   }, [open]);
 
   const toggle = e => {
@@ -44,7 +46,7 @@ export default function FileMenu({ onEditMetadata, onRename, onMove, onSupersede
       <button
         ref={btnRef}
         onClick={toggle}
-        className="p-1 rounded-lg text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-colors shrink-0"
+        className="mobile-touch-target grid place-items-center rounded-lg text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-colors shrink-0"
         title="More actions"
         aria-label="More actions"
       >
@@ -54,14 +56,14 @@ export default function FileMenu({ onEditMetadata, onRename, onMove, onSupersede
       {open && createPortal(
         <div
           ref={menuRef}
-          style={{ position: "fixed", top: pos.top, left: pos.left, zIndex: 9999, width: FILE_MENU_W }}
-          className="bg-white border border-border-slate rounded-xl shadow-xl py-1 overflow-hidden"
+          style={{ position: "fixed", top: pos.top, left: pos.left, width: FILE_MENU_W }}
+          className="z-[400] bg-white border border-border-slate rounded-xl shadow-xl py-1 overflow-hidden"
           onClick={e => e.stopPropagation()}
         >
           {onEditMetadata && (
             <button
               onClick={() => { onEditMetadata(); close(); }}
-              className="w-full flex items-center gap-2.5 px-4 py-2.5 text-[13px] font-medium text-on-surface hover:bg-surface-container-low transition-colors text-left"
+              className="w-full min-h-11 flex items-center gap-2.5 px-4 py-2.5 text-[13px] font-medium text-on-surface hover:bg-surface-container-low transition-colors text-left"
             >
               <FileEdit size={13} className="text-on-surface-variant shrink-0" />
               Edit Metadata
@@ -70,7 +72,7 @@ export default function FileMenu({ onEditMetadata, onRename, onMove, onSupersede
           {onRename && (
             <button
               onClick={() => { onRename(); close(); }}
-              className="w-full flex items-center gap-2.5 px-4 py-2.5 text-[13px] font-medium text-on-surface hover:bg-surface-container-low transition-colors text-left"
+              className="w-full min-h-11 flex items-center gap-2.5 px-4 py-2.5 text-[13px] font-medium text-on-surface hover:bg-surface-container-low transition-colors text-left"
             >
               <Pencil size={13} className="text-on-surface-variant shrink-0" />
               Rename
@@ -79,7 +81,7 @@ export default function FileMenu({ onEditMetadata, onRename, onMove, onSupersede
           {onMove && (
             <button
               onClick={() => { onMove(); close(); }}
-              className="w-full flex items-center gap-2.5 px-4 py-2.5 text-[13px] font-medium text-on-surface hover:bg-surface-container-low transition-colors text-left"
+              className="w-full min-h-11 flex items-center gap-2.5 px-4 py-2.5 text-[13px] font-medium text-on-surface hover:bg-surface-container-low transition-colors text-left"
             >
               <FolderInput size={13} className="text-on-surface-variant shrink-0" />
               Move to Folder
@@ -88,7 +90,7 @@ export default function FileMenu({ onEditMetadata, onRename, onMove, onSupersede
           {onSupersede && (
             <button
               onClick={() => { onSupersede(); close(); }}
-              className="w-full flex items-center gap-2.5 px-4 py-2.5 text-[13px] font-medium text-on-surface hover:bg-surface-container-low transition-colors text-left"
+              className="w-full min-h-11 flex items-center gap-2.5 px-4 py-2.5 text-[13px] font-medium text-on-surface hover:bg-surface-container-low transition-colors text-left"
             >
               <RefreshCcw size={13} className="text-on-surface-variant shrink-0" />
               Upload New Revision
@@ -97,7 +99,7 @@ export default function FileMenu({ onEditMetadata, onRename, onMove, onSupersede
           {onViewHistory && (
             <button
               onClick={() => { onViewHistory(); close(); }}
-              className="w-full flex items-center gap-2.5 px-4 py-2.5 text-[13px] font-medium text-on-surface hover:bg-surface-container-low transition-colors text-left"
+              className="w-full min-h-11 flex items-center gap-2.5 px-4 py-2.5 text-[13px] font-medium text-on-surface hover:bg-surface-container-low transition-colors text-left"
             >
               <History size={13} className="text-on-surface-variant shrink-0" />
               Revision History
@@ -108,7 +110,7 @@ export default function FileMenu({ onEditMetadata, onRename, onMove, onSupersede
           <div className="h-px bg-border-slate mx-2 my-1" />
           <button
             onClick={() => { onDelete(); close(); }}
-            className="w-full flex items-center gap-2.5 px-4 py-2.5 text-[13px] font-medium text-red-600 hover:bg-red-50 transition-colors text-left"
+            className="w-full min-h-11 flex items-center gap-2.5 px-4 py-2.5 text-[13px] font-medium text-red-600 hover:bg-red-50 transition-colors text-left"
           >
             <Trash2 size={13} className="text-red-500 shrink-0" />
             Delete

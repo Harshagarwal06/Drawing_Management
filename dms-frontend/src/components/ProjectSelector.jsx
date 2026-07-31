@@ -21,7 +21,7 @@ export default function ProjectSelector({ projects, activeProject, onChange, onN
       {/* Trigger */}
       <button
         onClick={() => setOpen(o => !o)}
-        className="flex items-center gap-3 bg-surface-container-low hover:bg-surface-container border border-outline-variant rounded-xl px-4 py-2.5 transition-all focus:outline-none focus:ring-2 focus:ring-primary/20 min-w-[200px]"
+        className="flex items-center gap-3 bg-surface-container-low hover:bg-surface-container border border-outline-variant rounded-xl px-4 py-2.5 transition-colors focus:outline-none focus:ring-2 focus:ring-primary/20 min-w-[200px]"
       >
         <span
           className="w-3 h-3 rounded-full shrink-0"

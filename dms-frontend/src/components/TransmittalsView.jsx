@@ -103,7 +103,7 @@ export default function TransmittalsView({ transmittals = [], drawings = [], loa
             const hiddenCount    = allDrawings.length - TRUNCATE_AT;
 
             return (
-              <div key={t.id} className="bg-surface border border-outline-variant rounded-xl p-5 shadow-card hover:shadow-card-md transition-shadow">
+              <article key={t.id} className="bg-surface border border-outline-variant rounded-xl p-4 sm:p-5 shadow-card">
                 <div className="flex flex-col md:flex-row md:items-start gap-4">
 
                   {/* Left: number + purpose + date */}
@@ -141,7 +141,7 @@ export default function TransmittalsView({ transmittals = [], drawings = [], loa
                       {!isExpanded && hiddenCount > 0 && (
                         <button
                           onClick={() => toggleExpand(t.id)}
-                          className="px-2 py-1 rounded bg-primary/10 border border-primary/20 text-primary text-[11px] font-medium hover:bg-primary/20 transition-colors"
+                          className="min-h-11 px-3 py-2 rounded-md bg-primary/10 border border-primary/20 text-primary text-[12px] font-medium hover:bg-primary/20 transition-colors"
                         >
                           +{hiddenCount} more
                         </button>
@@ -151,7 +151,7 @@ export default function TransmittalsView({ transmittals = [], drawings = [], loa
                       {isExpanded && allDrawings.length > TRUNCATE_AT && (
                         <button
                           onClick={() => toggleExpand(t.id)}
-                          className="px-2 py-1 rounded bg-surface-container border border-outline-variant text-on-surface-variant text-[11px] font-medium hover:bg-surface-container-high transition-colors"
+                          className="min-h-11 px-3 py-2 rounded-md bg-surface-container border border-outline-variant text-on-surface-variant text-[12px] font-medium hover:bg-surface-container-high transition-colors"
                         >
                           Show less
                         </button>
@@ -187,7 +187,7 @@ export default function TransmittalsView({ transmittals = [], drawings = [], loa
                                 </span>
                                 <button
                                   onClick={() => copyLink(ack.ackUrl)}
-                                  className="shrink-0 p-1 rounded-md text-on-surface-variant hover:text-primary hover:bg-surface-container transition-colors"
+                                  className="shrink-0 mobile-touch-target grid place-items-center rounded-md text-on-surface-variant hover:text-primary hover:bg-surface-container transition-colors"
                                   title="Copy acknowledgment link"
                                   aria-label={`Copy acknowledgment link for ${name}`}
                                 >
@@ -203,14 +203,14 @@ export default function TransmittalsView({ transmittals = [], drawings = [], loa
                     </div>
                     <button
                       onClick={() => openTransmittalPdf(t, token).catch(() => window.alert("Could not open the transmittal PDF. Please try again."))}
-                      className="mt-1 inline-flex items-center gap-1.5 text-[11px] font-medium text-primary hover:underline w-fit"
+                      className="mt-1 min-h-11 inline-flex items-center gap-1.5 text-[12px] font-semibold text-primary hover:underline w-fit whitespace-nowrap"
                     >
                       <span className="material-symbols-outlined text-[14px]">download</span>
                       Download PDF
                     </button>
                   </div>
                 </div>
-              </div>
+              </article>
             );
           })}
         </div>
