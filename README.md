@@ -31,12 +31,19 @@ registers, revision history, and transmittals across multiple projects.
   CSV export (Director only).
 - **JWT auth with server-side revocation** — stateless tokens backed by a per-user
   `token_version`, so a password reset or deactivation invalidates existing sessions immediately.
+- **Installable PWA with a role-based mobile UI** — a service worker (Workbox via
+  `vite-plugin-pwa`) precaches the app shell for install-to-home-screen use and shows an
+  update-available banner the user controls; a role-based bottom navigation bar replaces the
+  sidebar under 768px. Deliberately **not** offline-first for data: every `/api`, `/uploads`,
+  and signed file-URL request is routed `NetworkOnly` and an offline banner tells the user
+  live data is unavailable, rather than silently serving stale drawings.
 
 ## Architecture
 
 ```mermaid
 flowchart LR
-    subgraph Client
+    subgraph Browser
+        SW["Service worker\n(app shell cache only)"]
         FE["React 19 SPA (Vite)"]
     end
     subgraph Railway
@@ -49,6 +56,7 @@ flowchart LR
     end
     Mail["SMTP (Nodemailer)"]
 
+    SW -. "precached JS/CSS/HTML" .-> FE
     FE -- "JWT Bearer" --> API
     API -- "sync queries" --> DB
     API -- "signed upload/download URLs" --> Files
@@ -58,15 +66,19 @@ flowchart LR
 
 The frontend is a single-page React app that authenticates via JWT and drives all state from
 `App.jsx` (projects → drawings/transmittals fetched per active project, always re-fetched after
-a mutation — no optimistic updates). The backend is a single Express app (`server.js`) fronting
-SQLite, with Cloudflare R2 for file storage and Nodemailer for transactional email. Both deploy
-independently and automatically: frontend to Vercel, backend to Railway, on every push to `main`.
+a mutation — no optimistic updates). Below 768px, a role-based bottom navigation bar
+(`MobileBottomNav.jsx`) replaces the sidebar; a `PwaManager` component handles install prompts,
+online/offline status, and service-worker update banners. The backend is a single Express app
+(`server.js`) fronting SQLite, with Cloudflare R2 for file storage and Nodemailer for
+transactional email. Both deploy independently and automatically: frontend to Vercel, backend
+to Railway, on every push to `main`.
 
 ## Tech stack
 
 | Layer | Technology |
 |---|---|
 | Frontend | React 19, Vite 8, Tailwind CSS 3, React Router 7, lucide-react |
+| PWA / mobile | `vite-plugin-pwa` (Workbox service worker, install prompt, web app manifest) |
 | Backend | Node.js, Express 4, better-sqlite3, multer, bcrypt, jsonwebtoken, helmet, express-rate-limit |
 | File storage | Cloudflare R2 (S3-compatible, via `@aws-sdk/client-s3`) |
 | Email | Nodemailer (SMTP) |
@@ -102,7 +114,7 @@ see `dms-backend/.env.example` for the full list of required/optional variables,
 
 ```bash
 cd dms-backend  && npm test && npm run lint   # 61 tests (Jest)
-cd dms-frontend && npm test && npm run lint   # 12 tests (Vitest)
+cd dms-frontend && npm test && npm run lint   # 35 tests (Vitest)
 ```
 
 Both suites currently pass, and `npm run build` (frontend) produces a working production
