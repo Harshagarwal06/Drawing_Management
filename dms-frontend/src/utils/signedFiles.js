@@ -1,5 +1,5 @@
 import { API } from "../components/documents/constants";
-import { isNative, openExternal } from "./native";
+import { isNative, isAndroid, openExternal, openFileNative, shareFileNative } from "./native";
 
 export function fileNameFromPath(path = "") {
   const raw = String(path || "");
@@ -22,12 +22,21 @@ async function fetchSignedFileUrl(endpoint, token) {
   return res.json();
 }
 
-async function openSignedFile(endpoint, token) {
+/* On Android the signed URL is never handed to the in-app browser: Chrome
+   Custom Tabs cannot render PDFs or CAD files. The bytes are cached and
+   passed to the OS instead — a viewer app for "view", the share sheet for
+   "download" — and awaited so a failure reaches the caller's .catch().
+   iOS and web are unchanged. */
+async function openSignedFile(endpoint, token, mode = "view") {
   let popup = null;
   if (!isNative()) popup = window.open("about:blank", "_blank", "noopener");
   try {
-    const { url } = await fetchSignedFileUrl(endpoint, token);
-    if (isNative()) {
+    const { url, filename } = await fetchSignedFileUrl(endpoint, token);
+    if (isAndroid()) {
+      const name = filename || fileNameFromPath(url);
+      if (mode === "download") await shareFileNative(url, name);
+      else await openFileNative(url, name);
+    } else if (isNative()) {
       openExternal(url);
     } else if (popup) {
       popup.location.href = url;
@@ -54,11 +63,11 @@ export function revisionFileEndpoint(drawing, revision, mode = "view") {
 }
 
 export function openSignedDrawingFile(drawing, token, mode = "view") {
-  return openSignedFile(drawingFileEndpoint(drawing, mode), token);
+  return openSignedFile(drawingFileEndpoint(drawing, mode), token, mode);
 }
 
 export function openSignedRevisionFile(drawing, revision, token, mode = "view") {
-  return openSignedFile(revisionFileEndpoint(drawing, revision, mode), token);
+  return openSignedFile(revisionFileEndpoint(drawing, revision, mode), token, mode);
 }
 
 export function transmittalPdfEndpoint(transmittal) {

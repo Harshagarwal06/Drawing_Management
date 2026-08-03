@@ -2,9 +2,11 @@ import { Capacitor } from "@capacitor/core";
 import { App } from "@capacitor/app";
 import { Browser } from "@capacitor/browser";
 import { Filesystem, Directory } from "@capacitor/filesystem";
+import { FileOpener } from "@capacitor-community/file-opener";
 import { Share } from "@capacitor/share";
 
 export const isNative = () => Capacitor.isNativePlatform();
+export const isAndroid = () => Capacitor.getPlatform() === "android";
 
 /* Register Android/iOS lifecycle listeners. No-op on web.
    - back button: navigate back through history, exit the app at the root
@@ -41,6 +43,77 @@ export function openExternal(url) {
   if (!url) return;
   if (isNative()) Browser.open({ url });
   else window.open(url, "_blank", "noopener");
+}
+
+/* Android only. Documents must not go through the in-app browser there:
+   Chrome Custom Tabs has no inline PDF viewer (it falls back to a download
+   prompt) and no browser renders CAD formats at all, so a DWG tap did
+   nothing. Instead we cache the bytes and hand them to the OS via
+   ACTION_VIEW, which lets the user's own PDF/DWG app take over. iOS keeps
+   using openExternal, where SFSafariViewController renders PDFs natively. */
+const MIME_TYPES = {
+  pdf:  "application/pdf",
+  jpg:  "image/jpeg",
+  jpeg: "image/jpeg",
+  png:  "image/png",
+  tif:  "image/tiff",
+  tiff: "image/tiff",
+  doc:  "application/msword",
+  docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  xls:  "application/vnd.ms-excel",
+  xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+};
+
+// CAD formats (dwg, dxf, ifc, rvt, nwd) have no MIME type Android reliably
+// maps to an installed app, so they resolve to the wildcard type, which
+// forces the chooser and lists every viewer that can take the file.
+export const WILDCARD_MIME = "*/*";
+
+export function mimeTypeFor(filename) {
+  const ext = String(filename || "").toLowerCase().split(".").pop();
+  return MIME_TYPES[ext] || WILDCARD_MIME;
+}
+
+/* Strip directory separators so a server-supplied name can't escape the
+   cache directory it is written into. */
+function safeCacheName(filename) {
+  const base = String(filename || "").split(/[\\/]/).pop().trim();
+  if (!base || base === "." || base === "..") return "drawing-file";
+  return base;
+}
+
+/* Fetch a signed file URL into the cache directory and resolve its file://
+   URI. getUri is asked for the location explicitly rather than trusting the
+   shape of downloadFile's return value, which differs by platform. */
+async function downloadToCache(url, name) {
+  await Filesystem.downloadFile({ url, path: name, directory: Directory.Cache });
+  const { uri } = await Filesystem.getUri({ path: name, directory: Directory.Cache });
+  if (!uri) throw new Error("Could not save the file to open it.");
+  return uri;
+}
+
+/* Download a signed file URL to the cache, then open it in a native viewer. */
+export async function openFileNative(url, filename) {
+  const name = safeCacheName(filename);
+  const contentType = mimeTypeFor(name);
+  const uri = await downloadToCache(url, name);
+  await FileOpener.open({
+    filePath: uri,
+    contentType,
+    // A known type opens straight in the default viewer; the wildcard has no
+    // sensible default, so always let the user pick.
+    openWithDefault: contentType !== WILDCARD_MIME,
+  });
+  return uri;
+}
+
+/* Download a signed file URL to the cache, then offer the native share sheet
+   so the file can be saved out of the app. */
+export async function shareFileNative(url, filename) {
+  const name = safeCacheName(filename);
+  const uri = await downloadToCache(url, name);
+  await Share.share({ title: name, url: uri });
+  return uri;
 }
 
 /* onClick for <a target="_blank" / download> anchors — keeps normal web
