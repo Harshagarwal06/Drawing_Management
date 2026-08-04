@@ -12,7 +12,7 @@ vi.mock("@capacitor/filesystem", () => ({
 vi.mock("@capacitor-community/file-opener", () => ({ FileOpener: { open: vi.fn() } }));
 vi.mock("@capacitor/share", () => ({ Share: { share: vi.fn() } }));
 
-const { mimeTypeFor, WILDCARD_MIME } = await import("./native");
+const { mimeTypeFor, FALLBACK_MIME } = await import("./native");
 
 describe("mimeTypeFor", () => {
   it("maps types Android can open directly", () => {
@@ -23,17 +23,29 @@ describe("mimeTypeFor", () => {
     );
   });
 
-  // CAD files have no MIME type Android maps to an installed app; the
-  // wildcard forces the chooser so the user's DWG viewer is offered.
-  it("falls back to the wildcard for CAD formats", () => {
-    for (const name of ["site.dwg", "site.dxf", "model.ifc", "model.rvt", "model.nwd"]) {
-      expect(mimeTypeFor(name)).toBe(WILDCARD_MIME);
-    }
+  // These are the exact types CAD viewers register for — verified against DWG
+  // FastView (com.gstarmc.android) with `cmd package query-activities`.
+  it("maps CAD formats to the types CAD viewers register", () => {
+    expect(mimeTypeFor("site.dwg")).toBe("image/vnd.dwg");
+    expect(mimeTypeFor("site.DXF")).toBe("image/vnd.dxf");
+    expect(mimeTypeFor("model.ifc")).toBe("application/ifc");
+    expect(mimeTypeFor("model.rvt")).toBe("application/rvt");
+    expect(mimeTypeFor("model.nwd")).toBe("application/nwd");
   });
 
-  it("falls back to the wildcard for missing or extensionless names", () => {
-    expect(mimeTypeFor("")).toBe(WILDCARD_MIME);
-    expect(mimeTypeFor(undefined)).toBe(WILDCARD_MIME);
-    expect(mimeTypeFor("drawing")).toBe(WILDCARD_MIME);
+  it("falls back to a real binary type for missing or extensionless names", () => {
+    expect(mimeTypeFor("")).toBe(FALLBACK_MIME);
+    expect(mimeTypeFor(undefined)).toBe(FALLBACK_MIME);
+    expect(mimeTypeFor("drawing")).toBe(FALLBACK_MIME);
+  });
+
+  // The regression guard that matters: "*/*" resolves to zero activities on
+  // Android, which is what hid DWG FastView from the chooser.
+  it("never returns the wildcard type", () => {
+    const names = [
+      "a.dwg", "a.dxf", "a.ifc", "a.rvt", "a.nwd", "a.pdf", "a.png", "a.docx",
+      "a.unknown", "noextension", "", undefined, null, "a.", ".dwg",
+    ];
+    for (const name of names) expect(mimeTypeFor(name)).not.toBe("*/*");
   });
 });

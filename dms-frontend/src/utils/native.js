@@ -62,16 +62,24 @@ const MIME_TYPES = {
   docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
   xls:  "application/vnd.ms-excel",
   xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  // CAD viewers register these exact types. Verified against DWG FastView
+  // (com.gstarmc.android) with `cmd package query-activities`.
+  dwg:  "image/vnd.dwg",
+  dxf:  "image/vnd.dxf",
+  ifc:  "application/ifc",
+  rvt:  "application/rvt",
+  nwd:  "application/nwd",
 };
 
-// CAD formats (dwg, dxf, ifc, rvt, nwd) have no MIME type Android reliably
-// maps to an installed app, so they resolve to the wildcard type, which
-// forces the chooser and lists every viewer that can take the file.
-export const WILDCARD_MIME = "*/*";
+// Never dispatch the wildcard type: it resolves to ZERO activities, so the
+// chooser opens with "no application can perform this action" even when a
+// capable app is installed. application/octet-stream is the generic binary
+// type that real viewers do register for.
+export const FALLBACK_MIME = "application/octet-stream";
 
 export function mimeTypeFor(filename) {
   const ext = String(filename || "").toLowerCase().split(".").pop();
-  return MIME_TYPES[ext] || WILDCARD_MIME;
+  return MIME_TYPES[ext] || FALLBACK_MIME;
 }
 
 /* Strip directory separators so a server-supplied name can't escape the
@@ -102,7 +110,7 @@ export async function openFileNative(url, filename) {
     contentType,
     // A known type opens straight in the default viewer; the wildcard has no
     // sensible default, so always let the user pick.
-    openWithDefault: contentType !== WILDCARD_MIME,
+    openWithDefault: contentType !== FALLBACK_MIME,
   });
   return uri;
 }
